@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l routes/api/*.js views/*.ejs views/admin/*.ejs)",
+      "Bash(find /c/Users/xiner/Desktop/serve/website/Aeoleaf -name *.html -type f)",
+      "Bash(find /c/Users/xiner/Desktop/serve/website/Aeoleaf -maxdepth 2 -type d -not -path */node_modules* -not -path */database*)",
+      "Bash(wc:*)",
+      "WebFetch(domain:rw0ter.tech)",
+      "Bash(grep -n \"nav-logo\" views/*.ejs)",
+      "Bash(grep -n \"admin/login\" views/*.ejs)",
+      "Bash(git config:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

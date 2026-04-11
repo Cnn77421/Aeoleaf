@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <meta name="description" content="浏览所有博客文章，分享技术见解和创意思考">
+  <meta name="keywords" content="博客,文章,技术博客,编程">
+  <meta name="author" content="aeoleaf">
+  <meta name="theme-color" content="#3A7D44">
+  <link rel="canonical" href="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/blog">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="<%= title %>">
+  <meta property="og:description" content="浏览所有博客文章，分享技术见解和创意思考">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/blog">
+  <meta property="og:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/images/logo.png">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="<%= title %>">
+  <meta name="twitter:description" content="浏览所有博客文章，分享技术见解和创意思考">
+  <meta name="twitter:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/images/logo.png">
+
+  <!-- RSS Feed -->
+  <link rel="alternate" type="application/rss+xml" title="RSS Feed" href="/rss.xml">
+
+  <link rel="icon" type="image/png" href="/images/logo.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Lora:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css?v=4">
+  <link rel="stylesheet" href="/css/blog.css?v=4">
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav-container">
+      <a href="/" class="nav-logo">
+        <span>Aeoleaf <span class="nav-logo-zh">风叶</span></span>
+      </a>
+      <div class="nav-right">
+        <ul class="nav-links">
+          <li><a href="/blog">Blog</a></li>
+          <li><a href="/works">Works</a></li>
+          <li><a href="/about">About</a></li>
+        </ul>
+        <button id="search-toggle" class="search-toggle" aria-label="Toggle search">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+        </button>
+        <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+      </div>
+    </nav>
+  </header>
+  <div id="search-modal" class="search-modal">
+    <div class="search-modal-content">
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="搜索文章和作品...">
+        <button id="search-close">✕</button>
+      </div>
+      <div id="search-results"></div>
+    </div>
+  </div>
+  <main class="site-main">
+    <div class="content-container">
+      <h1>Blog</h1>
+      <% if (posts.length === 0) { %>
+        <p class="empty-state">No posts yet.</p>
+      <% } else { %>
+        <div class="blog-list">
+          <% posts.forEach(post => { %>
+          <article class="blog-item">
+            <time class="blog-date"><%= new Date(post.created_at).toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'}) %></time>
+            <h2><a href="/blog/<%= post.slug %>"><%= post.title %></a></h2>
+            <% if (post.excerpt) { %><p class="blog-excerpt"><%= post.excerpt %></p><% } %>
+            <% if (post.tags.length > 0) { %>
+            <div class="tags">
+              <% post.tags.forEach(tag => { %><span class="tag"><%= tag %></span><% }); %>
+            </div>
+            <% } %>
+          </article>
+          <% }); %>
+        </div>
+        <% if (totalPages > 1) { %>
+        <nav class="pagination">
+          <% if (page > 1) { %><a href="/blog?page=<%= page - 1 %>">← Newer</a><% } %>
+          <% if (page < totalPages) { %><a href="/blog?page=<%= page + 1 %>">Older →</a><% } %>
+        </nav>
+        <% } %>
+      <% } %>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-content">
+      <div class="footer-section">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+            <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
+          </svg>
+          aeoleaf 风叶
+        </h3>
+        <p>个人博客与作品集</p>
+      </div>
+      <div class="footer-section">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+          导航
+        </h3>
+        <ul>
+          <li><a href="/">首页</a></li>
+          <li><a href="/blog">博客</a></li>
+          <li><a href="/works">作品</a></li>
+          <li><a href="/about">关于</a></li>
+        </ul>
+      </div>
+      <div class="footer-section">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+            <polyline points="22,6 12,13 2,6"></polyline>
+          </svg>
+          联系
+        </h3>
+        <ul>
+          <li>
+            <a href="mailto:xiner521@aliyun.com">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="4"></circle>
+                <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
+              </svg>
+              邮箱
+            </a>
+          </li>
+          <li>
+            <a href="https://github.com/Cnn77421" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+              </svg>
+              GitHub
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; <%= new Date().getFullYear() %> aeoleaf. All rights reserved.</p>
+      <p><a href="/admin/login" style="opacity:0;font-size:0;user-select:none;">.</a></p>
+    </div>
+  </footer>
+  <button id="back-to-top" aria-label="Back to top">↑</button>
+  <script src="/js/main.js"></script>
+</body>
+</html>

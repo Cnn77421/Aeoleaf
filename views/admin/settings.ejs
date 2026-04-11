@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body class="admin-body">
+  <aside class="admin-sidebar">
+    <div class="admin-logo">
+      <a href="/">aeoleaf <span>风叶</span></a>
+    </div>
+    <nav class="admin-nav">
+      <a href="/admin/dashboard">Dashboard</a>
+      <a href="/admin/posts">Posts</a>
+      <a href="/admin/works">Works</a>
+      <a href="/admin/settings">Settings</a>
+    </nav>
+    <div class="admin-footer">
+      <a href="/" target="_blank">View Site</a>
+      <form method="POST" action="/admin/logout" style="margin-top:0.5rem">
+        <button type="submit" class="btn-link">Log Out</button>
+      </form>
+    </div>
+  </aside>
+  <main class="admin-main">
+    <div class="admin-header">
+      <h1>Settings</h1>
+    </div>
+    <form method="POST" action="/admin/settings" class="settings-form">
+      <div class="form-group">
+        <label>Site Title</label>
+        <input type="text" name="site_title" value="<%= settings.site_title || '' %>">
+      </div>
+      <div class="form-group">
+        <label>Site Subtitle</label>
+        <input type="text" name="site_subtitle" value="<%= settings.site_subtitle || '' %>">
+      </div>
+      <div class="form-group">
+        <label>About Text (Markdown)</label>
+        <textarea name="about_text" rows="10"><%= settings.about_text || '' %></textarea>
+      </div>
+      <div class="form-group">
+        <label>About Image URL</label>
+        <input type="text" name="about_image" value="<%= settings.about_image || '' %>">
+      </div>
+      <button type="submit" class="btn-primary">Save Settings</button>
+    </form>
+  </main>
+  <script src="/js/toast.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

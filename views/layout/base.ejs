@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Lora:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css?v=2">
+  <link rel="stylesheet" href="/css/blog.css?v=2">
+  <link rel="stylesheet" href="/css/works.css?v=2">
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav-container">
+      <a href="/" class="nav-logo">aeoleaf <span class="nav-logo-zh">风叶</span></a>
+      <div class="nav-right">
+        <ul class="nav-links">
+          <li><a href="/blog">Blog</a></li>
+          <li><a href="/works">Works</a></li>
+          <li><a href="/about">About</a></li>
+        </ul>
+        <button id="search-toggle" class="search-toggle" aria-label="Toggle search">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+        </button>
+        <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+        <button class="nav-toggle" aria-label="Toggle menu">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </nav>
+  </header>
+  <div id="search-modal" class="search-modal">
+    <div class="search-modal-content">
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="搜索文章和作品...">
+        <button id="search-close">✕</button>
+      </div>
+      <div id="search-results"></div>
+    </div>
+  </div>
+  <main class="site-main">
+    <%- body %>
+  </main>
+  <footer class="site-footer">
+    <p>风叶 <a href="/admin/login" style="opacity:0;font-size:0;user-select:none;">.</a></p>
+  </footer>
+  <script src="/js/main.js"></script>
+</body>
+</html>

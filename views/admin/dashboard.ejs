@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body class="admin-body">
+  <aside class="admin-sidebar">
+    <div class="admin-logo">
+      <a href="/">aeoleaf <span>风叶</span></a>
+    </div>
+    <nav class="admin-nav">
+      <a href="/admin/dashboard">Dashboard</a>
+      <a href="/admin/posts">Posts</a>
+      <a href="/admin/works">Works</a>
+      <a href="/admin/settings">Settings</a>
+    </nav>
+    <div class="admin-footer">
+      <a href="/" target="_blank">View Site</a>
+      <form method="POST" action="/admin/logout" style="margin-top:0.5rem">
+        <button type="submit" class="btn-link">Log Out</button>
+      </form>
+    </div>
+  </aside>
+  <main class="admin-main">
+    <div class="dashboard-container">
+      <div class="dashboard-welcome">
+        <h1>Welcome back</h1>
+        <p class="dashboard-subtitle">Here's what's happening with your content</p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card stat-published">
+          <div class="stat-header">
+            <span class="stat-label">Published</span>
+            <span class="stat-badge">Posts</span>
+          </div>
+          <div class="stat-value"><%= stats.postsPublished %></div>
+        </div>
+        <div class="stat-card stat-draft">
+          <div class="stat-header">
+            <span class="stat-label">Drafts</span>
+            <span class="stat-badge">Posts</span>
+          </div>
+          <div class="stat-value"><%= stats.postsDraft %></div>
+        </div>
+        <div class="stat-card stat-works">
+          <div class="stat-header">
+            <span class="stat-label">Portfolio</span>
+            <span class="stat-badge">Works</span>
+          </div>
+          <div class="stat-value"><%= stats.worksTotal %></div>
+        </div>
+      </div>
+
+      <div class="quick-actions">
+        <a href="/admin/posts/new" class="action-card action-post">
+          <div class="action-content">
+            <h3>New Post</h3>
+            <p>Write a new blog post</p>
+          </div>
+          <span class="action-arrow">→</span>
+        </a>
+        <a href="/admin/works/new" class="action-card action-work">
+          <div class="action-content">
+            <h3>New Work</h3>
+            <p>Add a portfolio piece</p>
+          </div>
+          <span class="action-arrow">→</span>
+        </a>
+      </div>
+      <div class="recent-grid">
+        <div class="recent-section">
+          <h2>Recent Posts</h2>
+          <% if (recentPosts.length === 0) { %>
+            <p class="empty-state">No posts yet. <a href="/admin/posts/new">Create your first post</a></p>
+          <% } else { %>
+            <div class="recent-list">
+              <% recentPosts.forEach(post => { %>
+              <div class="recent-item">
+                <a href="/admin/posts/<%= post.id %>/edit" class="recent-title"><%= post.title %></a>
+                <span class="badge badge-<%= post.status %>"><%= post.status %></span>
+              </div>
+              <% }); %>
+            </div>
+            <a href="/admin/posts" class="view-all">View all posts →</a>
+          <% } %>
+        </div>
+        <div class="recent-section">
+          <h2>Recent Works</h2>
+          <% if (recentWorks.length === 0) { %>
+            <p class="empty-state">No works yet. <a href="/admin/works/new">Create your first work</a></p>
+          <% } else { %>
+            <div class="recent-list">
+              <% recentWorks.forEach(work => { %>
+              <div class="recent-item">
+                <a href="/admin/works/<%= work.id %>/edit" class="recent-title"><%= work.title %></a>
+                <span class="recent-meta"><%= work.year || '-' %></span>
+              </div>
+              <% }); %>
+            </div>
+            <a href="/admin/works" class="view-all">View all works →</a>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="/js/toast.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

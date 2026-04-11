@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <meta name="description" content="<%= work.description || work.title %>">
+  <meta name="keywords" content="<%= work.tags.join(',') %>">
+  <meta name="author" content="aeoleaf">
+  <meta name="theme-color" content="#3A7D44">
+  <link rel="canonical" href="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/works/<%= work.slug %>">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="<%= work.title %>">
+  <meta property="og:description" content="<%= work.description || work.title %>">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/works/<%= work.slug %>">
+  <% if (work.cover_image) { %>
+  <meta property="og:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %><%= work.cover_image %>">
+  <% } else { %>
+  <meta property="og:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/images/logo.png">
+  <% } %>
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="<%= work.title %>">
+  <meta name="twitter:description" content="<%= work.description || work.title %>">
+  <% if (work.cover_image) { %>
+  <meta name="twitter:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %><%= work.cover_image %>">
+  <% } else { %>
+  <meta name="twitter:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/images/logo.png">
+  <% } %>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Lora:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css?v=4">
+  <link rel="stylesheet" href="/css/works.css?v=4">
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav-container">
+      <a href="/" class="nav-logo">Aeoleaf <span class="nav-logo-zh">风叶</span></a>
+      <div class="nav-right">
+        <ul class="nav-links">
+          <li><a href="/blog">Blog</a></li>
+          <li><a href="/works">Works</a></li>
+          <li><a href="/about">About</a></li>
+        </ul>
+        <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+      </div>
+    </nav>
+  </header>
+  <main class="site-main">
+    <div class="work-detail">
+      <nav class="breadcrumb">
+        <a href="/">首页</a>
+        <span class="breadcrumb-separator">›</span>
+        <a href="/works">作品</a>
+        <span class="breadcrumb-separator">›</span>
+        <span class="breadcrumb-current"><%= work.title %></span>
+      </nav>
+      <aside class="work-sidebar">
+        <% if (work.cover_image) { %>
+        <img src="<%= work.cover_image %>" alt="<%= work.title %>" class="work-cover">
+        <% } %>
+        <h1><%= work.title %></h1>
+        <% if (work.year) { %><p class="work-year"><%= work.year %></p><% } %>
+        <% if (work.tags.length > 0) { %>
+        <div class="tags">
+          <% work.tags.forEach(tag => { %><span class="tag"><%= tag %></span><% }); %>
+        </div>
+        <% } %>
+        <% if (work.url) { %>
+        <a href="<%= work.url %>" target="_blank" class="btn-primary">Visit Project</a>
+        <% } %>
+      </aside>
+      <div class="work-content">
+        <% if (work.images.length > 0) { %>
+        <div class="work-images">
+          <% work.images.forEach(img => { %>
+          <img src="<%= img %>" alt="<%= work.title %>">
+          <% }); %>
+        </div>
+        <% } %>
+        <% if (work.html) { %>
+        <div class="prose">
+          <%- work.html %>
+        </div>
+        <% } %>
+      </div>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-content">
+      <div class="footer-section">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+            <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
+          </svg>
+          aeoleaf 风叶
+        </h3>
+        <p>个人博客与作品集</p>
+      </div>
+      <div class="footer-section">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+          导航
+        </h3>
+        <ul>
+          <li><a href="/">首页</a></li>
+          <li><a href="/blog">博客</a></li>
+          <li><a href="/works">作品</a></li>
+          <li><a href="/about">关于</a></li>
+        </ul>
+      </div>
+      <div class="footer-section">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+            <polyline points="22,6 12,13 2,6"></polyline>
+          </svg>
+          联系
+        </h3>
+        <ul>
+          <li>
+            <a href="mailto:xiner521@aliyun.com">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="4"></circle>
+                <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
+              </svg>
+              邮箱
+            </a>
+          </li>
+          <li>
+            <a href="https://github.com/Cnn77421" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+              </svg>
+              GitHub
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; <%= new Date().getFullYear() %> aeoleaf. All rights reserved.</p>
+      <p><a href="/admin/login" style="opacity:0;font-size:0;user-select:none;">.</a></p>
+    </div>
+  </footer>
+  <button id="back-to-top" aria-label="Back to top">↑</button>
+  <script src="/js/main.js"></script>
+</body>
+</html>

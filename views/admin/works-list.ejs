@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body class="admin-body">
+  <aside class="admin-sidebar">
+    <div class="admin-logo">
+      <a href="/">aeoleaf <span>风叶</span></a>
+    </div>
+    <nav class="admin-nav">
+      <a href="/admin/dashboard">Dashboard</a>
+      <a href="/admin/posts">Posts</a>
+      <a href="/admin/works">Works</a>
+      <a href="/admin/settings">Settings</a>
+    </nav>
+    <div class="admin-footer">
+      <a href="/" target="_blank">View Site</a>
+      <form method="POST" action="/admin/logout" style="margin-top:0.5rem">
+        <button type="submit" class="btn-link">Log Out</button>
+      </form>
+    </div>
+  </aside>
+  <main class="admin-main">
+    <div class="admin-header">
+      <h1>Works</h1>
+      <a href="/admin/works/new" class="btn-primary">New Work</a>
+    </div>
+    <div class="works-admin-grid">
+      <% if (works.length === 0) { %>
+        <p class="empty-state">No works yet</p>
+      <% } else { %>
+        <% works.forEach(work => { %>
+        <div class="work-admin-card">
+          <% if (work.cover_image) { %>
+          <img src="<%= work.cover_image %>" alt="<%= work.title %>">
+          <% } %>
+          <div class="work-admin-info">
+            <h3><%= work.title %></h3>
+            <p><%= work.year || '-' %></p>
+            <div class="work-admin-actions">
+              <a href="/admin/works/<%= work.id %>/edit" class="btn-sm">Edit</a>
+              <button class="btn-sm btn-danger" onclick="deleteWork(<%= work.id %>)">Delete</button>
+            </div>
+          </div>
+        </div>
+        <% }); %>
+      <% } %>
+    </div>
+  </main>
+  <script src="/js/toast.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

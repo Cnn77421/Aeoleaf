@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <h1>aeoleaf <span>风叶</span></h1>
+      <% if (error) { %>
+      <p class="error-message"><%= error %></p>
+      <% } %>
+      <form method="POST" action="/admin/login">
+        <input type="password" name="password" placeholder="Password" required autofocus>
+        <button type="submit" class="btn-primary">Login</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
