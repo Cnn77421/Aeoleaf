@@ -1,5 +1,17 @@
 const router = require('express').Router();
-const { db, getVisitorOverview, getVisitorTrend, getRegionDistribution, getTopPages, getVisitorsPage } = require('../config/db');
+const {
+  db,
+  getVisitorOverview,
+  getVisitorTrend,
+  getRegionDistribution,
+  getTopPages,
+  getVisitorsPage,
+  getVisitorsByFilter,
+  getVisitorDetail,
+  getVisitorSessionById,
+  getVisitorPathBySession,
+  getVisitorsByFingerprint
+} = require('../config/db');
 const { requireAdmin } = require('../middleware/auth');
 const { marked } = require('marked');
 const createDOMPurify = require('dompurify');
@@ -219,23 +231,33 @@ router.post('/admin/settings', requireAdmin, (req, res) => {
   res.redirect('/admin/settings');
 });
 
-router.get('/admin/dashboard/visitors', requireAdmin, (req, res, next) => {
+function parseDatetimeParam(val) {
+  if (!val) return null;
+  var n = Number(val);
+  if (Number.isFinite(n) && n > 1e12) return n;
+  var d = new Date(val);
+  return isNaN(d.getTime()) ? null : d.getTime();
+}
+
+function visitorFiltersFromQuery(req) {
+  return {
+    startTime: parseDatetimeParam(req.query.startTime),
+    endTime: parseDatetimeParam(req.query.endTime),
+    ip: (req.query.ip || '').trim(),
+    city: (req.query.city || '').trim(),
+    deviceType: (req.query.deviceType || '').trim(),
+    fingerprint: (req.query.fingerprint || '').trim()
+  };
+}
+
+function renderAdminVisitorsList(req, res, next) {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 20));
-
-    const startTime = req.query.startTime ? Number(req.query.startTime) : null;
-    const endTime = req.query.endTime ? Number(req.query.endTime) : null;
-    const filters = {
-      startTime: Number.isFinite(startTime) ? startTime : null,
-      endTime: Number.isFinite(endTime) ? endTime : null,
-      ip: (req.query.ip || '').trim(),
-      city: (req.query.city || '').trim(),
-      deviceType: (req.query.deviceType || '').trim()
-    };
+    const limit = 20;
+    const filters = visitorFiltersFromQuery(req);
 
     const overview = getVisitorOverview();
-    const trendRows = getVisitorTrend(14);
+    const trendRows = getVisitorTrend(7);
     const regionRows = getRegionDistribution(20);
     const topPages = getTopPages(10);
     const visitorsPage = getVisitorsPage(filters, page, limit);
@@ -252,10 +274,80 @@ router.get('/admin/dashboard/visitors', requireAdmin, (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}
 
-router.get('/admin/visitors', requireAdmin, (req, res) => {
-  res.redirect('/admin/dashboard/visitors');
-});
+router.get('/admin/visitors', requireAdmin, renderAdminVisitorsList);
+
+function renderVisitorFingerprint(req, res, next) {
+  try {
+    const fp = String(req.query.fp || '').trim();
+    if (!fp) return res.redirect('/admin/visitors');
+    const rows = getVisitorsByFingerprint(fp, 500);
+    res.render('admin/visitor-fingerprint', {
+      title: '访客路径 — aeoleaf',
+      fingerprint: fp,
+      rows
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+router.get('/admin/visitors/fingerprint', requireAdmin, renderVisitorFingerprint);
+
+function renderVisitorsExportCsv(req, res, next) {
+  try {
+    const startTime = req.query.startTime ? Number(req.query.startTime) : null;
+    const endTime = req.query.endTime ? Number(req.query.endTime) : null;
+    const filters = {
+      startTime: Number.isFinite(startTime) ? startTime : null,
+      endTime: Number.isFinite(endTime) ? endTime : null,
+      ip: (req.query.ip || '').trim(),
+      city: (req.query.city || '').trim(),
+      deviceType: (req.query.deviceType || '').trim(),
+      fingerprint: (req.query.fingerprint || '').trim()
+    };
+
+    const rows = getVisitorsByFilter(filters, 10000);
+    const headers = [
+      'id', 'tracked_at', 'ip', 'full_url', 'path', 'referer', 'device_type', 'os_name', 'browser_name',
+      'country', 'province', 'city', 'isp', 'network_type', 'stay_duration_ms', 'max_scroll_depth',
+      'fingerprint_id', 'request_id', 'utm_source', 'utm_medium', 'utm_campaign', 'search_keyword', 'is_bot'
+    ];
+
+    const escapeCsv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const csv = [headers.join(',')]
+      .concat(rows.map((row) => headers.map((h) => escapeCsv(row[h])).join(',')))
+      .join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="visitors-${Date.now()}.csv"`);
+    res.send('\uFEFF' + csv);
+  } catch (err) {
+    next(err);
+  }
+}
+
+router.get('/admin/visitors/export.csv', requireAdmin, renderVisitorsExportCsv);
+
+function renderVisitorDetail(req, res, next) {
+  try {
+    const visitor = getVisitorDetail(req.params.id);
+    if (!visitor) return res.status(404).render('404', { title: 'Not Found' });
+    const session = visitor.visitor_session_id ? getVisitorSessionById(visitor.visitor_session_id) : null;
+    const pathRows = visitor.visitor_session_id ? getVisitorPathBySession(visitor.visitor_session_id) : [visitor];
+
+    res.render('admin/visitor-detail', {
+      title: `Visitor #${visitor.id} — aeoleaf`,
+      visitor,
+      session,
+      pathRows
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+router.get('/admin/visitor/:id', requireAdmin, renderVisitorDetail);
 
 module.exports = router;

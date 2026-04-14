@@ -1,3 +1,30 @@
+// Page transition (fallback for browsers without View Transitions API)
+(function () {
+  var hasNativeVT = Boolean(document.startViewTransition) ||
+    CSS.supports && CSS.supports('view-transition-name', 'root');
+  if (hasNativeVT) return;
+
+  function shouldIntercept(a) {
+    if (!a || !a.href) return false;
+    if (a.target === '_blank' || a.download) return false;
+    if (a.origin !== location.origin) return false;
+    if (a.pathname === location.pathname && a.hash) return false;
+    var href = a.getAttribute('href') || '';
+    if (href.startsWith('#') || href.startsWith('javascript:')) return false;
+    if (a.closest('form')) return false;
+    return true;
+  }
+
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    var a = e.target.closest('a');
+    if (!shouldIntercept(a)) return;
+    e.preventDefault();
+    document.body.classList.add('page-leaving');
+    setTimeout(function () { location.href = a.href; }, 180);
+  });
+})();
+
 // Delete post
 async function deletePost(id) {
   if (!confirm('Delete this post?')) return;

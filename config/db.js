@@ -145,6 +145,47 @@ async function initDB() {
     // Column already exists, ignore error
   }
 
+  // Visitor table incremental columns (ALTER only, keep backward compatible)
+  try { db.run('ALTER TABLE visitors ADD COLUMN request_id TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN event_type TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN user_agent_raw TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN http_status INTEGER DEFAULT 200'); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN request_method TEXT DEFAULT \'POST\''); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN utm_source TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN utm_medium TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN utm_campaign TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN search_keyword TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN is_bot INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN visitor_session_id INTEGER'); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN country TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN province TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN city TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN isp TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN page_view_id TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN downlink REAL DEFAULT 0'); } catch (e) {}
+  try { db.run('ALTER TABLE visitors ADD COLUMN rtt REAL DEFAULT 0'); } catch (e) {}
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS visitor_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fingerprint_id TEXT NOT NULL,
+      start_time INTEGER NOT NULL,
+      end_time INTEGER NOT NULL DEFAULT 0,
+      page_count INTEGER NOT NULL DEFAULT 0,
+      total_duration INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  db.run('CREATE INDEX IF NOT EXISTS idx_visitors_time ON visitors(tracked_at)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_visitors_ip_search ON visitors(ip)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_visitors_fp_search ON visitors(fingerprint_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_visitors_url_search ON visitors(full_url)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_visitors_request_id ON visitors(request_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON visitors(visitor_session_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_visitors_page_view_id ON visitors(page_view_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_visitor_sessions_fingerprint ON visitor_sessions(fingerprint_id)');
+
   saveDB();
   return db;
 }
@@ -207,7 +248,7 @@ const dbWrapper = {
   }
 };
 
-function buildVisitorFilter({ startTime, endTime, ip, city, deviceType }) {
+function buildVisitorFilter({ startTime, endTime, ip, city, deviceType, fingerprint }) {
   let where = ' WHERE 1=1';
   const params = [];
 
@@ -231,6 +272,10 @@ function buildVisitorFilter({ startTime, endTime, ip, city, deviceType }) {
     where += ' AND device_type = ?';
     params.push(deviceType);
   }
+  if (fingerprint) {
+    where += ' AND fingerprint_id LIKE ?';
+    params.push(`%${fingerprint}%`);
+  }
 
   return { where, params };
 }
@@ -249,7 +294,7 @@ function getVisitorOverview() {
   return { todayPV, todayUV, yesterdayPV, totalPV, totalUV };
 }
 
-function getVisitorTrend(days = 14) {
+function getVisitorTrend(days = 7) {
   const from = Date.now() - days * 24 * 60 * 60 * 1000;
   const rows = dbWrapper.prepare(`
     SELECT
@@ -294,7 +339,7 @@ function getTopPages(limit = 10) {
 
 function getVisitorsPage(filters, page = 1, limit = 20) {
   const safePage = Math.max(1, Number(page) || 1);
-  const safeLimit = Math.max(1, Math.min(200, Number(limit) || 20));
+  const safeLimit = 20;
   const offset = (safePage - 1) * safeLimit;
   const { where, params } = buildVisitorFilter(filters || {});
 
@@ -309,6 +354,53 @@ function getVisitorsPage(filters, page = 1, limit = 20) {
   return { rows, total, page: safePage, limit: safeLimit, totalPages: Math.ceil(total / safeLimit) };
 }
 
+function getVisitorsByFilter(filters, limit = 5000) {
+  const safeLimit = Math.max(1, Math.min(10000, Number(limit) || 5000));
+  const { where, params } = buildVisitorFilter(filters || {});
+  return dbWrapper.prepare(`
+    SELECT * FROM visitors
+    ${where}
+    ORDER BY tracked_at DESC
+    LIMIT ?
+  `).all(...params, safeLimit);
+}
+
+function getVisitorDetail(id) {
+  const numericId = Number.parseInt(String(id), 10);
+  if (!Number.isFinite(numericId) || numericId < 1) return null;
+  // Bypass queryCache: by-id lookups must never serve stale null after inserts.
+  const stmt = db.prepare('SELECT * FROM visitors WHERE id = ?');
+  stmt.bind([numericId]);
+  const result = stmt.step() ? stmt.getAsObject() : null;
+  stmt.free();
+  return result;
+}
+
+function getVisitorSessionById(sessionId) {
+  return dbWrapper.prepare('SELECT * FROM visitor_sessions WHERE id = ?').get(sessionId);
+}
+
+function getVisitorPathBySession(sessionId) {
+  return dbWrapper.prepare(`
+    SELECT *
+    FROM visitors
+    WHERE visitor_session_id = ?
+    ORDER BY tracked_at ASC
+  `).all(sessionId);
+}
+
+function getVisitorsByFingerprint(fingerprintId, limit = 500) {
+  const fp = String(fingerprintId || '').trim();
+  if (!fp) return [];
+  const cap = Math.max(1, Math.min(1000, Number(limit) || 500));
+  return dbWrapper.prepare(`
+    SELECT * FROM visitors
+    WHERE fingerprint_id = ?
+    ORDER BY tracked_at ASC
+    LIMIT ?
+  `).all(fp, cap);
+}
+
 module.exports = {
   initDB,
   db: dbWrapper,
@@ -316,5 +408,10 @@ module.exports = {
   getVisitorTrend,
   getRegionDistribution,
   getTopPages,
-  getVisitorsPage
+  getVisitorsPage,
+  getVisitorsByFilter,
+  getVisitorDetail,
+  getVisitorSessionById,
+  getVisitorPathBySession,
+  getVisitorsByFingerprint
 };

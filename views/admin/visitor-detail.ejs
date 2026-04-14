@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="view-transition" content="same-origin">
+  <title><%= title %></title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body class="admin-body">
+  <aside class="admin-sidebar">
+    <div class="admin-logo"><a href="/">aeoleaf <span>风叶</span></a></div>
+    <nav class="admin-nav">
+      <a href="/admin/dashboard">Dashboard</a>
+      <a href="/admin/posts">Posts</a>
+      <a href="/admin/works">Works</a>
+      <a href="/admin/visitors" class="active">Visitors</a>
+      <a href="/admin/settings">Settings</a>
+    </nav>
+    <div class="admin-footer">
+      <a href="/" target="_blank">View Site</a>
+      <form method="POST" action="/admin/logout" style="margin-top:0.5rem">
+        <button type="submit" class="btn-link">Log Out</button>
+      </form>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="breadcrumb">
+      <a href="/admin/visitors">访客列表</a>
+      <span class="sep">/</span>
+      <span>详情 #<%= visitor.id %></span>
+    </div>
+
+    <div class="admin-header">
+      <h1>访客详情 #<%= visitor.id %></h1>
+      <a href="/admin/visitors" class="btn-link">返回列表</a>
+    </div>
+
+    <%
+      function fmtTime(ms) {
+        if (!ms) return '—';
+        var d = new Date(Number(ms));
+        if (isNaN(d.getTime())) return String(ms);
+        var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+        return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate())
+             + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+      }
+      function fmtStay(ms) {
+        var n = Number(ms);
+        if (!n || n <= 0) return '—';
+        if (n < 1000) return n + 'ms';
+        return (n / 1000).toFixed(1) + 's';
+      }
+    %>
+
+    <div class="detail-sections">
+      <div class="recent-section">
+        <h2>请求信息</h2>
+        <div class="detail-grid">
+          <div><strong>访问时间:</strong> <%= fmtTime(visitor.tracked_at) %></div>
+          <div><strong>IP:</strong> <%= visitor.ip || '—' %></div>
+          <div><strong>完整 URL:</strong> <span style="word-break:break-all"><%= visitor.full_url || '—' %></span></div>
+          <div><strong>路径:</strong> <%= visitor.path || '/' %></div>
+          <div><strong>来源页面:</strong> <span style="word-break:break-all"><%= visitor.referer || '—' %></span></div>
+          <div><strong>查询参数:</strong> <%= visitor.query_string || '—' %></div>
+        </div>
+      </div>
+
+      <div class="recent-section">
+        <h2>设备与环境</h2>
+        <div class="detail-grid">
+          <div><strong>设备类型:</strong> <%= visitor.device_type || '—' %></div>
+          <div><strong>操作系统:</strong> <%= visitor.os_name %> <%= visitor.os_version %></div>
+          <div><strong>浏览器:</strong> <%= visitor.browser_name %> <%= visitor.browser_version %></div>
+          <div><strong>屏幕分辨率:</strong> <%= visitor.screen_resolution || '—' %></div>
+          <div><strong>视口大小:</strong> <%= visitor.viewport_size || '—' %></div>
+          <div><strong>像素比:</strong> <%= visitor.device_pixel_ratio ? Number(visitor.device_pixel_ratio).toFixed(2) : '—' %></div>
+          <div><strong>语言:</strong> <%= visitor.language || '—' %></div>
+          <div><strong>时区:</strong> <%= visitor.timezone || '—' %></div>
+          <div><strong>Cookie:</strong> <%= visitor.cookie_enabled ? '是' : '否' %></div>
+          <div><strong>无痕模式:</strong> <%= visitor.incognito ? '是' : '否' %></div>
+          <div><strong>CPU 核数:</strong> <%= visitor.cpu_cores || '—' %></div>
+          <div><strong>设备内存:</strong> <%= visitor.device_memory ? visitor.device_memory + ' GB' : '—' %></div>
+        </div>
+      </div>
+
+      <div class="recent-section">
+        <h2>地域与网络</h2>
+        <div class="detail-grid">
+          <div><strong>地域:</strong> <%= [visitor.country, visitor.province, visitor.city].filter(Boolean).join(' / ') || '—' %></div>
+          <div><strong>运营商:</strong> <%= visitor.isp || '—' %></div>
+          <div><strong>网络类型:</strong> <%= (visitor.network_type && String(visitor.network_type).trim()) ? visitor.network_type : '—' %></div>
+          <div><strong>下行带宽:</strong> <%= visitor.downlink ? visitor.downlink + ' Mbps' : '—' %></div>
+          <div><strong>延迟:</strong> <%= visitor.rtt ? visitor.rtt + ' ms' : '—' %></div>
+        </div>
+      </div>
+
+      <div class="recent-section">
+        <h2>行为数据</h2>
+        <div class="detail-grid">
+          <div><strong>进入时间:</strong> <%= fmtTime(visitor.page_enter_at) %></div>
+          <div><strong>离开时间:</strong> <%= fmtTime(visitor.page_leave_at) %></div>
+          <div><strong>停留时长:</strong> <%= fmtStay(visitor.stay_duration_ms) %></div>
+          <div><strong>最大滚动:</strong> <%= visitor.max_scroll_depth ? Number(visitor.max_scroll_depth).toFixed(1) + '%' : '—' %></div>
+          <div><strong>机器人:</strong> <%= visitor.is_bot ? '是' : '否' %></div>
+        </div>
+      </div>
+
+      <div class="recent-section">
+        <h2>来源与营销</h2>
+        <div class="detail-grid">
+          <div><strong>UTM 来源:</strong> <%= visitor.utm_source || '—' %></div>
+          <div><strong>UTM 媒介:</strong> <%= visitor.utm_medium || '—' %></div>
+          <div><strong>UTM 活动:</strong> <%= visitor.utm_campaign || '—' %></div>
+          <div><strong>搜索关键词:</strong> <%= visitor.search_keyword || '—' %></div>
+        </div>
+      </div>
+
+      <div class="recent-section">
+        <h2>标识信息</h2>
+        <div class="detail-grid">
+          <div><strong>指纹 ID:</strong> <span style="word-break:break-all"><%= visitor.fingerprint_id %></span></div>
+          <div><strong>请求 ID:</strong> <span style="word-break:break-all"><%= visitor.request_id || '—' %></span></div>
+          <div><strong>页面视图 ID:</strong> <span style="word-break:break-all"><%= visitor.page_view_id || '—' %></span></div>
+          <div><strong>会话 ID:</strong> <%= visitor.session_id || '—' %></div>
+        </div>
+      </div>
+
+      <% if (session) { %>
+      <div class="recent-section">
+        <h2>会话信息</h2>
+        <div class="detail-grid">
+          <div><strong>会话编号:</strong> #<%= session.id %></div>
+          <div><strong>开始时间:</strong> <%= fmtTime(session.start_time) %></div>
+          <div><strong>结束时间:</strong> <%= fmtTime(session.end_time) %></div>
+          <div><strong>页面数:</strong> <%= session.page_count %></div>
+          <div><strong>总时长:</strong> <%= fmtStay(session.total_duration) %></div>
+        </div>
+      </div>
+      <% } %>
+
+      <div class="recent-section visitors-table-section">
+        <h2>访问路径</h2>
+        <div class="visitors-table-wrap">
+          <table class="admin-table visitors-table visitors-table-compact">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>完整 URL</th>
+                <th>路径</th>
+                <th>来源页面</th>
+                <th>停留</th>
+                <th>滚动</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (!pathRows || pathRows.length === 0) { %>
+                <tr><td colspan="6">暂无访问路径</td></tr>
+              <% } %>
+              <% (pathRows || []).forEach(function(row) { %>
+              <tr>
+                <td style="white-space:nowrap"><%= fmtTime(row.tracked_at) %></td>
+                <td class="cell-referer"><%= row.full_url %></td>
+                <td class="cell-path"><%= row.path %></td>
+                <td class="cell-referer"><%= row.referer %></td>
+                <td><%= fmtStay(row.stay_duration_ms) %></td>
+                <td><%= row.max_scroll_depth ? Number(row.max_scroll_depth).toFixed(1) + '%' : '—' %></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="/js/toast.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

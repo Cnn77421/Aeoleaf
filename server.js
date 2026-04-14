@@ -7,6 +7,7 @@ const path = require('path');
 const { initDB } = require('./config/db');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 (async () => {
@@ -18,7 +19,36 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-app.use(express.json());
+const jsonParser = express.json({ limit: '1mb' });
+const trackRawParser = express.raw({ type: '*/*', limit: '512kb' });
+
+function pathWithoutQuery(req) {
+  let u = req.originalUrl || req.url || '';
+  const q = u.indexOf('?');
+  if (q >= 0) u = u.slice(0, q);
+  if (u.length > 1 && u.endsWith('/')) u = u.slice(0, -1);
+  return u;
+}
+
+app.use((req, res, next) => {
+  if (req.method === 'POST' && pathWithoutQuery(req) === '/api/track') {
+    return trackRawParser(req, res, (err) => {
+      if (err) return next(err);
+      try {
+        if (Buffer.isBuffer(req.body) && req.body.length) {
+          const text = req.body.toString('utf8');
+          req.body = text ? JSON.parse(text) : {};
+        } else {
+          req.body = {};
+        }
+      } catch (e) {
+        req.body = {};
+      }
+      return next();
+    });
+  }
+  return jsonParser(req, res, next);
+});
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'), {
   maxAge: '1d',

@@ -1,259 +1,240 @@
 (function () {
-  const TRACK_URL = '/api/track';
-  const FP_KEY = 'aeoleaf_device_fingerprint';
-  const SID_KEY = 'aeoleaf_track_session_id';
-  const PATH_KEY = 'aeoleaf_visit_path';
-  const PAGE_ENTER_AT = Date.now();
-  let maxScrollDepth = 0;
-  const memoryStore = {};
+  var TRACK_URL = '/api/track';
+  var FP_KEY = 'aeoleaf_device_fingerprint';
+  var SID_KEY = 'aeoleaf_track_session_id';
+  var PATH_KEY = 'aeoleaf_visit_path';
+  var PAGE_ENTER_AT = Date.now();
+  var PAGE_VIEW_ID = 'pv_' + Date.now() + '_' + Math.random().toString(16).slice(2, 10);
+  var maxScrollDepth = 0;
+  var enterSent = false;
+  var leaveSent = false;
+  var cachedPublicIp = '';
+  var cachedFingerprintId = '';
+  var memoryStore = {};
 
   function storageGet(key) {
-    try {
-      return localStorage.getItem(key);
-    } catch (e) {
-      return Object.prototype.hasOwnProperty.call(memoryStore, key) ? memoryStore[key] : null;
-    }
+    try { return localStorage.getItem(key); }
+    catch (e) { return Object.prototype.hasOwnProperty.call(memoryStore, key) ? memoryStore[key] : null; }
   }
 
   function storageSet(key, value) {
-    try {
-      localStorage.setItem(key, value);
-      return true;
-    } catch (e) {
-      memoryStore[key] = value;
-      return false;
-    }
+    try { localStorage.setItem(key, value); }
+    catch (e) { memoryStore[key] = value; }
   }
 
-  function safeString(value) {
-    if (value === null || value === undefined) return '';
-    return String(value);
-  }
+  function safeString(v) { return v == null ? '' : String(v); }
 
   function getScreenResolution() {
-    return window.screen ? `${window.screen.width}x${window.screen.height}` : '';
+    return window.screen ? window.screen.width + 'x' + window.screen.height : '';
   }
 
   function getViewportSize() {
-    return `${window.innerWidth || 0}x${window.innerHeight || 0}`;
+    return (window.innerWidth || 0) + 'x' + (window.innerHeight || 0);
   }
 
-  function getNetworkType() {
-    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-    return conn && conn.effectiveType ? conn.effectiveType : 'unknown';
+  function getNetworkInfo() {
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!c) return { effectiveType: 'unknown', downlink: 0, rtt: 0 };
+      return {
+        effectiveType: (typeof c.effectiveType === 'string' && c.effectiveType) ? c.effectiveType : 'unknown',
+        downlink: Number(c.downlink) || 0,
+        rtt: Number(c.rtt) || 0
+      };
+    } catch (e) {
+      return { effectiveType: 'unknown', downlink: 0, rtt: 0 };
+    }
   }
 
-  async function detectIncognito() {
+  function detectIncognito() {
     try {
       if (navigator.storage && navigator.storage.estimate) {
-        const estimate = await navigator.storage.estimate();
-        if (estimate && estimate.quota && estimate.quota < 120000000) return true;
+        return navigator.storage.estimate().then(function (est) {
+          return !!(est && est.quota && est.quota < 120000000);
+        });
       }
-    } catch (e) {
-      // ignore
-    }
-    return false;
+    } catch (e) { /* ignore */ }
+    return Promise.resolve(false);
   }
 
   function hashText(text) {
     if (!window.crypto || !window.crypto.subtle) {
       return Promise.resolve(btoa(unescape(encodeURIComponent(text))).slice(0, 32));
     }
-    const data = new TextEncoder().encode(text);
-    return window.crypto.subtle.digest('SHA-256', data).then((buf) => {
-      return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+    return window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
+      return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
     });
   }
 
   function canvasFingerprint() {
     try {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      canvas.width = 280;
-      canvas.height = 60;
-      ctx.textBaseline = 'top';
-      ctx.font = '16px Arial';
-      ctx.fillStyle = '#f60';
-      ctx.fillRect(10, 10, 120, 24);
-      ctx.fillStyle = '#069';
-      ctx.fillText('aeoleaf-fp', 14, 14);
+      var c = document.createElement('canvas'), ctx = c.getContext('2d');
+      c.width = 280; c.height = 60;
+      ctx.textBaseline = 'top'; ctx.font = '16px Arial';
+      ctx.fillStyle = '#f60'; ctx.fillRect(10, 10, 120, 24);
+      ctx.fillStyle = '#069'; ctx.fillText('aeoleaf-fp', 14, 14);
       ctx.strokeStyle = 'rgba(102, 204, 0, 0.7)';
-      ctx.arc(180, 30, 20, 0, Math.PI * 2, true);
-      ctx.stroke();
-      return canvas.toDataURL();
-    } catch (e) {
-      return 'canvas-unavailable';
-    }
+      ctx.arc(180, 30, 20, 0, Math.PI * 2, true); ctx.stroke();
+      return c.toDataURL();
+    } catch (e) { return 'canvas-unavailable'; }
   }
 
   function webglFingerprint() {
     try {
-      const canvas = document.createElement('canvas');
-      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      var c = document.createElement('canvas');
+      var gl = c.getContext('webgl') || c.getContext('experimental-webgl');
       if (!gl) return 'webgl-unavailable';
-      const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-      const vendor = debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR);
-      const renderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
-      return `${vendor}::${renderer}`;
-    } catch (e) {
-      return 'webgl-error';
-    }
+      var d = gl.getExtension('WEBGL_debug_renderer_info');
+      var vendor = d ? gl.getParameter(d.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR);
+      var renderer = d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+      return vendor + '::' + renderer;
+    } catch (e) { return 'webgl-error'; }
   }
 
-  async function getPublicIp() {
-    try {
-      const resp = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
-      const data = await resp.json();
-      return data && data.ip ? data.ip : '';
-    } catch (e) {
-      return '';
-    }
+  function getPublicIp() {
+    return fetch('https://api.ipify.org?format=json', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { return (d && d.ip) ? d.ip : ''; })
+      .catch(function () { return ''; });
   }
 
   function getOrCreateSessionId() {
-    const existing = storageGet(SID_KEY);
+    var existing = storageGet(SID_KEY);
     if (existing) return existing;
-    const id = `sess_${Date.now()}_${Math.random().toString(16).slice(2, 10)}`;
+    var id = 'sess_' + Date.now() + '_' + Math.random().toString(16).slice(2, 10);
     storageSet(SID_KEY, id);
     return id;
   }
 
   function trackPath() {
-    let list = [];
-    try {
-      list = JSON.parse(storageGet(PATH_KEY) || '[]');
-      if (!Array.isArray(list)) list = [];
-    } catch (e) {
-      list = [];
-    }
-    const item = {
-      path: window.location.pathname,
-      fullUrl: window.location.href,
-      ts: Date.now(),
-      sequenceNo: list.length + 1
-    };
-    list.push(item);
+    var list = [];
+    try { list = JSON.parse(storageGet(PATH_KEY) || '[]'); if (!Array.isArray(list)) list = []; }
+    catch (e) { list = []; }
+    list.push({ path: window.location.pathname, fullUrl: window.location.href, ts: Date.now(), sequenceNo: list.length + 1 });
     if (list.length > 500) list = list.slice(-500);
     storageSet(PATH_KEY, JSON.stringify(list));
-    return list;
   }
 
   function computeMaxScrollDepth() {
-    const scrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-    const scrollHeight = Math.max(
-      document.body.scrollHeight,
-      document.documentElement.scrollHeight,
-      document.body.offsetHeight,
-      document.documentElement.offsetHeight
-    );
-    const clientHeight = document.documentElement.clientHeight || window.innerHeight || 1;
-    const ratio = ((scrollTop + clientHeight) / Math.max(scrollHeight, 1)) * 100;
-    maxScrollDepth = Math.max(maxScrollDepth, Math.min(100, ratio));
+    var st = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    var sh = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight,
+                      document.body.offsetHeight, document.documentElement.offsetHeight);
+    var ch = document.documentElement.clientHeight || window.innerHeight || 1;
+    maxScrollDepth = Math.max(maxScrollDepth, Math.min(100, ((st + ch) / Math.max(sh, 1)) * 100));
   }
 
   function getVisitPath() {
-    try {
-      const val = JSON.parse(storageGet(PATH_KEY) || '[]');
-      return Array.isArray(val) ? val : [];
-    } catch (e) {
-      return [];
-    }
+    try { var v = JSON.parse(storageGet(PATH_KEY) || '[]'); return Array.isArray(v) ? v : []; }
+    catch (e) { return []; }
   }
 
-  async function getFingerprintId() {
-    const existing = storageGet(FP_KEY);
-    if (existing) return existing;
+  function getCampaignData() {
+    var p = new URLSearchParams(window.location.search || '');
+    return { utmSource: p.get('utm_source') || '', utmMedium: p.get('utm_medium') || '', utmCampaign: p.get('utm_campaign') || '' };
+  }
 
-    const canvasFp = canvasFingerprint();
-    const webglFp = webglFingerprint();
-    const raw = [
-      navigator.userAgent,
-      navigator.platform,
-      navigator.language,
+  function getSearchKeyword() {
+    var p = new URLSearchParams(window.location.search || '');
+    var d = p.get('q') || p.get('keyword') || p.get('query') || '';
+    if (d) return d;
+    try {
+      if (!document.referrer) return '';
+      var rp = new URL(document.referrer).searchParams;
+      return rp.get('q') || rp.get('wd') || rp.get('query') || '';
+    } catch (e) { return ''; }
+  }
+
+  function getFingerprintId() {
+    var existing = storageGet(FP_KEY);
+    if (existing) return Promise.resolve(existing);
+    var raw = [
+      navigator.userAgent, navigator.platform, navigator.language,
       getScreenResolution(),
-      getViewportSize(),
       safeString(window.devicePixelRatio),
       safeString(navigator.deviceMemory),
       safeString(navigator.hardwareConcurrency),
-      canvasFp,
-      webglFp
+      canvasFingerprint(), webglFingerprint()
     ].join('|');
-    const hash = await hashText(raw);
-    const fid = `fp_${hash}`;
-    storageSet(FP_KEY, fid);
-    return fid;
+    return hashText(raw).then(function (hash) {
+      var fid = 'fp_' + hash;
+      storageSet(FP_KEY, fid);
+      return fid;
+    });
   }
 
-  async function sendTracking(useBeacon) {
-    const visitPath = getVisitPath();
-    const pageLeaveAt = Date.now();
-    const stayDurationMs = pageLeaveAt - PAGE_ENTER_AT;
-    const canvasFp = canvasFingerprint();
-    const webglFp = webglFingerprint();
-    const [fingerprintId, publicIp, incognito] = await Promise.all([
-      getFingerprintId(),
-      getPublicIp(),
-      detectIncognito()
-    ]);
-
-    const payload = {
-      eventType: useBeacon ? 'leave' : 'enter',
-      trackedAt: Date.now(),
-      sessionId: getOrCreateSessionId(),
-      publicIp: publicIp,
-      fullUrl: window.location.href,
-      path: window.location.pathname,
-      queryString: window.location.search || '',
-      referer: document.referrer || '',
-      userAgent: navigator.userAgent,
-      deviceType: /mobile|iphone|ipod|android/i.test(navigator.userAgent) ? '手机' : (/ipad|tablet/i.test(navigator.userAgent) ? '平板' : 'PC'),
-      osName: navigator.platform || '',
-      osVersion: '',
-      browserName: '',
-      browserVersion: '',
-      screenResolution: getScreenResolution(),
-      viewportSize: getViewportSize(),
-      devicePixelRatio: Number(window.devicePixelRatio || 1),
-      language: navigator.language || '',
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
-      cookieEnabled: !!navigator.cookieEnabled,
-      incognito: incognito,
-      networkType: getNetworkType(),
-      deviceMemory: Number(navigator.deviceMemory || 0),
-      cpuCores: Number(navigator.hardwareConcurrency || 0),
-      canvasFp: canvasFp,
-      webglFp: webglFp,
-      fingerprintId: fingerprintId,
-      pageEnterAt: PAGE_ENTER_AT,
-      pageLeaveAt: pageLeaveAt,
-      stayDurationMs: stayDurationMs,
-      maxScrollDepth: Number(maxScrollDepth.toFixed(2)),
-      visitPath: visitPath
-    };
-
-    const body = JSON.stringify(payload);
-    if (useBeacon && navigator.sendBeacon) {
-      const blob = new Blob([body], { type: 'application/json' });
-      navigator.sendBeacon(TRACK_URL, blob);
-      return;
+  function beacon(payload) {
+    if (typeof navigator.sendBeacon === 'function') {
+      navigator.sendBeacon(TRACK_URL, new Blob([JSON.stringify(payload)], { type: 'application/json' }));
     }
+  }
 
-    try {
-      await fetch(TRACK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        keepalive: true
+  function sendEnter() {
+    if (enterSent) return;
+    enterSent = true;
+    var net = getNetworkInfo();
+    Promise.all([getFingerprintId(), getPublicIp(), detectIncognito()]).then(function (results) {
+      var fingerprintId = results[0], publicIp = results[1], incognito = results[2];
+      cachedPublicIp = publicIp;
+      cachedFingerprintId = fingerprintId;
+      var campaign = getCampaignData();
+      beacon({
+        pageViewId: PAGE_VIEW_ID,
+        requestId: PAGE_VIEW_ID + '_enter_' + Date.now(),
+        eventType: 'enter',
+        trackedAt: Date.now(),
+        sessionId: getOrCreateSessionId(),
+        publicIp: publicIp,
+        fullUrl: window.location.href,
+        path: window.location.pathname,
+        queryString: window.location.search || '',
+        referer: document.referrer || '',
+        screenResolution: getScreenResolution(),
+        viewportSize: getViewportSize(),
+        devicePixelRatio: Number(window.devicePixelRatio || 1),
+        language: navigator.language || '',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+        cookieEnabled: !!navigator.cookieEnabled,
+        incognito: incognito,
+        deviceMemory: Number(navigator.deviceMemory || 0),
+        cpuCores: Number(navigator.hardwareConcurrency || 0),
+        canvasFp: canvasFingerprint(),
+        webglFp: webglFingerprint(),
+        fingerprintId: fingerprintId,
+        pageEnterAt: PAGE_ENTER_AT,
+        visitPath: getVisitPath(),
+        utmSource: campaign.utmSource,
+        utmMedium: campaign.utmMedium,
+        utmCampaign: campaign.utmCampaign,
+        searchKeyword: getSearchKeyword(),
+        networkType: net.effectiveType,
+        downlink: net.downlink,
+        rtt: net.rtt
       });
-    } catch (e) {
-      // ignore tracking transport errors
-    }
+    }).catch(function () {});
+  }
+
+  function sendLeave() {
+    if (leaveSent || !enterSent) return;
+    leaveSent = true;
+    var now = Date.now();
+    beacon({
+      pageViewId: PAGE_VIEW_ID,
+      eventType: 'leave',
+      trackedAt: now,
+      pageLeaveAt: now,
+      stayDurationMs: now - PAGE_ENTER_AT,
+      maxScrollDepth: Number(maxScrollDepth.toFixed(2)),
+      fingerprintId: cachedFingerprintId,
+      publicIp: cachedPublicIp
+    });
   }
 
   trackPath();
   computeMaxScrollDepth();
   window.addEventListener('scroll', computeMaxScrollDepth, { passive: true });
-  setTimeout(function () { sendTracking(false); }, 1500);
-  window.addEventListener('pagehide', function () { sendTracking(true); });
-  window.addEventListener('beforeunload', function () { sendTracking(true); });
+  setTimeout(sendEnter, 200);
+  window.addEventListener('pagehide', sendLeave);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') sendLeave();
+  });
 })();

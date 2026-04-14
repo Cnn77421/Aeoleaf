@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="view-transition" content="same-origin">
+  <title><%= title %></title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body class="admin-body">
+  <aside class="admin-sidebar">
+    <div class="admin-logo"><a href="/">aeoleaf <span>风叶</span></a></div>
+    <nav class="admin-nav">
+      <a href="/admin/dashboard">Dashboard</a>
+      <a href="/admin/posts">Posts</a>
+      <a href="/admin/works">Works</a>
+      <a href="/admin/visitors" class="active">Visitors</a>
+      <a href="/admin/settings">Settings</a>
+    </nav>
+    <div class="admin-footer">
+      <a href="/" target="_blank">View Site</a>
+      <form method="POST" action="/admin/logout" style="margin-top:0.5rem">
+        <button type="submit" class="btn-link">Log Out</button>
+      </form>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="breadcrumb">
+      <a href="/admin/visitors">访客列表</a>
+      <span class="sep">/</span>
+      <span>指纹路径</span>
+    </div>
+
+    <div class="admin-header">
+      <h1>按指纹查看路径</h1>
+      <a href="/admin/visitors" class="btn-link">返回列表</a>
+    </div>
+    <p class="dashboard-subtitle" style="margin-bottom:1rem;word-break:break-all;"><strong>指纹 ID:</strong> <%= fingerprint %></p>
+
+    <%
+      function fmtTime(ms) {
+        if (!ms) return '—';
+        var d = new Date(Number(ms));
+        if (isNaN(d.getTime())) return String(ms);
+        var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+        return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate())
+             + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+      }
+      function fmtStay(ms) {
+        var n = Number(ms);
+        if (!n || n <= 0) return '—';
+        if (n < 1000) return n + 'ms';
+        return (n / 1000).toFixed(1) + 's';
+      }
+    %>
+
+    <div class="recent-section visitors-table-section">
+      <div class="visitors-table-wrap">
+        <table class="admin-table visitors-table visitors-table-compact">
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>路径</th>
+              <th>完整 URL</th>
+              <th>停留</th>
+              <th>IP</th>
+              <th>地域</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!rows || rows.length === 0) { %>
+              <tr><td colspan="6">暂无记录</td></tr>
+            <% } %>
+            <% (rows || []).forEach(function (row) { %>
+              <tr>
+                <td style="white-space:nowrap"><%= fmtTime(row.tracked_at) %></td>
+                <td class="cell-path"><%= row.path %></td>
+                <td class="cell-referer"><%= row.full_url %></td>
+                <td><%= fmtStay(row.stay_duration_ms) %></td>
+                <td><%= row.ip || '—' %></td>
+                <td><%= [row.country, row.province, row.city].filter(Boolean).join(' / ') || '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  <script src="/js/toast.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>
