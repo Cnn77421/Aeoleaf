@@ -40,6 +40,7 @@ app.use('/api/auth', require('./routes/api/auth'));
 app.use('/api/posts', require('./routes/api/posts'));
 app.use('/api/works', require('./routes/api/works'));
 app.use('/api/search', require('./routes/api/search'));
+app.use('/api/track', require('./routes/api/track'));
 app.use('/', require('./routes/api/sitemap'));
 app.use('/', require('./routes/api/rss'));
 app.use('/', require('./routes/pages'));

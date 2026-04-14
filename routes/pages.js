@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { db } = require('../config/db');
+const { db, getVisitorOverview, getVisitorTrend, getRegionDistribution, getTopPages, getVisitorsPage } = require('../config/db');
 const { requireAdmin } = require('../middleware/auth');
 const { marked } = require('marked');
 const createDOMPurify = require('dompurify');
@@ -217,6 +217,45 @@ router.post('/admin/settings', requireAdmin, (req, res) => {
   });
   update();
   res.redirect('/admin/settings');
+});
+
+router.get('/admin/dashboard/visitors', requireAdmin, (req, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 20));
+
+    const startTime = req.query.startTime ? Number(req.query.startTime) : null;
+    const endTime = req.query.endTime ? Number(req.query.endTime) : null;
+    const filters = {
+      startTime: Number.isFinite(startTime) ? startTime : null,
+      endTime: Number.isFinite(endTime) ? endTime : null,
+      ip: (req.query.ip || '').trim(),
+      city: (req.query.city || '').trim(),
+      deviceType: (req.query.deviceType || '').trim()
+    };
+
+    const overview = getVisitorOverview();
+    const trendRows = getVisitorTrend(14);
+    const regionRows = getRegionDistribution(20);
+    const topPages = getTopPages(10);
+    const visitorsPage = getVisitorsPage(filters, page, limit);
+
+    res.render('admin/visitors', {
+      title: 'Visitors — aeoleaf',
+      overview,
+      trendRows,
+      regionRows,
+      topPages,
+      visitorsPage,
+      filters
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/admin/visitors', requireAdmin, (req, res) => {
+  res.redirect('/admin/dashboard/visitors');
 });
 
 module.exports = router;

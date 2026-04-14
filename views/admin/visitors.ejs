@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="admin-body">
+  <aside class="admin-sidebar">
+    <div class="admin-logo">
+      <a href="/">aeoleaf <span>风叶</span></a>
+    </div>
+    <nav class="admin-nav">
+      <a href="/admin/dashboard">Dashboard</a>
+      <a href="/admin/posts">Posts</a>
+      <a href="/admin/works">Works</a>
+      <a href="/admin/dashboard/visitors" class="active">Visitors</a>
+      <a href="/admin/settings">Settings</a>
+    </nav>
+    <div class="admin-footer">
+      <a href="/" target="_blank">View Site</a>
+      <form method="POST" action="/admin/logout" style="margin-top:0.5rem">
+        <button type="submit" class="btn-link">Log Out</button>
+      </form>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="dashboard-container">
+      <div class="dashboard-welcome">
+        <h1>Visitor Analytics</h1>
+        <p class="dashboard-subtitle">实时访问统计、轨迹和设备画像</p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">今日 PV</div><div class="stat-value"><%= overview.todayPV %></div></div>
+        <div class="stat-card"><div class="stat-label">今日 UV</div><div class="stat-value"><%= overview.todayUV %></div></div>
+        <div class="stat-card"><div class="stat-label">昨日 PV</div><div class="stat-value"><%= overview.yesterdayPV %></div></div>
+        <div class="stat-card"><div class="stat-label">总 PV / UV</div><div class="stat-value"><%= overview.totalPV %> / <%= overview.totalUV %></div></div>
+      </div>
+
+      <div class="recent-grid">
+        <div class="recent-section">
+          <h2>PV / UV 趋势</h2>
+          <canvas id="trendChart" height="120"></canvas>
+        </div>
+        <div class="recent-section">
+          <h2>地域分布</h2>
+          <canvas id="regionChart" height="120"></canvas>
+        </div>
+      </div>
+
+      <div class="recent-grid">
+        <div class="recent-section">
+          <h2>热门页面 TOP10</h2>
+          <canvas id="pagesChart" height="120"></canvas>
+        </div>
+      </div>
+
+      <div class="recent-section" style="margin-top:1rem;">
+        <h2>筛选</h2>
+        <form method="GET" action="/admin/dashboard/visitors" class="admin-form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.75rem;align-items:end;">
+          <label>开始时间(ms)<input type="text" name="startTime" value="<%= filters.startTime || '' %>" class="input"></label>
+          <label>结束时间(ms)<input type="text" name="endTime" value="<%= filters.endTime || '' %>" class="input"></label>
+          <label>IP<input type="text" name="ip" value="<%= filters.ip || '' %>" class="input"></label>
+          <label>城市<input type="text" name="city" value="<%= filters.city || '' %>" class="input"></label>
+          <label>设备类型
+            <select name="deviceType" class="input">
+              <option value="">全部</option>
+              <option value="PC" <%= filters.deviceType === 'PC' ? 'selected' : '' %>>PC</option>
+              <option value="手机" <%= filters.deviceType === '手机' ? 'selected' : '' %>>手机</option>
+              <option value="平板" <%= filters.deviceType === '平板' ? 'selected' : '' %>>平板</option>
+            </select>
+          </label>
+          <label>每页
+            <select name="limit" class="input">
+              <option value="20" <%= visitorsPage.limit === 20 ? 'selected' : '' %>>20</option>
+              <option value="50" <%= visitorsPage.limit === 50 ? 'selected' : '' %>>50</option>
+              <option value="100" <%= visitorsPage.limit === 100 ? 'selected' : '' %>>100</option>
+            </select>
+          </label>
+          <button type="submit" class="btn">应用筛选</button>
+        </form>
+      </div>
+
+      <div class="recent-section" style="margin-top:1rem;">
+        <h2>访客明细</h2>
+        <div style="overflow:auto;">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>ID</th><th>时间(ms)</th><th>IP</th><th>URL</th><th>Referer</th><th>设备</th><th>系统</th><th>浏览器</th><th>地域</th><th>网络</th><th>分辨率</th><th>语言/时区</th><th>Cookie</th><th>无痕</th><th>CPU</th><th>内存</th><th>停留(ms)</th><th>滚动%</th><th>指纹ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (visitorsPage.rows.length === 0) { %>
+                <tr><td colspan="19">暂无数据</td></tr>
+              <% } %>
+              <% visitorsPage.rows.forEach(row => { %>
+                <tr>
+                  <td><%= row.id %></td>
+                  <td><%= row.tracked_at %></td>
+                  <td><%= row.ip %></td>
+                  <td style="max-width:220px;word-break:break-all;"><%= row.path %></td>
+                  <td style="max-width:220px;word-break:break-all;"><%= row.referer %></td>
+                  <td><%= row.device_type %></td>
+                  <td><%= row.os_name %> <%= row.os_version %></td>
+                  <td><%= row.browser_name %> <%= row.browser_version %></td>
+                  <td><%= [row.country, row.province, row.city].filter(Boolean).join('/') %></td>
+                  <td><%= row.network_type %></td>
+                  <td><%= row.screen_resolution %> / <%= row.viewport_size %> / DPR:<%= row.device_pixel_ratio %></td>
+                  <td><%= row.language %> / <%= row.timezone %></td>
+                  <td><%= row.cookie_enabled ? '是' : '否' %></td>
+                  <td><%= row.incognito ? '是' : '否' %></td>
+                  <td><%= row.cpu_cores %></td>
+                  <td><%= row.device_memory %></td>
+                  <td><%= row.stay_duration_ms %></td>
+                  <td><%= row.max_scroll_depth %></td>
+                  <td style="max-width:240px;word-break:break-all;"><%= row.fingerprint_id %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.75rem;">
+          <div>共 <%= visitorsPage.total %> 条，当前第 <%= visitorsPage.page %> / <%= visitorsPage.totalPages || 1 %> 页</div>
+          <div style="display:flex;gap:0.5rem;">
+            <% const prev = Math.max(1, visitorsPage.page - 1); %>
+            <% const next = Math.min(visitorsPage.totalPages || 1, visitorsPage.page + 1); %>
+            <a class="btn-link" href="?page=<%= prev %>&limit=<%= visitorsPage.limit %>&startTime=<%= filters.startTime || '' %>&endTime=<%= filters.endTime || '' %>&ip=<%= encodeURIComponent(filters.ip || '') %>&city=<%= encodeURIComponent(filters.city || '') %>&deviceType=<%= encodeURIComponent(filters.deviceType || '') %>">上一页</a>
+            <a class="btn-link" href="?page=<%= next %>&limit=<%= visitorsPage.limit %>&startTime=<%= filters.startTime || '' %>&endTime=<%= filters.endTime || '' %>&ip=<%= encodeURIComponent(filters.ip || '') %>&city=<%= encodeURIComponent(filters.city || '') %>&deviceType=<%= encodeURIComponent(filters.deviceType || '') %>">下一页</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const trendRows = <%- JSON.stringify(trendRows || []) %>;
+    const regionRows = <%- JSON.stringify(regionRows || []) %>;
+    const topPages = <%- JSON.stringify(topPages || []) %>;
+
+    new Chart(document.getElementById('trendChart'), {
+      type: 'line',
+      data: {
+        labels: trendRows.map(x => x.d),
+        datasets: [
+          { label: 'PV', data: trendRows.map(x => x.pv), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.2)', tension: 0.3 },
+          { label: 'UV', data: trendRows.map(x => x.uv), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.2)', tension: 0.3 }
+        ]
+      }
+    });
+
+    new Chart(document.getElementById('regionChart'), {
+      type: 'bar',
+      data: {
+        labels: regionRows.map(x => x.region),
+        datasets: [{ label: 'PV', data: regionRows.map(x => x.pv), backgroundColor: '#6366f1' }]
+      },
+      options: { indexAxis: 'y' }
+    });
+
+    new Chart(document.getElementById('pagesChart'), {
+      type: 'bar',
+      data: {
+        labels: topPages.map(x => x.path || '/'),
+        datasets: [{ label: 'PV', data: topPages.map(x => x.pv), backgroundColor: '#f59e0b' }]
+      }
+    });
+  </script>
+  <script src="/js/toast.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>
