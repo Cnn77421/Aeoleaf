@@ -5,6 +5,25 @@
   const PATH_KEY = 'aeoleaf_visit_path';
   const PAGE_ENTER_AT = Date.now();
   let maxScrollDepth = 0;
+  const memoryStore = {};
+
+  function storageGet(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      return Object.prototype.hasOwnProperty.call(memoryStore, key) ? memoryStore[key] : null;
+    }
+  }
+
+  function storageSet(key, value) {
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch (e) {
+      memoryStore[key] = value;
+      return false;
+    }
+  }
 
   function safeString(value) {
     if (value === null || value === undefined) return '';
@@ -92,17 +111,17 @@
   }
 
   function getOrCreateSessionId() {
-    const existing = localStorage.getItem(SID_KEY);
+    const existing = storageGet(SID_KEY);
     if (existing) return existing;
     const id = `sess_${Date.now()}_${Math.random().toString(16).slice(2, 10)}`;
-    localStorage.setItem(SID_KEY, id);
+    storageSet(SID_KEY, id);
     return id;
   }
 
   function trackPath() {
     let list = [];
     try {
-      list = JSON.parse(localStorage.getItem(PATH_KEY) || '[]');
+      list = JSON.parse(storageGet(PATH_KEY) || '[]');
       if (!Array.isArray(list)) list = [];
     } catch (e) {
       list = [];
@@ -115,7 +134,7 @@
     };
     list.push(item);
     if (list.length > 500) list = list.slice(-500);
-    localStorage.setItem(PATH_KEY, JSON.stringify(list));
+    storageSet(PATH_KEY, JSON.stringify(list));
     return list;
   }
 
@@ -134,7 +153,7 @@
 
   function getVisitPath() {
     try {
-      const val = JSON.parse(localStorage.getItem(PATH_KEY) || '[]');
+      const val = JSON.parse(storageGet(PATH_KEY) || '[]');
       return Array.isArray(val) ? val : [];
     } catch (e) {
       return [];
@@ -142,7 +161,7 @@
   }
 
   async function getFingerprintId() {
-    const existing = localStorage.getItem(FP_KEY);
+    const existing = storageGet(FP_KEY);
     if (existing) return existing;
 
     const canvasFp = canvasFingerprint();
@@ -161,11 +180,11 @@
     ].join('|');
     const hash = await hashText(raw);
     const fid = `fp_${hash}`;
-    localStorage.setItem(FP_KEY, fid);
+    storageSet(FP_KEY, fid);
     return fid;
   }
 
-  async function sendTracking() {
+  async function sendTracking(useBeacon) {
     const visitPath = getVisitPath();
     const pageLeaveAt = Date.now();
     const stayDurationMs = pageLeaveAt - PAGE_ENTER_AT;
@@ -178,6 +197,7 @@
     ]);
 
     const payload = {
+      eventType: useBeacon ? 'leave' : 'enter',
       trackedAt: Date.now(),
       sessionId: getOrCreateSessionId(),
       publicIp: publicIp,
@@ -212,7 +232,7 @@
     };
 
     const body = JSON.stringify(payload);
-    if (navigator.sendBeacon) {
+    if (useBeacon && navigator.sendBeacon) {
       const blob = new Blob([body], { type: 'application/json' });
       navigator.sendBeacon(TRACK_URL, blob);
       return;
@@ -233,6 +253,7 @@
   trackPath();
   computeMaxScrollDepth();
   window.addEventListener('scroll', computeMaxScrollDepth, { passive: true });
-  window.addEventListener('pagehide', sendTracking);
-  window.addEventListener('beforeunload', sendTracking);
+  setTimeout(function () { sendTracking(false); }, 1500);
+  window.addEventListener('pagehide', function () { sendTracking(true); });
+  window.addEventListener('beforeunload', function () { sendTracking(true); });
 })();
