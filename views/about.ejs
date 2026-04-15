@@ -81,9 +81,10 @@
           <% } %>
           <div class="about-profile__meta">
             <ul class="about-stats" role="list">
-              <li><span class="about-stats__num"><%= (locals.statsData && locals.statsData.postsCount != null) ? locals.statsData.postsCount : 0 %></span><span class="about-stats__lbl">文章</span></li>
-              <li><span class="about-stats__num"><%= (locals.statsData && locals.statsData.worksCount != null) ? locals.statsData.worksCount : 0 %></span><span class="about-stats__lbl">作品</span></li>
-              <li><span class="about-stats__num"><%= (locals.statsData && locals.statsData.totalPV != null) ? locals.statsData.totalPV : 0 %></span><span class="about-stats__lbl">访问记录</span></li>
+              <% var aboutSiteStats = (typeof statsData !== 'undefined' && statsData) ? statsData : ((locals.statsData && typeof locals.statsData === 'object') ? locals.statsData : { postsCount: 0, worksCount: 0, totalPV: 0 }); %>
+              <li><span class="about-stats__num" data-target="<%= aboutSiteStats.postsCount %>">0</span><span class="about-stats__lbl">文章</span></li>
+              <li><span class="about-stats__num" data-target="<%= aboutSiteStats.worksCount %>">0</span><span class="about-stats__lbl">作品</span></li>
+              <li><span class="about-stats__num" data-target="<%= aboutSiteStats.totalPV %>">0</span><span class="about-stats__lbl">访问记录</span></li>
             </ul>
           </div>
         </div>

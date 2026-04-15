@@ -175,7 +175,7 @@
   }
 
   function initStatsCounters() {
-    var counters = document.querySelectorAll('.hp-stats__number[data-target]');
+    var counters = document.querySelectorAll('.hp-stats__number[data-target], .about-stats__num[data-target]');
     if (!counters.length) return;
     if (prefersReducedMotion()) {
       counters.forEach(function (el) {

@@ -31,6 +31,11 @@ let db;
 const queryCache = new Map();
 const CACHE_TTL = 60000; // 1分钟缓存
 
+/** COUNT(...) 等聚合读不应缓存，避免多进程/写入后长时间读到旧的 0 */
+function skipResultCacheForSql(sql) {
+  return typeof sql === 'string' && /\bCOUNT\s*\(/i.test(sql);
+}
+
 async function initDB() {
   const SQL = await initSqlJs();
 
@@ -251,10 +256,13 @@ const dbWrapper = {
   prepare: (sql) => {
     return {
       get: (...params) => {
+        const noCache = skipResultCacheForSql(sql);
         const cacheKey = sql + JSON.stringify(params);
-        const cached = queryCache.get(cacheKey);
-        if (cached && Date.now() - cached.time < CACHE_TTL) {
-          return cached.data;
+        if (!noCache) {
+          const cached = queryCache.get(cacheKey);
+          if (cached && Date.now() - cached.time < CACHE_TTL) {
+            return cached.data;
+          }
         }
 
         const stmt = db.prepare(sql);
@@ -262,14 +270,19 @@ const dbWrapper = {
         const result = stmt.step() ? stmt.getAsObject() : null;
         stmt.free();
 
-        queryCache.set(cacheKey, { data: result, time: Date.now() });
+        if (!noCache) {
+          queryCache.set(cacheKey, { data: result, time: Date.now() });
+        }
         return result;
       },
       all: (...params) => {
+        const noCache = skipResultCacheForSql(sql);
         const cacheKey = sql + JSON.stringify(params);
-        const cached = queryCache.get(cacheKey);
-        if (cached && Date.now() - cached.time < CACHE_TTL) {
-          return cached.data;
+        if (!noCache) {
+          const cached = queryCache.get(cacheKey);
+          if (cached && Date.now() - cached.time < CACHE_TTL) {
+            return cached.data;
+          }
         }
 
         const stmt = db.prepare(sql);
@@ -278,7 +291,9 @@ const dbWrapper = {
         while (stmt.step()) results.push(stmt.getAsObject());
         stmt.free();
 
-        queryCache.set(cacheKey, { data: results, time: Date.now() });
+        if (!noCache) {
+          queryCache.set(cacheKey, { data: results, time: Date.now() });
+        }
         return results;
       },
       run: (...params) => {
