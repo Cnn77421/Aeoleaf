@@ -486,6 +486,32 @@
   border-radius: var(--radius);
 }
 
+.form-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: var(--space-2);
+  line-height: 1.45;
+}
+
+.admin-notice {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+}
+
+.admin-notice--ok {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  color: var(--text);
+}
+
+.admin-notice--err {
+  background: var(--surface);
+  border: 1px solid #c0392b;
+  color: var(--text);
+}
+
 .preview-img {
   width: 100%;
   border-radius: var(--radius);

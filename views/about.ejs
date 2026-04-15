@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= title %></title>
-  <meta name="description" content="关于我 - 了解更多关于 aeoleaf 的信息">
+  <meta name="description" content="<%= locals.ogDescription != null && String(locals.ogDescription) ? locals.ogDescription : '关于我 — 个人博客与作品集' %>">
   <meta name="keywords" content="关于,个人简介,联系方式">
   <meta name="author" content="aeoleaf">
   <meta name="theme-color" content="#3A7D44">
@@ -12,11 +12,11 @@
 
   <!-- Open Graph -->
   <meta property="og:title" content="<%= title %>">
-  <meta property="og:description" content="关于我 - 了解更多关于 aeoleaf 的信息">
+  <meta property="og:description" content="<%= locals.ogDescription != null && String(locals.ogDescription) ? locals.ogDescription : '关于我 — 个人博客与作品集' %>">
   <meta property="og:type" content="website">
   <meta property="og:url" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/about">
-  <% if (aboutImage) { %>
-  <meta property="og:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %><%= aboutImage %>">
+  <% if (locals.aboutImage) { %>
+  <meta property="og:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %><%= locals.aboutImage %>">
   <% } else { %>
   <meta property="og:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/images/logo.png">
   <% } %>
@@ -24,15 +24,15 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="<%= title %>">
-  <meta name="twitter:description" content="关于我 - 了解更多关于 aeoleaf 的信息">
-  <% if (aboutImage) { %>
-  <meta name="twitter:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %><%= aboutImage %>">
+  <meta name="twitter:description" content="<%= locals.ogDescription != null && String(locals.ogDescription) ? locals.ogDescription : '关于我 — 个人博客与作品集' %>">
+  <% if (locals.aboutImage) { %>
+  <meta name="twitter:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %><%= locals.aboutImage %>">
   <% } else { %>
   <meta name="twitter:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/images/logo.png">
   <% } %>
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Lora:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/main.css?v=4">
+  <link rel="stylesheet" href="/css/main.css?v=5">
 </head>
 <body>
   <header class="site-header">
@@ -62,24 +62,108 @@
   </header>
   <main class="site-main">
     <div class="content-container about-page">
-      <h1>About</h1>
-      <div class="about-content">
-        <% if (aboutImage) { %>
-        <img src="<%= aboutImage %>" alt="About" class="about-image">
-        <% } %>
-        <div class="prose">
-          <% if (aboutText) { %>
-            <%- aboutText %>
+      <header class="about-hero">
+        <h1>About</h1>
+        <p class="about-hero__tagline"><%= locals.aboutHeroLine != null && String(locals.aboutHeroLine) ? locals.aboutHeroLine : '个人博客与作品集' %></p>
+      </header>
+
+      <section class="about-profile" aria-labelledby="about-profile-heading">
+        <h2 id="about-profile-heading" class="visually-hidden">简介与数据</h2>
+        <div class="about-profile__inner">
+          <% if (locals.aboutImage) { %>
+          <div class="about-profile__avatar">
+            <img src="<%= locals.aboutImage %>" alt="">
+          </div>
           <% } else { %>
-            <p>Welcome to aeoleaf.</p>
+          <div class="about-profile__avatar about-profile__avatar--placeholder" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <% } %>
+          <div class="about-profile__meta">
+            <ul class="about-stats" role="list">
+              <li><span class="about-stats__num"><%= (locals.statsData && locals.statsData.postsCount != null) ? locals.statsData.postsCount : 0 %></span><span class="about-stats__lbl">文章</span></li>
+              <li><span class="about-stats__num"><%= (locals.statsData && locals.statsData.worksCount != null) ? locals.statsData.worksCount : 0 %></span><span class="about-stats__lbl">作品</span></li>
+              <li><span class="about-stats__num"><%= (locals.statsData && locals.statsData.totalPV != null) ? locals.statsData.totalPV : 0 %></span><span class="about-stats__lbl">访问记录</span></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="about-body prose" aria-labelledby="about-body-heading">
+        <h2 id="about-body-heading" class="about-section-title">关于</h2>
+        <% if (locals.aboutText) { %>
+          <%- locals.aboutText %>
+        <% } else { %>
+          <p>Welcome to aeoleaf. 在后台 <strong>Settings</strong> 中填写 About 文本（支持 Markdown）即可展示你的介绍。</p>
+        <% } %>
+      </section>
+
+      <section class="about-contact" aria-labelledby="about-contact-heading">
+        <h2 id="about-contact-heading" class="about-section-title">联系与社交</h2>
+        <% var _ce = locals.contactEmail != null ? String(locals.contactEmail) : ''; %>
+        <% var _cq = locals.contactQq != null ? String(locals.contactQq) : ''; %>
+        <% var _socialAbout = Array.isArray(locals.socialLinks) ? locals.socialLinks : []; %>
+        <% var _hasContact = typeof locals.hasContact === 'boolean' ? locals.hasContact : Boolean((_ce && _ce.trim()) || (_cq && _cq.trim()) || _socialAbout.length); %>
+        <% if (_hasContact) { %>
+        <div class="about-contact__grid">
+          <% if (_ce && _ce.trim()) { %>
+          <p class="about-contact__item"><span class="about-contact__k">Email</span> <a href="mailto:<%= _ce.trim() %>"><%= _ce.trim() %></a></p>
+          <% } %>
+          <% if (_cq && _cq.trim()) { %>
+          <p class="about-contact__item"><span class="about-contact__k">QQ</span> <span class="about-contact__qq"><%= _cq.trim() %></span></p>
           <% } %>
         </div>
-        <div class="contact-info">
-          <h2>Contact</h2>
-          <p><strong>Email:</strong> <a href="mailto:xiner521@aliyun.com">xiner521@aliyun.com</a></p>
-          <p><strong>QQ:</strong> 2727639066</p>
+        <% if (_socialAbout.length) { %>
+        <ul class="about-social" role="list">
+          <% _socialAbout.forEach(function (s) { %>
+          <li><a class="about-social__link" href="<%= s.url %>" rel="noopener noreferrer" target="_blank"><%= s.label %></a></li>
+          <% }); %>
+        </ul>
+        <% } %>
+        <% } else { %>
+        <p class="about-contact__empty">尚未填写联系方式。可在后台 <strong>Settings</strong> 中设置邮箱、QQ 与社交链接（JSON 数组）。</p>
+        <% } %>
+      </section>
+
+      <section class="about-explore" aria-labelledby="about-explore-heading">
+        <h2 id="about-explore-heading" class="about-section-title">站内一览</h2>
+        <div class="about-explore__cols">
+          <div class="about-explore__col">
+            <h3 class="about-explore__subtitle">最近文章</h3>
+            <% var _recentPosts = Array.isArray(locals.recentPosts) ? locals.recentPosts : []; %>
+            <% if (_recentPosts.length) { %>
+            <ul class="about-explore__list">
+              <% _recentPosts.forEach(function (p) { %>
+              <li>
+                <a href="/blog/<%= p.slug %>"><%= p.title %></a>
+                <time datetime="<%= p.created_at %>"><%= new Date(p.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }) %></time>
+              </li>
+              <% }); %>
+            </ul>
+            <a href="/blog" class="about-explore__more">查看全部文章 <span aria-hidden="true">→</span></a>
+            <% } else { %>
+            <p class="about-explore__empty">暂无已发布文章。</p>
+            <% } %>
+          </div>
+          <div class="about-explore__col">
+            <h3 class="about-explore__subtitle">精选作品</h3>
+            <% var _featuredWorks = Array.isArray(locals.featuredWorks) ? locals.featuredWorks : []; %>
+            <% if (_featuredWorks.length) { %>
+            <ul class="about-explore__list about-explore__list--works">
+              <% _featuredWorks.forEach(function (w) { %>
+              <li>
+                <a href="/works/<%= w.slug %>"><%= w.title %></a>
+                <% if (w.description) { %><span class="about-explore__desc"><%= w.description %></span><% } %>
+              </li>
+              <% }); %>
+            </ul>
+            <a href="/works" class="about-explore__more">浏览全部作品 <span aria-hidden="true">→</span></a>
+            <% } else { %>
+            <p class="about-explore__empty">暂无精选作品。可在作品编辑中勾选「精选」。</p>
+            <% } %>
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   </main>
   <footer class="site-footer">
@@ -119,8 +203,12 @@
           联系
         </h3>
         <ul>
+          <% var _fce = locals.contactEmail != null ? String(locals.contactEmail) : ''; %>
+          <% var _fcq = locals.contactQq != null ? String(locals.contactQq) : ''; %>
+          <% var _fsl = Array.isArray(locals.socialLinks) ? locals.socialLinks : []; %>
+          <% if (_fce && _fce.trim()) { %>
           <li>
-            <a href="mailto:xiner521@aliyun.com">
+            <a href="mailto:<%= _fce.trim() %>">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="4"></circle>
                 <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
@@ -128,14 +216,20 @@
               邮箱
             </a>
           </li>
+          <% } %>
+          <% if (_fsl.length) { %>
+            <% _fsl.forEach(function (s) { %>
           <li>
-            <a href="https://github.com/Cnn77421" target="_blank" rel="noopener">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
-              </svg>
-              GitHub
-            </a>
+            <a href="<%= s.url %>" target="_blank" rel="noopener noreferrer"><%= s.label %></a>
           </li>
+            <% }); %>
+          <% } %>
+          <% if (_fcq && _fcq.trim()) { %>
+          <li><span class="footer-qq">QQ <%= _fcq.trim() %></span></li>
+          <% } %>
+          <% if (!(_fce && _fce.trim()) && !_fsl.length && !(_fcq && _fcq.trim())) { %>
+          <li><a href="/about">关于页</a></li>
+          <% } %>
         </ul>
       </div>
     </div>

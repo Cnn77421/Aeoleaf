@@ -148,7 +148,12 @@ async function initDB() {
       ('site_title', 'aeoleaf'),
       ('site_subtitle', '风叶'),
       ('about_text', ''),
-      ('about_image', '');
+      ('about_image', ''),
+      ('about_tagline', ''),
+      ('about_meta', ''),
+      ('contact_email', ''),
+      ('contact_qq', ''),
+      ('social_links', '[]');
   `);
 
   // Add views column if it doesn't exist
@@ -520,6 +525,7 @@ function removeFromBlacklist(ip) {
 module.exports = {
   initDB,
   flushDB,
+  saveDBSync,
   db: dbWrapper,
   getVisitorOverview,
   getVisitorTrend,

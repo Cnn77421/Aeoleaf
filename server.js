@@ -50,7 +50,7 @@ app.set('views', path.join(__dirname, 'views'));
 
 app.locals.baseUrl = process.env.BASE_URL || 'http://localhost:3000';
 
-const jsonParser = express.json({ limit: '1mb' });
+const jsonParser = express.json({ limit: '5mb' });
 const trackRawParser = express.raw({ type: '*/*', limit: '512kb' });
 
 app.use((req, res, next) => {
@@ -72,7 +72,7 @@ app.use((req, res, next) => {
   }
   return jsonParser(req, res, next);
 });
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.get('/robots.txt', (req, res) => {
   const base = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
   res.type('text/plain').send(

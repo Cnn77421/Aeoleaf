@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const {
   db,
+  saveDBSync,
   getVisitorOverview,
   getVisitorTrend,
   getRegionDistribution,
@@ -34,6 +35,52 @@ function render(md) {
 function getSetting(key) {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
   return row ? row.value : '';
+}
+
+function safeSocialUrl(u) {
+  const s = String(u || '').trim();
+  if (!s) return null;
+  if (s.startsWith('/') && !s.startsWith('//')) return s;
+  const lower = s.toLowerCase();
+  if (lower.startsWith('mailto:') && s.length > 7) return s;
+  try {
+    const p = new URL(s);
+    if (p.protocol === 'http:' || p.protocol === 'https:') return p.href;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function parseSocialLinks(raw) {
+  if (!raw || !String(raw).trim()) return [];
+  try {
+    const a = JSON.parse(raw);
+    if (!Array.isArray(a)) return [];
+    return a
+      .map((x) => {
+        if (!x || typeof x !== 'object') return null;
+        const label = typeof x.label === 'string' ? x.label.trim() : '';
+        const url = safeSocialUrl(x.url);
+        if (!label || !url) return null;
+        return { label, url };
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function plainTextFromMarkdown(md, maxLen) {
+  if (!md) return '';
+  const t = String(md)
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/`{1,3}[^`]*`{1,3}/g, ' ')
+    .replace(/\*\*?|__|\[|\]|\([^)]*\)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (t.length <= maxLen) return t;
+  return `${t.slice(0, maxLen - 1)}…`;
 }
 
 // ─── Public Pages ────────────────────────────────────────────────────────────
@@ -134,10 +181,53 @@ router.get('/works/:slug', (req, res) => {
 });
 
 router.get('/about', (req, res) => {
+  const aboutTextRaw = getSetting('about_text');
+  const aboutMeta = (getSetting('about_meta') || '').trim();
+  const ogDescription = aboutMeta || plainTextFromMarkdown(aboutTextRaw, 160)
+    || '关于我 — 个人博客与作品集';
+
+  const featuredWorks = db.prepare(
+    'SELECT * FROM works WHERE featured = 1 ORDER BY sort_order ASC, created_at DESC LIMIT 3'
+  ).all().map((w) => ({ ...w, tags: JSON.parse(w.tags || '[]') }));
+
+  const recentPosts = db.prepare(
+    "SELECT * FROM posts WHERE status = 'published' ORDER BY created_at DESC LIMIT 5"
+  ).all().map((p) => ({ ...p, tags: JSON.parse(p.tags || '[]') }));
+
+  const statsData = {
+    postsCount: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='published'").get()?.cnt || 0,
+    worksCount: db.prepare('SELECT COUNT(*) as cnt FROM works').get()?.cnt || 0,
+    totalPV: db.prepare('SELECT COUNT(*) as cnt FROM visitors').get()?.cnt || 0
+  };
+
+  const aboutTagline = getSetting('about_tagline');
+  const siteSubtitle = getSetting('site_subtitle');
+  const aboutHeroLine = (aboutTagline && aboutTagline.trim())
+    || (siteSubtitle && siteSubtitle.trim())
+    || '个人博客与作品集';
+
+  const contactEmail = getSetting('contact_email');
+  const contactQq = getSetting('contact_qq');
+  const socialLinks = parseSocialLinks(getSetting('social_links'));
+  const hasContact = Boolean(
+    (contactEmail && String(contactEmail).trim())
+      || (contactQq && String(contactQq).trim())
+      || (socialLinks && socialLinks.length)
+  );
+
   res.render('about', {
     title: 'About — ' + getSetting('site_title'),
-    aboutText: render(getSetting('about_text')),
-    aboutImage: getSetting('about_image')
+    aboutText: render(aboutTextRaw),
+    aboutImage: getSetting('about_image'),
+    aboutHeroLine,
+    ogDescription,
+    contactEmail,
+    contactQq,
+    socialLinks,
+    hasContact,
+    statsData,
+    featuredWorks,
+    recentPosts
   });
 });
 
@@ -232,24 +322,83 @@ router.get('/admin/works/:id/edit', requireAdmin, (req, res) => {
 });
 
 // Settings page
-router.get('/admin/settings', requireAdmin, (req, res) => {
+function loadSettingsMap() {
   const rows = db.prepare('SELECT * FROM settings').all();
   const settings = {};
-  rows.forEach(r => { settings[r.key] = r.value; });
-  res.render('admin/settings', { title: 'Settings — aeoleaf', settings });
+  rows.forEach((r) => { settings[r.key] = r.value; });
+  return settings;
+}
+
+router.get('/admin/settings', requireAdmin, (req, res) => {
+  const settings = loadSettingsMap();
+  const notice = req.query.ok === '1' ? '已保存' : null;
+  const saveError = req.query.err === 'social_json'
+    ? '社交链接 JSON 格式无效，请检查括号与引号后重试。'
+    : req.query.err === 'body'
+      ? '未收到表单数据（可能被代理截断或请求过大）。'
+      : null;
+  res.render('admin/settings', { title: 'Settings — aeoleaf', settings, notice, saveError });
 });
 
-router.post('/admin/settings', requireAdmin, (req, res) => {
-  const { site_title, site_subtitle, about_text, about_image } = req.body;
-  const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
-  const update = db.transaction(() => {
-    if (site_title !== undefined) stmt.run('site_title', site_title);
-    if (site_subtitle !== undefined) stmt.run('site_subtitle', site_subtitle);
-    if (about_text !== undefined) stmt.run('about_text', about_text);
-    if (about_image !== undefined) stmt.run('about_image', about_image);
-  });
-  update();
-  res.redirect('/admin/settings');
+router.post('/admin/settings', requireAdmin, (req, res, next) => {
+  try {
+    const b = req.body;
+    if (!b || typeof b !== 'object') {
+      return res.redirect('/admin/settings?err=body');
+    }
+
+    const keys = [
+      'site_title',
+      'site_subtitle',
+      'about_text',
+      'about_image',
+      'about_tagline',
+      'about_meta',
+      'contact_email',
+      'contact_qq',
+      'social_links'
+    ];
+    const hasAnyField = keys.some((k) => Object.prototype.hasOwnProperty.call(b, k));
+    if (!hasAnyField) {
+      return res.redirect('/admin/settings?err=body');
+    }
+
+    let socialVal = b.social_links;
+    if (Object.prototype.hasOwnProperty.call(b, 'social_links')) {
+      const raw = socialVal == null ? '' : String(socialVal);
+      if (raw.trim() === '') {
+        socialVal = '[]';
+      } else {
+        try {
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed)) {
+            return res.redirect('/admin/settings?err=social_json');
+          }
+          socialVal = JSON.stringify(parsed);
+        } catch {
+          return res.redirect('/admin/settings?err=social_json');
+        }
+      }
+    }
+
+    const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+    const update = db.transaction(() => {
+      if (Object.prototype.hasOwnProperty.call(b, 'site_title')) stmt.run('site_title', b.site_title ?? '');
+      if (Object.prototype.hasOwnProperty.call(b, 'site_subtitle')) stmt.run('site_subtitle', b.site_subtitle ?? '');
+      if (Object.prototype.hasOwnProperty.call(b, 'about_text')) stmt.run('about_text', b.about_text ?? '');
+      if (Object.prototype.hasOwnProperty.call(b, 'about_image')) stmt.run('about_image', b.about_image ?? '');
+      if (Object.prototype.hasOwnProperty.call(b, 'about_tagline')) stmt.run('about_tagline', b.about_tagline ?? '');
+      if (Object.prototype.hasOwnProperty.call(b, 'about_meta')) stmt.run('about_meta', b.about_meta ?? '');
+      if (Object.prototype.hasOwnProperty.call(b, 'contact_email')) stmt.run('contact_email', b.contact_email ?? '');
+      if (Object.prototype.hasOwnProperty.call(b, 'contact_qq')) stmt.run('contact_qq', b.contact_qq ?? '');
+      if (Object.prototype.hasOwnProperty.call(b, 'social_links')) stmt.run('social_links', socialVal);
+    });
+    update();
+    saveDBSync();
+    return res.redirect('/admin/settings?ok=1');
+  } catch (e) {
+    return next(e);
+  }
 });
 
 function parseDatetimeParam(val) {

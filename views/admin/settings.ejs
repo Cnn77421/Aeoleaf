@@ -32,7 +32,13 @@
     <div class="admin-header">
       <h1>Settings</h1>
     </div>
-    <form method="POST" action="/admin/settings" class="settings-form">
+    <% if (typeof notice !== 'undefined' && notice) { %>
+    <div class="admin-notice admin-notice--ok" role="status"><%= notice %></div>
+    <% } %>
+    <% if (typeof saveError !== 'undefined' && saveError) { %>
+    <div class="admin-notice admin-notice--err" role="alert"><%= saveError %></div>
+    <% } %>
+    <form method="POST" action="/admin/settings" class="settings-form" accept-charset="UTF-8">
       <div class="form-group">
         <label>Site Title</label>
         <input type="text" name="site_title" value="<%= settings.site_title || '' %>">
@@ -48,6 +54,27 @@
       <div class="form-group">
         <label>About Image URL</label>
         <input type="text" name="about_image" value="<%= settings.about_image || '' %>">
+      </div>
+      <div class="form-group">
+        <label>About 页副标题（留空则用站点副标题）</label>
+        <input type="text" name="about_tagline" value="<%= settings.about_tagline || '' %>" placeholder="一句话介绍自己或本站">
+      </div>
+      <div class="form-group">
+        <label>About 页 SEO / 分享摘要（留空则从 About 正文截取）</label>
+        <textarea name="about_meta" rows="2" placeholder="用于 meta description 与 Open Graph"><%= settings.about_meta || '' %></textarea>
+      </div>
+      <div class="form-group">
+        <label>联系邮箱</label>
+        <input type="text" name="contact_email" value="<%= settings.contact_email || '' %>" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label>QQ</label>
+        <input type="text" name="contact_qq" value="<%= settings.contact_qq || '' %>" placeholder="选填">
+      </div>
+      <div class="form-group">
+        <label>社交链接（JSON 数组）</label>
+        <textarea name="social_links" rows="5" placeholder='[{"label":"GitHub","url":"https://github.com/..."}]'><%= settings.social_links || '[]' %></textarea>
+        <p class="form-hint">每项包含 label 与 url；url 仅支持 http(s)、mailto: 或以 / 开头的站内路径。</p>
       </div>
       <button type="submit" class="btn-primary">Save Settings</button>
     </form>
