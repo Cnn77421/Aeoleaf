@@ -1,7 +1,14 @@
 const router = require('express').Router();
 const crypto = require('crypto');
+const { rateLimit } = require('../../middleware/rateLimit');
 
-router.post('/login', (req, res) => {
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 12,
+  message: 'Too many login attempts, try again later'
+});
+
+router.post('/login', loginLimiter, (req, res) => {
   const { password } = req.body;
   const adminPass = process.env.ADMIN_PASSWORD || '';
 

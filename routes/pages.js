@@ -10,7 +10,11 @@ const {
   getVisitorDetail,
   getVisitorSessionById,
   getVisitorPathBySession,
-  getVisitorsByFingerprint
+  getVisitorsByFingerprint,
+  getSessionsPage,
+  addToBlacklist,
+  removeFromBlacklist,
+  getBlacklistIps
 } = require('../config/db');
 const { requireAdmin } = require('../middleware/auth');
 const { marked } = require('marked');
@@ -43,11 +47,28 @@ router.get('/', (req, res) => {
     "SELECT * FROM posts WHERE status = 'published' ORDER BY created_at DESC LIMIT 5"
   ).all().map(p => ({ ...p, tags: JSON.parse(p.tags || '[]') }));
 
+  const featuredPostRow = db.prepare(
+    "SELECT * FROM posts WHERE status='published' AND cover_image != '' ORDER BY created_at DESC LIMIT 1"
+  ).get();
+  const featuredPost = featuredPostRow
+    ? { ...featuredPostRow, tags: JSON.parse(featuredPostRow.tags || '[]') }
+    : null;
+
+  const statsData = {
+    postsCount: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='published'").get()?.cnt || 0,
+    worksCount: db.prepare("SELECT COUNT(*) as cnt FROM works").get()?.cnt || 0,
+    totalPV: db.prepare("SELECT COUNT(*) as cnt FROM visitors").get()?.cnt || 0
+  };
+
   res.render('index', {
     title: getSetting('site_title'),
     subtitle: getSetting('site_subtitle'),
     featuredWorks,
-    recentPosts
+    recentPosts,
+    featuredPost,
+    statsData,
+    aboutText: getSetting('about_text') || '',
+    aboutImage: getSetting('about_image') || ''
   });
 });
 
@@ -255,12 +276,25 @@ function renderAdminVisitorsList(req, res, next) {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = 20;
     const filters = visitorFiltersFromQuery(req);
+    const view = req.query.view === 'sessions' ? 'sessions' : 'detail';
+
+    const allowedSortCols = ['tracked_at', 'ip', 'stay_duration_ms'];
+    const sortBy = allowedSortCols.includes(req.query.sortBy) ? req.query.sortBy : 'tracked_at';
+    const sortDir = req.query.sortDir === 'asc' ? 'asc' : 'desc';
 
     const overview = getVisitorOverview();
     const trendRows = getVisitorTrend(7);
     const regionRows = getRegionDistribution(20);
     const topPages = getTopPages(10);
-    const visitorsPage = getVisitorsPage(filters, page, limit);
+
+    let visitorsPage = null;
+    let sessionsPage = null;
+
+    if (view === 'sessions') {
+      sessionsPage = getSessionsPage(filters, page, limit);
+    } else {
+      visitorsPage = getVisitorsPage(filters, page, limit, sortBy, sortDir);
+    }
 
     res.render('admin/visitors', {
       title: 'Visitors — aeoleaf',
@@ -269,7 +303,11 @@ function renderAdminVisitorsList(req, res, next) {
       regionRows,
       topPages,
       visitorsPage,
-      filters
+      sessionsPage,
+      filters,
+      view,
+      sortBy,
+      sortDir
     });
   } catch (err) {
     next(err);
@@ -349,5 +387,40 @@ function renderVisitorDetail(req, res, next) {
 }
 
 router.get('/admin/visitor/:id', requireAdmin, renderVisitorDetail);
+
+router.post('/admin/visitors/blacklist', requireAdmin, (req, res) => {
+  try {
+    const ip = (req.body.ip || '').trim();
+    const reason = (req.body.reason || '').trim();
+    if (!ip) return res.status(400).json({ error: 'IP is required' });
+    addToBlacklist(ip, reason);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/admin/visitors/blacklist/remove', requireAdmin, (req, res) => {
+  try {
+    const ip = (req.body.ip || '').trim();
+    if (!ip) return res.status(400).json({ error: 'IP is required' });
+    removeFromBlacklist(ip);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/admin/visitors/blacklist', requireAdmin, (req, res) => {
+  try {
+    const list = getBlacklistIps();
+    res.render('admin/visitors-blacklist', {
+      title: 'IP Blacklist — aeoleaf',
+      list
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 module.exports = router;

@@ -74,7 +74,7 @@
       </div>
     </form>
     <script>
-    const postId = <%= post ? post.id : 'null' %>;
+    window.__AEOL_ADMIN_CTX = { postId: <%= post ? post.id : 'null' %>, workId: null };
     </script>
   </main>
   <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>

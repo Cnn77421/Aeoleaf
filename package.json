@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "lint": "eslint .",
+    "test": "node --test"
   },
   "dependencies": {
     "compression": "^1.8.1",
@@ -23,6 +25,7 @@
     "sql.js": "^1.10.3"
   },
   "devDependencies": {
+    "eslint": "^8.57.0",
     "nodemon": "^3.0.3"
   }
 }

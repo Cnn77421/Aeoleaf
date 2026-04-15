@@ -1,3 +1,11 @@
+/* Works 列表：单列居中；卡片宽度跟随 --list-content-max（见 main.css，对齐 yydnas 类主栏比例） */
+.works-page .tag-filter {
+  justify-content: center;
+  max-width: var(--list-content-max, min(92vw, 900px));
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .tag-filter {
   display: flex;
   gap: var(--space-2);
@@ -28,11 +36,23 @@
   border-color: var(--accent);
 }
 
-.works-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-6);
+.works-page .works-grid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
   margin-top: var(--space-8);
+  margin-bottom: var(--space-12);
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+}
+
+.works-page .work-card {
+  width: min(100%, var(--list-content-max, min(92vw, 900px)));
+  max-width: 100%;
+  box-sizing: border-box;
+  padding-bottom: var(--space-10);
 }
 
 .work-card {
@@ -48,20 +68,18 @@
 }
 
 .work-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-xl);
   border-color: var(--accent);
 }
 
-.work-image {
-  width: 100%;
-  height: 160px;
-  object-fit: cover;
-  background: var(--gradient-primary);
-}
-
+/* 封面裁切见 main.css .work-card__media；此处仅保留无封面时的底 */
 .work-card:not(:has(.work-image)) {
   background: var(--gradient-surface);
+}
+
+.works-page .work-card__media {
+  flex-shrink: 0;
 }
 
 .work-title {
@@ -94,7 +112,6 @@
 .work-detail {
   max-width: var(--content-max);
   margin: 0 auto;
-  padding-top: 80px;
 }
 
 .work-sidebar {

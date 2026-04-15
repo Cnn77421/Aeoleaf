@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="view-transition" content="same-origin">
+  <title><%= title %></title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body class="admin-body">
+  <aside class="admin-sidebar">
+    <div class="admin-logo"><a href="/">aeoleaf <span>风叶</span></a></div>
+    <nav class="admin-nav">
+      <a href="/admin/dashboard">Dashboard</a>
+      <a href="/admin/posts">Posts</a>
+      <a href="/admin/works">Works</a>
+      <a href="/admin/visitors" class="active">Visitors</a>
+      <a href="/admin/settings">Settings</a>
+    </nav>
+    <div class="admin-footer">
+      <a href="/" target="_blank">View Site</a>
+      <form method="POST" action="/admin/logout" style="margin-top:0.5rem">
+        <button type="submit" class="btn-link">Log Out</button>
+      </form>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="breadcrumb">
+      <a href="/admin/visitors">访客列表</a>
+      <span class="sep">/</span>
+      <span>IP 黑名单</span>
+    </div>
+
+    <div class="admin-header">
+      <h1>IP 黑名单</h1>
+      <a href="/admin/visitors" class="btn-link">返回列表</a>
+    </div>
+
+    <div class="recent-section" style="margin-bottom:1.5rem">
+      <h2>手动添加</h2>
+      <form onsubmit="return addBlacklist(event)" style="display:flex;gap:0.5rem;align-items:end;flex-wrap:wrap">
+        <label class="visitors-field">IP 地址<input type="text" id="bl-ip" class="input" placeholder="1.2.3.4" required></label>
+        <label class="visitors-field">原因<input type="text" id="bl-reason" class="input" placeholder="可选"></label>
+        <button type="submit" class="btn visitors-filter-btn">添加</button>
+      </form>
+    </div>
+
+    <div class="recent-section visitors-table-section">
+      <div class="visitors-table-wrap">
+        <table class="admin-table visitors-table visitors-table-compact">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>IP</th>
+              <th>原因</th>
+              <th>添加时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!list || list.length === 0) { %>
+              <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2rem">黑名单为空</td></tr>
+            <% } else { %>
+              <% list.forEach(function(row) { %>
+                <tr>
+                  <td><%= row.id %></td>
+                  <td><%= row.ip %></td>
+                  <td><%= row.reason || '—' %></td>
+                  <td><%= row.created_at %></td>
+                  <td>
+                    <button class="btn-link" onclick="removeBlacklist(this.dataset.ip)" data-ip="<%= row.ip || '' %>">移除</button>
+                  </td>
+                </tr>
+              <% }); %>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    async function addBlacklist(e) {
+      e.preventDefault();
+      var ip = document.getElementById('bl-ip').value.trim();
+      var reason = document.getElementById('bl-reason').value.trim();
+      if (!ip) return;
+      try {
+        var res = await fetch('/admin/visitors/blacklist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip: ip, reason: reason })
+        });
+        if (res.ok) location.reload();
+        else alert('操作失败');
+      } catch (err) { alert('网络错误'); }
+      return false;
+    }
+
+    async function removeBlacklist(ip) {
+      if (!confirm('确定将 ' + ip + ' 从黑名单中移除？')) return;
+      try {
+        var res = await fetch('/admin/visitors/blacklist/remove', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip: ip })
+        });
+        if (res.ok) location.reload();
+        else alert('操作失败');
+      } catch (err) { alert('网络错误'); }
+    }
+  </script>
+  <script src="/js/toast.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

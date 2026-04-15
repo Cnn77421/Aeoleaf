@@ -1,0 +1,36 @@
+<a href="#main" class="skip-link">跳到主要内容</a>
+<div id="pjax-progress" class="pjax-progress" aria-hidden="true"></div>
+<%- include('icons-sprite') %>
+<header class="site-header">
+  <nav class="nav-container" aria-label="主导航">
+    <a href="/" class="nav-logo">
+      <span>Aeoleaf <span class="nav-logo-zh">风叶</span></span>
+    </a>
+    <div class="nav-right">
+      <ul class="nav-links" id="site-nav-links">
+        <li><a href="/blog">Blog</a></li>
+        <li><a href="/works">Works</a></li>
+        <li><a href="/about">About</a></li>
+      </ul>
+      <button type="button" id="search-toggle" class="search-toggle" aria-label="打开搜索" aria-expanded="false" aria-controls="search-modal">
+        <svg class="nav-icon" width="20" height="20" aria-hidden="true"><use href="#icon-search"/></svg>
+      </button>
+      <button type="button" id="theme-toggle" class="theme-toggle" aria-label="切换深色或浅色主题">
+        <svg class="nav-icon" width="20" height="20" aria-hidden="true"><use href="#icon-theme"/></svg>
+      </button>
+      <button type="button" class="nav-toggle" aria-label="打开或关闭菜单" aria-expanded="false" aria-controls="site-nav-links">
+        <svg class="nav-icon" width="24" height="24" aria-hidden="true"><use href="#icon-menu"/></svg>
+      </button>
+    </div>
+  </nav>
+</header>
+<div id="search-modal" class="search-modal" role="dialog" aria-modal="true" aria-labelledby="search-modal-title" aria-hidden="true">
+  <div class="search-modal-content">
+    <h2 id="search-modal-title" class="visually-hidden" tabindex="-1">搜索</h2>
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="搜索文章和作品..." autocomplete="off" aria-autocomplete="list" aria-controls="search-results">
+      <button type="button" id="search-close" class="search-close-btn" aria-label="关闭搜索">✕</button>
+    </div>
+    <div id="search-results" role="region" aria-live="polite"></div>
+  </div>
+</div>

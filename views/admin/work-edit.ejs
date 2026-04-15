@@ -56,8 +56,8 @@
           <input type="number" name="year" value="<%= work ? work.year || '' : '' %>">
         </div>
         <div class="form-group">
-          <label>Date (显示格式: 2026年3月)</label>
-          <input type="text" name="date" placeholder="2026年3月" value="<%= work ? work.date || '' : '' %>">
+          <label>Date (显示格式: 2026-01-15)</label>
+          <input type="text" name="date" placeholder="2026-01-15" value="<%= work ? work.date || '' : '' %>">
         </div>
         <div class="form-group">
           <label>Tags</label>
@@ -82,7 +82,7 @@
       </div>
     </form>
     <script>
-    const workId = <%= work ? work.id : 'null' %>;
+    window.__AEOL_ADMIN_CTX = { workId: <%= work ? work.id : 'null' %>, postId: null };
     </script>
   </main>
   <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>

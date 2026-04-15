@@ -1,6 +1,13 @@
 const router = require('express').Router();
 const IP2Region = require('ip2region').default;
 const { db } = require('../../config/db');
+const { rateLimit } = require('../../middleware/rateLimit');
+
+const trackLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 180,
+  message: 'Too many tracking requests'
+});
 const ip2Region = new IP2Region();
 
 function setCors(req, res) {
@@ -171,7 +178,7 @@ router.options('/', (req, res) => {
   return res.status(204).end();
 });
 
-router.post('/', (req, res) => {
+router.post('/', trackLimiter, (req, res) => {
   setCors(req, res);
   backfillGeo();
   try {

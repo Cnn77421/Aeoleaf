@@ -2,7 +2,7 @@ const router = require('express').Router();
 const { db } = require('../../config/db');
 const slugify = require('slugify');
 const { requireAdmin } = require('../../middleware/auth');
-const { uploadPost, uploadGeneral } = require('../../middleware/upload');
+const { uploadPost, uploadGeneral, wrapUpload } = require('../../middleware/upload');
 const fs = require('fs');
 const path = require('path');
 
@@ -19,6 +19,14 @@ function parseTags(tags) {
     return JSON.stringify(tags.split(',').map(t => t.trim()).filter(Boolean));
   }
   return '[]';
+}
+
+function optionalPostCover(req, res, next) {
+  const ct = req.headers['content-type'] || '';
+  if (ct.indexOf('multipart/form-data') === 0) {
+    return wrapUpload(uploadPost.single('cover'))(req, res, next);
+  }
+  next();
 }
 
 // GET /api/posts — list posts
@@ -51,8 +59,8 @@ router.get('/:slug', (req, res) => {
   res.json({ ...post, tags: JSON.parse(post.tags || '[]') });
 });
 
-// POST /api/posts — create
-router.post('/', requireAdmin, (req, res) => {
+// POST /api/posts — create (JSON or multipart with optional `cover`)
+router.post('/', requireAdmin, optionalPostCover, (req, res) => {
   const { title, slug, excerpt, content, tags, status } = req.body;
   if (!title) return res.status(400).json({ error: 'Title required' });
 
@@ -65,12 +73,18 @@ router.post('/', requireAdmin, (req, res) => {
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run(title, finalSlug, excerpt || '', content || '', parseTags(tags), status || 'draft');
 
-  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(result.lastInsertRowid);
+  const newId = result.lastInsertRowid;
+  if (req.file) {
+    const coverUrl = '/uploads/posts/' + req.file.filename;
+    db.prepare('UPDATE posts SET cover_image = ? WHERE id = ?').run(coverUrl, newId);
+  }
+
+  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(newId);
   res.status(201).json({ ...post, tags: JSON.parse(post.tags || '[]') });
 });
 
-// PUT /api/posts/:id — update
-router.put('/:id', requireAdmin, (req, res) => {
+// PUT /api/posts/:id — update (JSON or multipart with optional `cover`)
+router.put('/:id', requireAdmin, optionalPostCover, (req, res) => {
   const { title, slug, excerpt, content, tags, status } = req.body;
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
@@ -94,6 +108,15 @@ router.put('/:id', requireAdmin, (req, res) => {
     post.id
   );
 
+  if (req.file) {
+    if (post.cover_image) {
+      const old = path.join(__dirname, '../../public', post.cover_image);
+      if (fs.existsSync(old)) fs.unlinkSync(old);
+    }
+    const coverUrl = '/uploads/posts/' + req.file.filename;
+    db.prepare('UPDATE posts SET cover_image = ? WHERE id = ?').run(coverUrl, post.id);
+  }
+
   const updated = db.prepare('SELECT * FROM posts WHERE id = ?').get(post.id);
   res.json({ ...updated, tags: JSON.parse(updated.tags || '[]') });
 });
@@ -113,7 +136,7 @@ router.delete('/:id', requireAdmin, (req, res) => {
 });
 
 // POST /api/posts/:id/cover — upload cover image
-router.post('/:id/cover', requireAdmin, uploadPost.single('cover'), (req, res) => {
+router.post('/:id/cover', requireAdmin, wrapUpload(uploadPost.single('cover')), (req, res) => {
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -129,7 +152,7 @@ router.post('/:id/cover', requireAdmin, uploadPost.single('cover'), (req, res) =
 });
 
 // POST /api/posts/upload-image — inline image for EasyMDE
-router.post('/upload-image', requireAdmin, uploadGeneral.single('image'), (req, res) => {
+router.post('/upload-image', requireAdmin, wrapUpload(uploadGeneral.single('image')), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file' });
   res.json({ url: '/uploads/general/' + req.file.filename });
 });

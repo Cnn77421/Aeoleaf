@@ -2,7 +2,7 @@ const router = require('express').Router();
 const { db } = require('../../config/db');
 const slugify = require('slugify');
 const { requireAdmin } = require('../../middleware/auth');
-const { uploadWork } = require('../../middleware/upload');
+const { uploadWork, wrapUpload } = require('../../middleware/upload');
 const fs = require('fs');
 const path = require('path');
 
@@ -19,6 +19,26 @@ function parseTags(tags) {
     return JSON.stringify(tags.split(',').map(t => t.trim()).filter(Boolean));
   }
   return '[]';
+}
+
+function optionalWorkCover(req, res, next) {
+  const ct = req.headers['content-type'] || '';
+  if (ct.indexOf('multipart/form-data') === 0) {
+    return wrapUpload(uploadWork.single('cover'))(req, res, next);
+  }
+  next();
+}
+
+function parseFeatured(v) {
+  if (v === undefined || v === null || v === '') return 0;
+  if (v === true || v === 1 || v === '1' || v === 'true') return 1;
+  return 0;
+}
+
+function parseYearField(y) {
+  if (y === undefined || y === null || y === '') return null;
+  const n = parseInt(String(y), 10);
+  return Number.isFinite(n) ? n : null;
 }
 
 // GET /api/works
@@ -46,8 +66,8 @@ router.get('/:slug', (req, res) => {
   res.json({ ...work, tags: JSON.parse(work.tags || '[]'), images: JSON.parse(work.images || '[]') });
 });
 
-// POST /api/works
-router.post('/', requireAdmin, (req, res) => {
+// POST /api/works — JSON or multipart/form-data (optional field `cover`)
+router.post('/', requireAdmin, optionalWorkCover, (req, res) => {
   const { title, slug, description, content, tags, url, year, date, featured, sort_order } = req.body;
   if (!title) return res.status(400).json({ error: 'Title required' });
 
@@ -55,21 +75,43 @@ router.post('/', requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT id FROM works WHERE slug = ?').get(finalSlug);
   if (existing) return res.status(409).json({ error: 'Slug already exists' });
 
+  const feat = featured !== undefined ? parseFeatured(featured) : 0;
+  const yr = year !== undefined && year !== '' ? parseYearField(year) : null;
+  const so = sort_order !== undefined && sort_order !== '' ? parseInt(String(sort_order), 10) : 0;
+
   const result = db.prepare(
     `INSERT INTO works (title, slug, description, content, tags, url, year, date, featured, sort_order)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     title, finalSlug, description || '', content || '', parseTags(tags),
-    url || '', year ? parseInt(year) : null, date || '',
-    featured ? 1 : 0, sort_order ? parseInt(sort_order) : 0
+    url || '', yr, date || '',
+    feat,
+    Number.isFinite(so) ? so : 0
   );
 
-  const work = db.prepare('SELECT * FROM works WHERE id = ?').get(result.lastInsertRowid);
+  const newId = result.lastInsertRowid;
+  if (req.file) {
+    const coverUrl = '/uploads/works/' + req.file.filename;
+    db.prepare('UPDATE works SET cover_image = ? WHERE id = ?').run(coverUrl, newId);
+  }
+
+  const work = db.prepare('SELECT * FROM works WHERE id = ?').get(newId);
   res.status(201).json({ ...work, tags: JSON.parse(work.tags || '[]'), images: JSON.parse(work.images || '[]') });
 });
 
-// PUT /api/works/:id
-router.put('/:id', requireAdmin, (req, res) => {
+// PUT /api/works/reorder (must be before PUT /:id)
+router.put('/reorder', requireAdmin, (req, res) => {
+  const { order } = req.body;
+  if (!Array.isArray(order)) return res.status(400).json({ error: 'order array required' });
+
+  const stmt = db.prepare('UPDATE works SET sort_order = ? WHERE id = ?');
+  const update = db.transaction(() => order.forEach(({ id, sort_order }) => stmt.run(sort_order, id)));
+  update();
+  res.json({ ok: true });
+});
+
+// PUT /api/works/:id — JSON or multipart (optional `cover`)
+router.put('/:id', requireAdmin, optionalWorkCover, (req, res) => {
   const { title, slug, description, content, tags, url, year, date, featured, sort_order } = req.body;
   const work = db.prepare('SELECT * FROM works WHERE id = ?').get(req.params.id);
   if (!work) return res.status(404).json({ error: 'Not found' });
@@ -80,6 +122,16 @@ router.put('/:id', requireAdmin, (req, res) => {
     if (existing) return res.status(409).json({ error: 'Slug already exists' });
   }
 
+  let yearVal = work.year;
+  if (year !== undefined) {
+    if (year === null || year === '') yearVal = null;
+    else yearVal = parseYearField(year);
+  }
+  const featVal = featured !== undefined ? parseFeatured(featured) : work.featured;
+  const soVal = sort_order !== undefined && sort_order !== ''
+    ? parseInt(String(sort_order), 10)
+    : work.sort_order;
+
   db.prepare(
     `UPDATE works SET title=?, slug=?, description=?, content=?, tags=?, url=?, year=?, date=?, featured=?, sort_order=?
      WHERE id=?`
@@ -88,12 +140,21 @@ router.put('/:id', requireAdmin, (req, res) => {
     description ?? work.description, content ?? work.content,
     parseTags(tags ?? work.tags),
     url ?? work.url,
-    year !== undefined ? parseInt(year) : work.year,
+    yearVal,
     date ?? work.date,
-    featured !== undefined ? (featured ? 1 : 0) : work.featured,
-    sort_order !== undefined ? parseInt(sort_order) : work.sort_order,
+    featVal,
+    Number.isFinite(soVal) ? soVal : work.sort_order,
     work.id
   );
+
+  if (req.file) {
+    if (work.cover_image) {
+      const old = path.join(__dirname, '../../public', work.cover_image);
+      if (fs.existsSync(old)) fs.unlinkSync(old);
+    }
+    const coverUrl = '/uploads/works/' + req.file.filename;
+    db.prepare('UPDATE works SET cover_image = ? WHERE id = ?').run(coverUrl, work.id);
+  }
 
   const updated = db.prepare('SELECT * FROM works WHERE id = ?').get(work.id);
   res.json({ ...updated, tags: JSON.parse(updated.tags || '[]'), images: JSON.parse(updated.images || '[]') });
@@ -115,7 +176,7 @@ router.delete('/:id', requireAdmin, (req, res) => {
 });
 
 // POST /api/works/:id/cover
-router.post('/:id/cover', requireAdmin, uploadWork.single('cover'), (req, res) => {
+router.post('/:id/cover', requireAdmin, wrapUpload(uploadWork.single('cover')), (req, res) => {
   const work = db.prepare('SELECT * FROM works WHERE id = ?').get(req.params.id);
   if (!work) return res.status(404).json({ error: 'Not found' });
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -131,7 +192,7 @@ router.post('/:id/cover', requireAdmin, uploadWork.single('cover'), (req, res) =
 });
 
 // POST /api/works/:id/images — add additional images
-router.post('/:id/images', requireAdmin, uploadWork.array('images', 10), (req, res) => {
+router.post('/:id/images', requireAdmin, wrapUpload(uploadWork.array('images', 10)), (req, res) => {
   const work = db.prepare('SELECT * FROM works WHERE id = ?').get(req.params.id);
   if (!work) return res.status(404).json({ error: 'Not found' });
   if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files' });
@@ -156,17 +217,6 @@ router.delete('/:id/images/:filename', requireAdmin, (req, res) => {
 
   const filePath = path.join(__dirname, '../../public', imgUrl);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  res.json({ ok: true });
-});
-
-// PUT /api/works/reorder
-router.put('/reorder', requireAdmin, (req, res) => {
-  const { order } = req.body; // [{ id, sort_order }, ...]
-  if (!Array.isArray(order)) return res.status(400).json({ error: 'order array required' });
-
-  const stmt = db.prepare('UPDATE works SET sort_order = ? WHERE id = ?');
-  const update = db.transaction(() => order.forEach(({ id, sort_order }) => stmt.run(sort_order, id)));
-  update();
   res.json({ ok: true });
 });
 

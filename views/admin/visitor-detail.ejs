@@ -61,7 +61,7 @@
         <h2>请求信息</h2>
         <div class="detail-grid">
           <div><strong>访问时间:</strong> <%= fmtTime(visitor.tracked_at) %></div>
-          <div><strong>IP:</strong> <%= visitor.ip || '—' %></div>
+          <div><strong>IP:</strong> <%= visitor.ip || '—' %> <% if (visitor.ip) { %><button class="btn-link btn-danger-text" onclick="blacklistIp('<%= (visitor.ip || '').replace(/'/g, "\\'") %>')">拉黑</button><% } %></div>
           <div><strong>完整 URL:</strong> <span style="word-break:break-all"><%= visitor.full_url || '—' %></span></div>
           <div><strong>路径:</strong> <%= visitor.path || '/' %></div>
           <div><strong>来源页面:</strong> <span style="word-break:break-all"><%= visitor.referer || '—' %></span></div>
@@ -176,6 +176,25 @@
       </div>
     </div>
   </main>
+  <script>
+    async function blacklistIp(ip) {
+      if (!ip) return;
+      if (!confirm('确定要将 ' + ip + ' 加入黑名单？该 IP 将无法访问网站。')) return;
+      try {
+        var res = await fetch('/admin/visitors/blacklist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip: ip, reason: '手动拉黑' })
+        });
+        if (res.ok) {
+          alert('已拉黑');
+          if (window.__adminPjax) window.__adminPjax(location.href, false);
+          else location.reload();
+        }
+        else { alert('操作失败'); }
+      } catch (e) { alert('网络错误'); }
+    }
+  </script>
   <script src="/js/toast.js"></script>
   <script src="/js/admin.js"></script>
 </body>

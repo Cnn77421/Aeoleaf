@@ -74,9 +74,56 @@
         }
       %>
 
+      <%
+        function fmtTime(ms) {
+          if (!ms) return '—';
+          var d = new Date(Number(ms));
+          if (isNaN(d.getTime())) return String(ms);
+          var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+          return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate())
+               + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+        }
+        function fmtStay(ms) {
+          var n = Number(ms);
+          if (!n || n <= 0) return '—';
+          if (n < 1000) return n + 'ms';
+          return (n / 1000).toFixed(1) + 's';
+        }
+        function maskIp(ip) {
+          if (!ip) return '—';
+          var parts = ip.split('.');
+          if (parts.length === 4) return parts[0] + '.' + parts[1] + '.xx.' + parts[3];
+          return ip.replace(/:.+:/, ':xx:');
+        }
+        function buildPageUrl(p, extraParams) {
+          var u = '?page=' + p
+            + '&view=' + (view || 'detail')
+            + '&startTime=' + (filters.startTime || '')
+            + '&endTime=' + (filters.endTime || '')
+            + '&ip=' + encodeURIComponent(filters.ip || '')
+            + '&fingerprint=' + encodeURIComponent(filters.fingerprint || '')
+            + '&city=' + encodeURIComponent(filters.city || '')
+            + '&deviceType=' + encodeURIComponent(filters.deviceType || '')
+            + '&sortBy=' + (sortBy || 'tracked_at')
+            + '&sortDir=' + (sortDir || 'desc');
+          return u;
+        }
+        function sortUrl(col) {
+          var newDir = (sortBy === col && sortDir === 'asc') ? 'desc' : 'asc';
+          return buildPageUrl(1).replace('sortBy=' + (sortBy || 'tracked_at'), 'sortBy=' + col).replace('sortDir=' + (sortDir || 'desc'), 'sortDir=' + newDir);
+        }
+        function sortArrow(col) {
+          if (sortBy !== col) return '';
+          return sortDir === 'asc' ? ' ↑' : ' ↓';
+        }
+      %>
+
       <div class="recent-section visitors-filter-section">
         <h2>筛选</h2>
         <form method="GET" action="/admin/visitors" class="visitors-filter-grid">
+          <input type="hidden" name="view" value="<%= view || 'detail' %>">
+          <input type="hidden" name="sortBy" value="<%= sortBy || 'tracked_at' %>">
+          <input type="hidden" name="sortDir" value="<%= sortDir || 'desc' %>">
           <label class="visitors-field">开始时间<input type="datetime-local" name="startTime" value="<%= msToDatetimeLocal(filters.startTime) %>" class="input"></label>
           <label class="visitors-field">结束时间<input type="datetime-local" name="endTime" value="<%= msToDatetimeLocal(filters.endTime) %>" class="input"></label>
           <label class="visitors-field">IP<input type="text" name="ip" value="<%= filters.ip || '' %>" class="input"></label>
@@ -94,88 +141,125 @@
         </form>
       </div>
 
-      <div class="recent-section visitors-table-section">
-        <h2>访客明细</h2>
-        <div class="visitors-table-wrap">
-          <table class="admin-table visitors-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>时间</th>
-                <th>IP</th>
-                <th>页面</th>
-                <th>设备</th>
-                <th>地域</th>
-                <th>网络</th>
-                <th>停留</th>
-                <th>指纹</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% if (visitorsPage.rows.length === 0) { %>
-                <tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:2rem">暂无数据</td></tr>
-              <% } %>
-              <%
-                function fmtTime(ms) {
-                  if (!ms) return '—';
-                  var d = new Date(Number(ms));
-                  if (isNaN(d.getTime())) return String(ms);
-                  var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
-                  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate())
-                       + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
-                }
-                function fmtStay(ms) {
-                  var n = Number(ms);
-                  if (!n || n <= 0) return '—';
-                  if (n < 1000) return n + 'ms';
-                  return (n / 1000).toFixed(1) + 's';
-                }
-              %>
-              <% visitorsPage.rows.forEach(function(row) { %>
-                <tr>
-                  <td><%= row.id %></td>
-                  <td style="white-space:nowrap"><%= fmtTime(row.tracked_at) %></td>
-                  <td><%= row.ip || '—' %></td>
-                  <td class="cell-path"><%= row.path || '/' %></td>
-                  <td style="white-space:nowrap"><%= row.device_type %> · <%= row.os_name %> · <%= row.browser_name %></td>
-                  <td><%= [row.country, row.province, row.city].filter(Boolean).join('/') || '—' %></td>
-                  <td><%= (row.network_type && String(row.network_type).trim()) ? row.network_type : '—' %></td>
-                  <td><%= fmtStay(row.stay_duration_ms) %></td>
-                  <td class="cell-fingerprint"><%= (row.fingerprint_id || '').slice(0, 12) %>…</td>
-                  <td style="white-space:nowrap">
-                    <a class="btn-link" href="/admin/visitors/fingerprint?fp=<%= encodeURIComponent(row.fingerprint_id || '') %>">路径</a>
-                    <span style="color:var(--border);margin:0 0.2rem">|</span>
-                    <a class="btn-link" href="/admin/visitor/<%= row.id %>">详情</a>
-                  </td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
-
-        <%
-          var curPage = visitorsPage.page;
-          var totalPages = visitorsPage.totalPages || 1;
-          var prevPage = Math.max(1, curPage - 1);
-          var nextPage = Math.min(totalPages, curPage + 1);
-          function buildPageUrl(p) {
-            return '?page=' + p
-              + '&startTime=' + (filters.startTime || '')
-              + '&endTime=' + (filters.endTime || '')
-              + '&ip=' + encodeURIComponent(filters.ip || '')
-              + '&fingerprint=' + encodeURIComponent(filters.fingerprint || '')
-              + '&city=' + encodeURIComponent(filters.city || '')
-              + '&deviceType=' + encodeURIComponent(filters.deviceType || '');
-          }
-        %>
-        <div class="visitors-pagination">
-          <div class="visitors-pagination-meta">共 <%= visitorsPage.total %> 条，第 <%= curPage %> / <%= totalPages %> 页</div>
-          <div class="visitors-pagination-actions">
-            <a class="btn-link<%= curPage <= 1 ? ' pagination-disabled' : '' %>" href="<%= buildPageUrl(prevPage) %>">上一页</a>
-            <a class="btn-link<%= curPage >= totalPages ? ' pagination-disabled' : '' %>" href="<%= buildPageUrl(nextPage) %>">下一页</a>
+      <div id="table" class="recent-section visitors-table-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem">
+          <h2 style="margin-bottom:0">
+            <% if (view === 'sessions') { %>会话合并<% } else { %>访客明细<% } %>
+          </h2>
+          <div class="view-toggle">
+            <a class="btn-link<%= view !== 'sessions' ? ' view-toggle-active' : '' %>" href="<%= buildPageUrl(1).replace('view=sessions', 'view=detail') %>">明细</a>
+            <span style="color:var(--border);margin:0 0.3rem">|</span>
+            <a class="btn-link<%= view === 'sessions' ? ' view-toggle-active' : '' %>" href="<%= buildPageUrl(1).replace('view=detail', 'view=sessions') %>">会话</a>
+            <span style="color:var(--border);margin:0 0.3rem">|</span>
+            <a class="btn-link" href="/admin/visitors/blacklist">黑名单</a>
           </div>
         </div>
+
+        <% if (view === 'sessions') { %>
+          <div class="visitors-table-wrap">
+            <table class="admin-table visitors-table">
+              <thead>
+                <tr>
+                  <th>会话 ID</th>
+                  <th>指纹</th>
+                  <th>开始时间</th>
+                  <th>结束时间</th>
+                  <th>页面数</th>
+                  <th>总停留</th>
+                  <th>访问路径</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!sessionsPage || sessionsPage.rows.length === 0) { %>
+                  <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:2rem">暂无会话数据</td></tr>
+                <% } else { %>
+                  <% sessionsPage.rows.forEach(function(row) { %>
+                    <tr>
+                      <td>#<%= row.id %></td>
+                      <td class="cell-fingerprint"><%= (row.fingerprint_id || '').slice(0, 12) %>…</td>
+                      <td style="white-space:nowrap"><%= fmtTime(row.start_time) %></td>
+                      <td style="white-space:nowrap"><%= fmtTime(row.end_time) %></td>
+                      <td><%= row.page_count %></td>
+                      <td><%= fmtStay(row.total_duration) %></td>
+                      <td class="cell-path"><%= (row.paths || '—').replace(/,/g, ' → ') %></td>
+                    </tr>
+                  <% }); %>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+          <% if (sessionsPage) { %>
+            <%
+              var curPage = sessionsPage.page;
+              var totalPages = sessionsPage.totalPages || 1;
+              var prevPage = Math.max(1, curPage - 1);
+              var nextPage = Math.min(totalPages, curPage + 1);
+            %>
+            <div class="visitors-pagination">
+              <div class="visitors-pagination-meta">共 <%=sessionsPage.total %> 条，第 <%= curPage %> / <%= totalPages %> 页</div>
+            </div>
+          <% } %>
+
+        <% } else { %>
+          <div class="visitors-table-wrap">
+            <table class="admin-table visitors-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th class="sort-header"><a href="<%= sortUrl('tracked_at') %>">时间<%= sortArrow('tracked_at') %></a></th>
+                  <th class="sort-header"><a href="<%= sortUrl('ip') %>">IP<%= sortArrow('ip') %></a></th>
+                  <th>页面</th>
+                  <th>设备</th>
+                  <th>地域</th>
+                  <th>网络</th>
+                  <th class="sort-header"><a href="<%= sortUrl('stay_duration_ms') %>">停留<%= sortArrow('stay_duration_ms') %></a></th>
+                  <th>指纹</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!visitorsPage || visitorsPage.rows.length === 0) { %>
+                  <tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:2rem">暂无数据</td></tr>
+                <% } else { %>
+                  <% visitorsPage.rows.forEach(function(row) { %>
+                    <tr<% if (row.is_bot) { %> class="row-bot"<% } %>>
+                      <td><%= row.id %></td>
+                      <td style="white-space:nowrap"><%= fmtTime(row.tracked_at) %></td>
+                      <td><%= maskIp(row.ip) %></td>
+                      <td class="cell-path"><%= row.path || '/' %></td>
+                      <td style="white-space:nowrap">
+                        <%= row.device_type %> · <%= row.os_name %> · <%= row.browser_name %>
+                        <% if (row.is_bot) { %><span class="badge-bot">爬虫</span><% } %>
+                      </td>
+                      <td><%= [row.country, row.province, row.city].filter(Boolean).join('/') || '—' %></td>
+                      <td><%= (row.network_type && String(row.network_type).trim()) ? row.network_type : '—' %></td>
+                      <td><%= fmtStay(row.stay_duration_ms) %></td>
+                      <td class="cell-fingerprint"><%= (row.fingerprint_id || '').slice(0, 12) %>…</td>
+                      <td style="white-space:nowrap">
+                        <a class="btn-link" href="/admin/visitors/fingerprint?fp=<%= encodeURIComponent(row.fingerprint_id || '') %>">路径</a>
+                        <span class="action-sep">|</span>
+                        <a class="btn-link" href="/admin/visitor/<%= row.id %>">详情</a>
+                        <span class="action-sep">|</span>
+                        <button class="btn-link btn-danger-text" onclick="blacklistIp(this.dataset.ip)" data-ip="<%= row.ip || '' %>">拉黑</button>
+                      </td>
+                    </tr>
+                  <% }); %>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+          <% if (visitorsPage) { %>
+            <%
+              var curPage = visitorsPage.page;
+              var totalPages = visitorsPage.totalPages || 1;
+              var prevPage = Math.max(1, curPage - 1);
+              var nextPage = Math.min(totalPages, curPage + 1);
+            %>
+            <div class="visitors-pagination">
+              <div class="visitors-pagination-meta">共 <%=visitorsPage.total %> 条，第 <%= curPage %> / <%= totalPages %> 页</div>
+            </div>
+          <% } %>
+        <% } %>
       </div>
     </div>
   </main>
@@ -191,8 +275,8 @@
         data: {
           labels: trendRows.map(function(x) { return x.d; }),
           datasets: [
-            { label: 'PV', data: trendRows.map(function(x) { return x.pv; }), borderColor: '#3A7D44', backgroundColor: 'rgba(58,125,68,0.15)', tension: 0.3, fill: true },
-            { label: 'UV', data: trendRows.map(function(x) { return x.uv; }), borderColor: '#8FAF8F', backgroundColor: 'rgba(143,175,143,0.15)', tension: 0.3, fill: true }
+            { label: 'PV', data: trendRows.map(function(x) { return x.pv; }), borderColor: '#7B2638', backgroundColor: 'rgba(123,38,56,0.15)', tension: 0.3, fill: true },
+            { label: 'UV', data: trendRows.map(function(x) { return x.uv; }), borderColor: '#C47184', backgroundColor: 'rgba(196,113,132,0.15)', tension: 0.3, fill: true }
           ]
         },
         options: { plugins: { legend: { position: 'bottom' } } }
@@ -225,6 +309,23 @@
         },
         options: { plugins: { legend: { display: false } } }
       });
+    }
+    async function blacklistIp(ip) {
+      if (!ip) return;
+      if (!confirm('确定要将 ' + ip + ' 加入黑名单？该 IP 将无法访问网站。')) return;
+      try {
+        var res = await fetch('/admin/visitors/blacklist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip: ip, reason: '手动拉黑' })
+        });
+        if (res.ok) {
+          alert('已拉黑');
+          if (window.__adminPjax) window.__adminPjax(location.href, false);
+          else location.reload();
+        }
+        else { alert('操作失败'); }
+      } catch (e) { alert('网络错误'); }
     }
   </script>
   <script src="/js/toast.js"></script>

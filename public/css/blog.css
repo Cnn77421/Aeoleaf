@@ -1,3 +1,11 @@
+.blog-page .blog-list,
+.blog-page .pagination,
+.blog-page .empty-state {
+  max-width: var(--list-content-max, min(92vw, 900px));
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .blog-list {
   margin-top: var(--space-8);
 }
@@ -16,6 +24,8 @@
 .blog-item h2 {
   margin: var(--space-2) 0;
   font-size: 1.5rem;
+  font-family: var(--font-journal);
+  font-weight: 600;
 }
 
 .blog-excerpt {
@@ -45,10 +55,28 @@
   margin-top: var(--space-8);
 }
 
+.post-hero {
+  width: 100%;
+  height: 360px;
+  padding-top: calc(80px + var(--space-8));
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.post-hero__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 40%, var(--bg) 100%);
+}
+
 .post-detail {
   max-width: var(--content-max);
   margin: 0 auto;
-  padding-top: 80px;
+}
+
+.post-hero + .post-detail {
+  padding-top: var(--space-4);
 }
 
 .back-link {
@@ -65,7 +93,7 @@
 }
 
 .post-detail h1 {
-  font-family: var(--font-serif);
+  font-family: var(--font-journal);
   font-size: 2.2rem;
   margin-bottom: var(--space-4);
 }
@@ -78,7 +106,7 @@
 }
 
 .prose {
-  font-family: var(--font-serif);
+  font-family: var(--font-journal);
   font-size: 1.125rem;
   line-height: 1.85;
 }

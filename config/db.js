@@ -1,11 +1,31 @@
 const initSqlJs = require('sql.js');
 const fs = require('fs');
+const fsp = require('fs').promises;
 const path = require('path');
 
-const dbDir = path.join(__dirname, '../database');
-const dbPath = path.join(dbDir, 'aeoleaf.db');
+const defaultDbPath = path.join(__dirname, '../database', 'aeoleaf.db');
+const dbPath = process.env.DATABASE_PATH
+  ? path.resolve(process.env.DATABASE_PATH)
+  : defaultDbPath;
+const dbDir = path.dirname(dbPath);
 
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+
+const SAVE_DEBOUNCE_MS = 400;
+let saveDebounceTimer = null;
+
+function exportDbBuffer() {
+  return Buffer.from(db.export());
+}
+
+function saveDBSync() {
+  if (saveDebounceTimer) {
+    clearTimeout(saveDebounceTimer);
+    saveDebounceTimer = null;
+  }
+  if (!db) return;
+  fs.writeFileSync(dbPath, exportDbBuffer());
+}
 
 let db;
 const queryCache = new Map();
@@ -186,13 +206,40 @@ async function initDB() {
   db.run('CREATE INDEX IF NOT EXISTS idx_visitors_page_view_id ON visitors(page_view_id)');
   db.run('CREATE INDEX IF NOT EXISTS idx_visitor_sessions_fingerprint ON visitor_sessions(fingerprint_id)');
 
-  saveDB();
+  db.run(`
+    CREATE TABLE IF NOT EXISTS ip_blacklist (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ip TEXT NOT NULL UNIQUE,
+      reason TEXT DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  db.run('CREATE INDEX IF NOT EXISTS idx_blacklist_ip ON ip_blacklist(ip)');
+
+  refreshBlacklistCache();
+  saveDBSync();
   return db;
 }
 
 function saveDB() {
-  const data = db.export();
-  fs.writeFileSync(dbPath, data);
+  if (!db) return;
+  if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+  saveDebounceTimer = setTimeout(() => {
+    saveDebounceTimer = null;
+    const buf = exportDbBuffer();
+    fsp.writeFile(dbPath, buf).catch((err) => {
+      console.error('Database write failed:', err);
+    });
+  }, SAVE_DEBOUNCE_MS);
+}
+
+async function flushDB() {
+  if (saveDebounceTimer) {
+    clearTimeout(saveDebounceTimer);
+    saveDebounceTimer = null;
+  }
+  if (!db) return;
+  await fsp.writeFile(dbPath, exportDbBuffer());
 }
 
 const dbWrapper = {
@@ -337,17 +384,21 @@ function getTopPages(limit = 10) {
   `).all(limit);
 }
 
-function getVisitorsPage(filters, page = 1, limit = 20) {
+function getVisitorsPage(filters, page = 1, _limit = 20, sortBy = 'tracked_at', sortDir = 'desc') {
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = 20;
   const offset = (safePage - 1) * safeLimit;
   const { where, params } = buildVisitorFilter(filters || {});
 
+  const allowedSort = { tracked_at: 1, ip: 1, stay_duration_ms: 1 };
+  const col = allowedSort[sortBy] ? sortBy : 'tracked_at';
+  const dir = sortDir === 'asc' ? 'ASC' : 'DESC';
+
   const total = dbWrapper.prepare(`SELECT COUNT(*) as cnt FROM visitors${where}`).get(...params)?.cnt || 0;
   const rows = dbWrapper.prepare(`
     SELECT * FROM visitors
     ${where}
-    ORDER BY tracked_at DESC
+    ORDER BY ${col} ${dir}
     LIMIT ? OFFSET ?
   `).all(...params, safeLimit, offset);
 
@@ -401,8 +452,74 @@ function getVisitorsByFingerprint(fingerprintId, limit = 500) {
   `).all(fp, cap);
 }
 
+function getSessionsPage(filters, page = 1, _limit = 20) {
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = 20;
+  const offset = (safePage - 1) * safeLimit;
+
+  let where = ' WHERE 1=1';
+  const params = [];
+
+  if (filters && filters.fingerprint) {
+    where += ' AND vs.fingerprint_id LIKE ?';
+    params.push(`%${filters.fingerprint}%`);
+  }
+  if (filters && filters.startTime) {
+    where += ' AND vs.start_time >= ?';
+    params.push(filters.startTime);
+  }
+  if (filters && filters.endTime) {
+    where += ' AND vs.start_time <= ?';
+    params.push(filters.endTime);
+  }
+
+  const total = dbWrapper.prepare(`SELECT COUNT(*) as cnt FROM visitor_sessions vs${where}`).get(...params)?.cnt || 0;
+  const rows = dbWrapper.prepare(`
+    SELECT vs.*,
+      (SELECT GROUP_CONCAT(DISTINCT path) FROM visitors WHERE visitor_session_id = vs.id) as paths
+    FROM visitor_sessions vs
+    ${where}
+    ORDER BY vs.start_time DESC
+    LIMIT ? OFFSET ?
+  `).all(...params, safeLimit, offset);
+
+  return { rows, total, page: safePage, limit: safeLimit, totalPages: Math.ceil(total / safeLimit) };
+}
+
+let blacklistSet = new Set();
+
+function refreshBlacklistCache() {
+  blacklistSet = new Set();
+  try {
+    const stmt = db.prepare('SELECT ip FROM ip_blacklist');
+    const rows = [];
+    while (stmt.step()) rows.push(stmt.getAsObject());
+    stmt.free();
+    rows.forEach(r => blacklistSet.add(r.ip));
+  } catch (e) {}
+}
+
+function isBlacklisted(ip) {
+  return blacklistSet.has(ip);
+}
+
+function getBlacklistIps() {
+  return dbWrapper.prepare('SELECT * FROM ip_blacklist ORDER BY created_at DESC').all();
+}
+
+function addToBlacklist(ip, reason) {
+  dbWrapper.prepare('INSERT OR IGNORE INTO ip_blacklist (ip, reason) VALUES (?, ?)').run(ip, reason || '');
+  refreshBlacklistCache();
+}
+
+function removeFromBlacklist(ip) {
+  dbWrapper.prepare('DELETE FROM ip_blacklist WHERE ip = ?').run(ip);
+  refreshBlacklistCache();
+}
+
 module.exports = {
   initDB,
+  flushDB,
   db: dbWrapper,
   getVisitorOverview,
   getVisitorTrend,
@@ -413,5 +530,10 @@ module.exports = {
   getVisitorDetail,
   getVisitorSessionById,
   getVisitorPathBySession,
-  getVisitorsByFingerprint
+  getVisitorsByFingerprint,
+  getSessionsPage,
+  isBlacklisted,
+  getBlacklistIps,
+  addToBlacklist,
+  removeFromBlacklist
 };

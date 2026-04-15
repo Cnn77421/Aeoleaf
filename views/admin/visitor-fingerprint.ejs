@@ -55,6 +55,12 @@
         if (n < 1000) return n + 'ms';
         return (n / 1000).toFixed(1) + 's';
       }
+      function maskIp(ip) {
+        if (!ip) return '—';
+        var parts = ip.split('.');
+        if (parts.length === 4) return parts[0] + '.' + parts[1] + '.xx.' + parts[3];
+        return ip.replace(/:.+:/, ':xx:');
+      }
     %>
 
     <div class="recent-section visitors-table-section">
@@ -80,7 +86,7 @@
                 <td class="cell-path"><%= row.path %></td>
                 <td class="cell-referer"><%= row.full_url %></td>
                 <td><%= fmtStay(row.stay_duration_ms) %></td>
-                <td><%= row.ip || '—' %></td>
+                <td><%= maskIp(row.ip) %></td>
                 <td><%= [row.country, row.province, row.city].filter(Boolean).join(' / ') || '—' %></td>
               </tr>
             <% }); %>
