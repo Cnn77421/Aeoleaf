@@ -71,51 +71,38 @@
     return p;
   }
 
-  // Append a <link rel="stylesheet"> and resolve when it has loaded. Used
-  // during PJAX navigations so page-specific CSS (home.css, works-v2.css,
-  // blog.css, …) is injected into the live document before the main swap.
-  // Without this, navigating into a page whose `extraCss` adds a new
-  // stylesheet leaves the previous stylesheet in effect and the target page
-  // renders unstyled — only a hard reload fixes it.
+  // Append a <link rel="stylesheet"> to the document head.
+  // Used during PJAX navigations to inject page-specific stylesheets.
   function loadStylesheet(href) {
-    if (!href) return Promise.resolve();
-    if (_loadedStyles[href] === 'loaded') return Promise.resolve();
-    if (_loadedStyles[href] && _loadedStyles[href].then) return _loadedStyles[href];
-    // Already in the DOM? Compare the element's resolved .href (always
-    // absolute) rather than the authored attribute; a CSS selector like
-    // link[href="..."] would only match the raw attribute string.
-    var nodes = document.querySelectorAll('link[rel="stylesheet"]');
+    if (!href) return;
+    
+    // Check if this stylesheet is already in the DOM
+    var nodes = document.querySelectorAll('head link[rel="stylesheet"]');
     for (var x = 0; x < nodes.length; x++) {
-      if (nodes[x].href === href) { _loadedStyles[href] = 'loaded'; return Promise.resolve(); }
-    }
-    var p = new Promise(function (resolve) {
-      var link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = href;
-      // Never block PJAX on a bad CSS URL: always resolve. A broken stylesheet
-      // is far less harmful than a permanently hung navigation.
-      link.onload = function () { _loadedStyles[href] = 'loaded'; resolve(); };
-      link.onerror = function () { delete _loadedStyles[href]; resolve(); };
-
-      // CRITICAL — cascade anchor.
-      // tokens.css and bento.css are authored as the "override layer" and
-      // MUST remain last in the cascade. A naive appendChild() would push
-      // page-specific stylesheets (home.css, blog.css, works-v2.css…) after
-      // those anchors and silently break anything tokens.css re-points or
-      // bento.css supplies, which is what users see as a "half-styled" page.
-      // Insert before the first override-layer link instead.
-      var anchor = document.querySelector(
-        'link[rel="stylesheet"][href*="/css/tokens.css"], ' +
-        'link[rel="stylesheet"][href*="/css/bento.css"]'
-      );
-      if (anchor) {
-        document.head.insertBefore(link, anchor);
-      } else {
-        document.head.appendChild(link);
+      var existingHref = nodes[x].getAttribute('href') || '';
+      // Compare paths ignoring query strings (version hashes)
+      if (existingHref.split('?')[0] === href.split('?')[0]) {
+        return;  // Already loaded
       }
-    });
-    _loadedStyles[href] = p;
-    return p;
+    }
+    
+    // Not in DOM, so add it
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+
+    // CRITICAL — cascade anchor.
+    // tokens.css and bento.css are authored as the "override layer" and
+    // MUST remain last in the cascade. Insert page-specific CSS before them.
+    var anchor = document.querySelector(
+      'link[rel="stylesheet"][href*="/css/tokens.css"], ' +
+      'link[rel="stylesheet"][href*="/css/bento.css"]'
+    );
+    if (anchor) {
+      document.head.insertBefore(link, anchor);
+    } else {
+      document.head.appendChild(link);
+    }
   }
 
   function execInlineScripts(container) {
@@ -295,28 +282,66 @@
       var newMain = doc.querySelector(MAIN_SEL);
       if (!newMain) throw new Error('no main');
 
-      // Inject stylesheets from the target page that aren't on the current
-      // page yet (e.g. /css/home.css when arriving at "/" via PJAX). Done
-      // BEFORE swapping main so the new markup paints with correct styles
-      // on the first frame — otherwise users see a flash of unstyled or
-      // half-styled content that only a hard reload fixes.
-      var headLinks = doc.querySelectorAll('head link[rel="stylesheet"]');
-      for (var sLi = 0; sLi < headLinks.length; sLi++) {
-        // Using .href (absolute) makes comparison with existing <link> nodes
-        // consistent regardless of how the source was authored.
-        await loadStylesheet(headLinks[sLi].href);
-      }
+      // CRITICAL: Sync all stylesheets from the target page.
+      // Remove page-specific CSS that the new page won't need,
+      // then add page-specific CSS that the new page requires.
+      // This ensures clean cascade without conflicts.
+      
+      var PAGE_SPECIFIC_CSS = [
+        '/css/home.css', '/css/blog-v2.css', '/css/blog.css', 
+        '/css/works-v2.css', '/css/works.css', '/css/about-v2.css'
+      ];
+      
+      // Remove old page-specific stylesheets
+      var currentLinks = Array.from(document.querySelectorAll('head link[rel="stylesheet"]'));
+      currentLinks.forEach(function (link) {
+        var href = link.getAttribute('href') || '';
+        var isPageSpecific = PAGE_SPECIFIC_CSS.some(function (pattern) {
+          return href.indexOf(pattern) !== -1;
+        });
+        if (isPageSpecific) {
+          link.remove();
+        }
+      });
+
+      // Extract stylesheet hrefs from the target page's head
+      var newLinks = Array.from(doc.querySelectorAll('head link[rel="stylesheet"]'));
+      var newHrefs = newLinks.map(function (l) { return l.getAttribute('href'); }).filter(Boolean);
+      
+      // Add stylesheets that are not already in the document
+      newHrefs.forEach(function (href) {
+        var already exists = !!document.querySelector('head link[rel="stylesheet"][href="' + href + '"]');
+        if (!alreadyExists) {
+          var link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = href;
+          // Insert before tokens.css/bento.css so they stay last in cascade
+          var anchor = document.querySelector(
+            'link[rel="stylesheet"][href*="/tokens.css"], ' +
+            'link[rel="stylesheet"][href*="/bento.css"]'
+          );
+          if (anchor) {
+            document.head.insertBefore(link, anchor);
+          } else {
+            document.head.appendChild(link);
+          }
+        }
+      });
 
       var headScripts = doc.querySelectorAll('head script[src]');
       for (var i = 0; i < headScripts.length; i++) {
         await loadScript(headScripts[i].src);
       }
 
-      await new Promise(function (r) { setTimeout(r, DURATION); });
+      // Wait for CSS to parse and render
+      await new Promise(function (r) { setTimeout(r, DURATION + 150); });
 
       mainEl.innerHTML = newMain.innerHTML;
 
       execInlineScripts(mainEl);
+      
+      // Critical: delay reinit to ensure CSS is applied
+      await new Promise(function (r) { setTimeout(r, 50); });
       reinitPageFeatures();
 
       var newTitle = doc.querySelector('title');
@@ -375,7 +400,11 @@
     pjaxNavigate(location.href, false);
   });
 
-  reinitPageFeatures();
+  // Always wait for window 'load' event for first page load.
+  // This ensures all CSS is parsed and applied before we initialize page features.
+  window.addEventListener('load', function initOnLoad() {
+    reinitPageFeatures();
+  }, { once: true });
 })();
 
 // Theme toggle
