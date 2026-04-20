@@ -1,246 +1,190 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= title %></title>
-  <meta name="description" content="<%= locals.ogDescription != null && String(locals.ogDescription) ? locals.ogDescription : '关于我 — 个人博客与作品集' %>">
-  <meta name="keywords" content="关于,个人简介,联系方式">
-  <meta name="author" content="aeoleaf">
-  <meta name="theme-color" content="#3A7D44">
-  <link rel="canonical" href="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/about">
-
-  <!-- Open Graph -->
-  <meta property="og:title" content="<%= title %>">
-  <meta property="og:description" content="<%= locals.ogDescription != null && String(locals.ogDescription) ? locals.ogDescription : '关于我 — 个人博客与作品集' %>">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/about">
-  <% if (locals.aboutImage) { %>
-  <meta property="og:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %><%= locals.aboutImage %>">
-  <% } else { %>
-  <meta property="og:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/images/logo.png">
-  <% } %>
-
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="<%= title %>">
-  <meta name="twitter:description" content="<%= locals.ogDescription != null && String(locals.ogDescription) ? locals.ogDescription : '关于我 — 个人博客与作品集' %>">
-  <% if (locals.aboutImage) { %>
-  <meta name="twitter:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %><%= locals.aboutImage %>">
-  <% } else { %>
-  <meta name="twitter:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/images/logo.png">
-  <% } %>
-
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Lora:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/main.css?v=5">
+<%- include('partials/public-head', {
+  title: title,
+  description: (locals.ogDescription != null && String(locals.ogDescription)) ? locals.ogDescription : '关于我 — 个人博客与作品集',
+  canonicalPath: '/about',
+  ogImagePath: locals.aboutImage || '/images/logo.png',
+  twitterCard: 'summary',
+  extraCss: ['/css/about-v2.css']
+}) %>
 </head>
-<body>
-  <header class="site-header">
-    <nav class="nav-container">
-      <a href="/" class="nav-logo">Aeoleaf <span class="nav-logo-zh">风叶</span></a>
-      <div class="nav-right">
-        <ul class="nav-links">
-          <li><a href="/blog">Blog</a></li>
-          <li><a href="/works">Works</a></li>
-          <li><a href="/about">About</a></li>
-        </ul>
-        <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line>
-            <line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-          </svg>
-        </button>
-      </div>
-    </nav>
-  </header>
-  <main class="site-main">
-    <div class="content-container about-page">
-      <header class="about-hero">
-        <h1>About</h1>
-        <p class="about-hero__tagline"><%= locals.aboutHeroLine != null && String(locals.aboutHeroLine) ? locals.aboutHeroLine : '个人博客与作品集' %></p>
+<body class="about-v2">
+  <%- include('partials/public-header') %>
+  <main id="main" class="site-main">
+    <div class="ab-shell">
+
+      <!-- Hero -->
+      <header class="ab-hero ab-reveal">
+        <p class="ab-hero__label">About</p>
+        <h1 class="ab-hero__title">关于</h1>
+        <p class="ab-hero__desc"><%= locals.aboutHeroLine != null && String(locals.aboutHeroLine) ? locals.aboutHeroLine : '个人博客与作品集' %></p>
       </header>
 
-      <section class="about-profile" aria-labelledby="about-profile-heading">
-        <h2 id="about-profile-heading" class="visually-hidden">简介与数据</h2>
-        <div class="about-profile__inner">
+      <div class="ab-divider ab-reveal"></div>
+
+      <!-- Profile: avatar + about text -->
+      <section class="ab-profile ab-reveal" aria-label="个人简介">
+        <div class="ab-profile__avatar">
           <% if (locals.aboutImage) { %>
-          <div class="about-profile__avatar">
-            <img src="<%= locals.aboutImage %>" alt="">
-          </div>
+          <img src="<%= locals.aboutImage %>" alt="">
           <% } else { %>
-          <div class="about-profile__avatar about-profile__avatar--placeholder" aria-hidden="true">
+          <div class="ab-profile__avatar-placeholder" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           </div>
           <% } %>
-          <div class="about-profile__meta">
-            <ul class="about-stats" role="list">
-              <% var aboutSiteStats = (typeof statsData !== 'undefined' && statsData) ? statsData : ((locals.statsData && typeof locals.statsData === 'object') ? locals.statsData : { postsCount: 0, worksCount: 0, totalPV: 0 }); %>
-              <li><span class="about-stats__num" data-target="<%= aboutSiteStats.postsCount %>">0</span><span class="about-stats__lbl">文章</span></li>
-              <li><span class="about-stats__num" data-target="<%= aboutSiteStats.worksCount %>">0</span><span class="about-stats__lbl">作品</span></li>
-              <li><span class="about-stats__num" data-target="<%= aboutSiteStats.totalPV %>">0</span><span class="about-stats__lbl">访问记录</span></li>
-            </ul>
+        </div>
+        <div class="ab-profile__body">
+          <div class="ab-profile__prose">
+            <% if (locals.aboutText) { %>
+              <%- locals.aboutText %>
+            <% } else { %>
+              <p>Welcome to aeoleaf. 在后台 <strong>Settings</strong> 中填写 About 文本（支持 Markdown）即可展示你的介绍。</p>
+            <% } %>
           </div>
         </div>
       </section>
 
-      <section class="about-body prose" aria-labelledby="about-body-heading">
-        <h2 id="about-body-heading" class="about-section-title">关于</h2>
-        <% if (locals.aboutText) { %>
-          <%- locals.aboutText %>
-        <% } else { %>
-          <p>Welcome to aeoleaf. 在后台 <strong>Settings</strong> 中填写 About 文本（支持 Markdown）即可展示你的介绍。</p>
-        <% } %>
+      <div class="ab-divider ab-reveal"></div>
+
+      <!-- Stats -->
+      <% var _stats = (typeof statsData !== 'undefined' && statsData) ? statsData : { postsCount: 0, worksCount: 0, totalPV: 0 }; %>
+      <section class="ab-stats ab-reveal" aria-label="站点数据">
+        <div class="ab-stat">
+          <span class="ab-stat__num" data-target="<%= _stats.postsCount %>">0</span>
+          <span class="ab-stat__label">文章</span>
+        </div>
+        <div class="ab-stat">
+          <span class="ab-stat__num" data-target="<%= _stats.worksCount %>">0</span>
+          <span class="ab-stat__label">作品</span>
+        </div>
+        <div class="ab-stat">
+          <span class="ab-stat__num" data-target="<%= _stats.totalPV %>">0</span>
+          <span class="ab-stat__label">访问记录</span>
+        </div>
       </section>
 
-      <section class="about-contact" aria-labelledby="about-contact-heading">
-        <h2 id="about-contact-heading" class="about-section-title">联系与社交</h2>
-        <% var _ce = locals.contactEmail != null ? String(locals.contactEmail) : ''; %>
-        <% var _cq = locals.contactQq != null ? String(locals.contactQq) : ''; %>
-        <% var _socialAbout = Array.isArray(locals.socialLinks) ? locals.socialLinks : []; %>
-        <% var _hasContact = typeof locals.hasContact === 'boolean' ? locals.hasContact : Boolean((_ce && _ce.trim()) || (_cq && _cq.trim()) || _socialAbout.length); %>
+      <div class="ab-divider ab-reveal"></div>
+
+      <!-- Contact -->
+      <% var _ce = locals.contactEmail != null ? String(locals.contactEmail) : ''; %>
+      <% var _cq = locals.contactQq != null ? String(locals.contactQq) : ''; %>
+      <% var _sl = Array.isArray(locals.socialLinks) ? locals.socialLinks : []; %>
+      <% var _hasContact = Boolean((_ce && _ce.trim()) || (_cq && _cq.trim()) || _sl.length); %>
+      <section class="ab-reveal" aria-label="联系方式">
+        <p class="ab-contact__label">联系与社交</p>
         <% if (_hasContact) { %>
-        <div class="about-contact__grid">
+        <div class="ab-contact__list">
           <% if (_ce && _ce.trim()) { %>
-          <p class="about-contact__item"><span class="about-contact__k">Email</span> <a href="mailto:<%= _ce.trim() %>"><%= _ce.trim() %></a></p>
+          <a href="mailto:<%= _ce.trim() %>" class="ab-contact__item">
+            <span class="ab-contact__key">Email</span>
+            <span class="ab-contact__val"><%= _ce.trim() %></span>
+            <span class="ab-contact__arrow">↗</span>
+          </a>
           <% } %>
           <% if (_cq && _cq.trim()) { %>
-          <p class="about-contact__item"><span class="about-contact__k">QQ</span> <span class="about-contact__qq"><%= _cq.trim() %></span></p>
+          <div class="ab-contact__item">
+            <span class="ab-contact__key">QQ</span>
+            <span class="ab-contact__val"><%= _cq.trim() %></span>
+            <span class="ab-contact__arrow"></span>
+          </div>
           <% } %>
-        </div>
-        <% if (_socialAbout.length) { %>
-        <ul class="about-social" role="list">
-          <% _socialAbout.forEach(function (s) { %>
-          <li><a class="about-social__link" href="<%= s.url %>" rel="noopener noreferrer" target="_blank"><%= s.label %></a></li>
+          <% _sl.forEach(function(s) { %>
+          <a href="<%= s.url %>" class="ab-contact__item" rel="noopener noreferrer" target="_blank">
+            <span class="ab-contact__key"><%= s.label %></span>
+            <span class="ab-contact__val"><%= s.url.replace(/^https?:\/\//, '') %></span>
+            <span class="ab-contact__arrow">↗</span>
+          </a>
           <% }); %>
-        </ul>
-        <% } %>
+        </div>
         <% } else { %>
-        <p class="about-contact__empty">尚未填写联系方式。可在后台 <strong>Settings</strong> 中设置邮箱、QQ 与社交链接（JSON 数组）。</p>
+        <p class="ab-contact__empty">尚未填写联系方式。可在后台 <strong>Settings</strong> 中设置。</p>
         <% } %>
       </section>
 
-      <section class="about-explore" aria-labelledby="about-explore-heading">
-        <h2 id="about-explore-heading" class="about-section-title">站内一览</h2>
-        <div class="about-explore__cols">
-          <div class="about-explore__col">
-            <h3 class="about-explore__subtitle">最近文章</h3>
-            <% var _recentPosts = Array.isArray(locals.recentPosts) ? locals.recentPosts : []; %>
-            <% if (_recentPosts.length) { %>
-            <ul class="about-explore__list">
-              <% _recentPosts.forEach(function (p) { %>
-              <li>
-                <a href="/blog/<%= p.slug %>"><%= p.title %></a>
-                <time datetime="<%= p.created_at %>"><%= new Date(p.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }) %></time>
-              </li>
-              <% }); %>
-            </ul>
-            <a href="/blog" class="about-explore__more">查看全部文章 <span aria-hidden="true">→</span></a>
-            <% } else { %>
-            <p class="about-explore__empty">暂无已发布文章。</p>
-            <% } %>
-          </div>
-          <div class="about-explore__col">
-            <h3 class="about-explore__subtitle">精选作品</h3>
-            <% var _featuredWorks = Array.isArray(locals.featuredWorks) ? locals.featuredWorks : []; %>
-            <% if (_featuredWorks.length) { %>
-            <ul class="about-explore__list about-explore__list--works">
-              <% _featuredWorks.forEach(function (w) { %>
-              <li>
-                <a href="/works/<%= w.slug %>"><%= w.title %></a>
-                <% if (w.description) { %><span class="about-explore__desc"><%= w.description %></span><% } %>
-              </li>
-              <% }); %>
-            </ul>
-            <a href="/works" class="about-explore__more">浏览全部作品 <span aria-hidden="true">→</span></a>
-            <% } else { %>
-            <p class="about-explore__empty">暂无精选作品。可在作品编辑中勾选「精选」。</p>
-            <% } %>
-          </div>
+      <div class="ab-divider ab-reveal"></div>
+
+      <!-- Explore -->
+      <section class="ab-explore ab-reveal" aria-label="站内一览">
+        <div>
+          <p class="ab-explore__label">最近文章</p>
+          <% var _rp = Array.isArray(locals.recentPosts) ? locals.recentPosts : []; %>
+          <% if (_rp.length) { %>
+          <ul class="ab-explore__list">
+            <% _rp.forEach(function(p) { %>
+            <li>
+              <a href="/blog/<%= p.slug %>"><%= p.title %></a>
+              <time datetime="<%= p.created_at %>"><%= new Date(p.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }) %></time>
+            </li>
+            <% }); %>
+          </ul>
+          <a href="/blog" class="ab-explore__more">全部文章 →</a>
+          <% } else { %>
+          <p class="ab-explore__empty">暂无已发布文章。</p>
+          <% } %>
+        </div>
+        <div>
+          <p class="ab-explore__label">精选作品</p>
+          <% var _fw = Array.isArray(locals.featuredWorks) ? locals.featuredWorks : []; %>
+          <% if (_fw.length) { %>
+          <ul class="ab-explore__list">
+            <% _fw.forEach(function(w) { %>
+            <li>
+              <a href="/works/<%= w.slug %>"><%= w.title %></a>
+              <% if (w.description) { %><span class="ab-explore__desc"><%= w.description %></span><% } %>
+            </li>
+            <% }); %>
+          </ul>
+          <a href="/works" class="ab-explore__more">全部作品 →</a>
+          <% } else { %>
+          <p class="ab-explore__empty">暂无精选作品。</p>
+          <% } %>
         </div>
       </section>
+
     </div>
   </main>
-  <footer class="site-footer">
-    <div class="footer-content">
-      <div class="footer-section">
-        <h3>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-            <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
-          </svg>
-          aeoleaf 风叶
-        </h3>
-        <p>个人博客与作品集</p>
-      </div>
-      <div class="footer-section">
-        <h3>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
-          导航
-        </h3>
-        <ul>
-          <li><a href="/">首页</a></li>
-          <li><a href="/blog">博客</a></li>
-          <li><a href="/works">作品</a></li>
-          <li><a href="/about">关于</a></li>
-        </ul>
-      </div>
-      <div class="footer-section">
-        <h3>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-            <polyline points="22,6 12,13 2,6"></polyline>
-          </svg>
-          联系
-        </h3>
-        <ul>
-          <% var _fce = locals.contactEmail != null ? String(locals.contactEmail) : ''; %>
-          <% var _fcq = locals.contactQq != null ? String(locals.contactQq) : ''; %>
-          <% var _fsl = Array.isArray(locals.socialLinks) ? locals.socialLinks : []; %>
-          <% if (_fce && _fce.trim()) { %>
-          <li>
-            <a href="mailto:<%= _fce.trim() %>">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="4"></circle>
-                <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
-              </svg>
-              邮箱
-            </a>
-          </li>
-          <% } %>
-          <% if (_fsl.length) { %>
-            <% _fsl.forEach(function (s) { %>
-          <li>
-            <a href="<%= s.url %>" target="_blank" rel="noopener noreferrer"><%= s.label %></a>
-          </li>
-            <% }); %>
-          <% } %>
-          <% if (_fcq && _fcq.trim()) { %>
-          <li><span class="footer-qq">QQ <%= _fcq.trim() %></span></li>
-          <% } %>
-          <% if (!(_fce && _fce.trim()) && !_fsl.length && !(_fcq && _fcq.trim())) { %>
-          <li><a href="/about">关于页</a></li>
-          <% } %>
-        </ul>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <p>&copy; <%= new Date().getFullYear() %> aeoleaf. All rights reserved.</p>
-      <p><a href="/admin/login" style="opacity:0;font-size:0;user-select:none;">.</a></p>
-    </div>
-  </footer>
-  <button id="back-to-top" aria-label="Back to top">↑</button>
-  <script src="/js/main.js"></script>
-  <script src="/js/tracker.js" async defer></script>
+  <%- include('partials/public-footer', {
+    contactEmail: locals.contactEmail,
+    contactQq: locals.contactQq,
+    socialLinks: locals.socialLinks
+  }) %>
+
+  <script>
+  (function () {
+    // Scroll-triggered entrance animation
+    var els = document.querySelectorAll('.ab-reveal');
+    if (!els.length) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.08 });
+    els.forEach(function (el) { io.observe(el); });
+
+    // Stats counter animation
+    var counters = document.querySelectorAll('.ab-stat__num[data-target]');
+    var counterIo = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var el = e.target;
+        var target = parseInt(el.getAttribute('data-target'), 10) || 0;
+        if (target === 0) { el.textContent = '0'; counterIo.unobserve(el); return; }
+        var duration = 900;
+        var start = performance.now();
+        function tick(now) {
+          var p = Math.min(1, (now - start) / duration);
+          var ease = 1 - Math.pow(1 - p, 3);
+          el.textContent = Math.round(ease * target).toLocaleString();
+          if (p < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+        counterIo.unobserve(el);
+      });
+    }, { threshold: 0.5 });
+    counters.forEach(function (el) { counterIo.observe(el); });
+  })();
+  </script>
 </body>
 </html>

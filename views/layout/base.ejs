@@ -4,13 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="view-transition" content="same-origin">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('theme');
+        if (t === 'dark' || t === 'light') {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (_e) {}
+      document.documentElement.classList.add('js-ready');
+    })();
+  </script>
   <title><%= title %></title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Lora:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/main.css?v=2">
-  <link rel="stylesheet" href="/css/blog.css?v=2">
-  <link rel="stylesheet" href="/css/works.css?v=2">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&family=Noto+Sans+SC:wght@400;500&family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="<%= asset('/css/main.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/blog.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/works.css') %>">
 </head>
 <body>
   <header class="site-header">
@@ -66,7 +77,7 @@
   <footer class="site-footer">
     <p>风叶 <a href="/admin/login" style="opacity:0;font-size:0;user-select:none;">.</a></p>
   </footer>
-  <script src="/js/main.js"></script>
-  <script src="/js/tracker.js" async defer></script>
+  <script src="<%= asset('/js/main.js') %>"></script>
+  <script src="<%= asset('/js/tracker.js') %>" async defer></script>
 </body>
 </html>

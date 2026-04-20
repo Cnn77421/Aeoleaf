@@ -6,8 +6,10 @@
   <meta name="view-transition" content="same-origin">
   <title><%= title %></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/main.css">
-  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="stylesheet" href="<%= asset('/css/main.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/admin.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/admin-v2.css') %>">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="admin-body">
@@ -106,7 +108,7 @@
             + '&deviceType=' + encodeURIComponent(filters.deviceType || '')
             + '&sortBy=' + (sortBy || 'tracked_at')
             + '&sortDir=' + (sortDir || 'desc');
-          return u;
+          return u + '#visitors-table';
         }
         function sortUrl(col) {
           var newDir = (sortBy === col && sortDir === 'asc') ? 'desc' : 'asc';
@@ -155,6 +157,7 @@
           </div>
         </div>
 
+        <div id="visitors-table"></div>
         <% if (view === 'sessions') { %>
           <div class="visitors-table-wrap">
             <table class="admin-table visitors-table">
@@ -197,6 +200,10 @@
             %>
             <div class="visitors-pagination">
               <div class="visitors-pagination-meta">共 <%=sessionsPage.total %> 条，第 <%= curPage %> / <%= totalPages %> 页</div>
+              <div class="visitors-pagination-actions">
+                <a href="<%- buildPageUrl(prevPage) %>" class="btn-link<%= curPage <= 1 ? ' pagination-disabled' : '' %>">← 上一页</a>
+                <a href="<%- buildPageUrl(nextPage) %>" class="btn-link<%= curPage >= totalPages ? ' pagination-disabled' : '' %>">下一页 →</a>
+              </div>
             </div>
           <% } %>
 
@@ -257,6 +264,10 @@
             %>
             <div class="visitors-pagination">
               <div class="visitors-pagination-meta">共 <%=visitorsPage.total %> 条，第 <%= curPage %> / <%= totalPages %> 页</div>
+              <div class="visitors-pagination-actions">
+                <a href="<%- buildPageUrl(prevPage) %>" class="btn-link<%= curPage <= 1 ? ' pagination-disabled' : '' %>">← 上一页</a>
+                <a href="<%- buildPageUrl(nextPage) %>" class="btn-link<%= curPage >= totalPages ? ' pagination-disabled' : '' %>">下一页 →</a>
+              </div>
             </div>
           <% } %>
         <% } %>
@@ -328,7 +339,7 @@
       } catch (e) { alert('网络错误'); }
     }
   </script>
-  <script src="/js/toast.js"></script>
-  <script src="/js/admin.js"></script>
+  <script src="<%= asset('/js/toast.js') %>"></script>
+  <script src="<%= asset('/js/admin.js') %>"></script>
 </body>
 </html>

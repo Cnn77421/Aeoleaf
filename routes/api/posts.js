@@ -3,8 +3,7 @@ const { db } = require('../../config/db');
 const slugify = require('slugify');
 const { requireAdmin } = require('../../middleware/auth');
 const { uploadPost, uploadGeneral, wrapUpload } = require('../../middleware/upload');
-const fs = require('fs');
-const path = require('path');
+const { unlinkPublicUpload } = require('../../lib/safeFs');
 
 function makeSlug(title) {
   return slugify(title, { lower: true, strict: true, locale: 'en' }) ||
@@ -123,10 +122,7 @@ router.put('/:id', requireAdmin, optionalPostCover, (req, res) => {
   );
 
   if (req.file) {
-    if (post.cover_image) {
-      const old = path.join(__dirname, '../../public', post.cover_image);
-      if (fs.existsSync(old)) fs.unlinkSync(old);
-    }
+    unlinkPublicUpload(post.cover_image);
     const coverUrl = '/uploads/posts/' + req.file.filename;
     db.prepare('UPDATE posts SET cover_image = ? WHERE id = ?').run(coverUrl, post.id);
   }
@@ -140,11 +136,7 @@ router.delete('/:id', requireAdmin, (req, res) => {
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
 
-  if (post.cover_image) {
-    const filePath = path.join(__dirname, '../../public', post.cover_image);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  }
-
+  unlinkPublicUpload(post.cover_image);
   db.prepare('DELETE FROM posts WHERE id = ?').run(post.id);
   res.json({ ok: true });
 });
@@ -155,11 +147,7 @@ router.post('/:id/cover', requireAdmin, wrapUpload(uploadPost.single('cover')), 
   if (!post) return res.status(404).json({ error: 'Not found' });
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-  if (post.cover_image) {
-    const old = path.join(__dirname, '../../public', post.cover_image);
-    if (fs.existsSync(old)) fs.unlinkSync(old);
-  }
-
+  unlinkPublicUpload(post.cover_image);
   const url = '/uploads/posts/' + req.file.filename;
   db.prepare('UPDATE posts SET cover_image = ? WHERE id = ?').run(url, post.id);
   res.json({ url });

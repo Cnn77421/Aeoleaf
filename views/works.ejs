@@ -1,167 +1,114 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= title %></title>
-  <meta name="description" content="浏览我的作品集，展示设计和开发项目">
-  <meta name="keywords" content="作品集,项目,设计,开发,<%= allTags.join(',') %>">
-  <meta name="author" content="aeoleaf">
-  <meta name="theme-color" content="#3A7D44">
-  <link rel="canonical" href="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/works">
-
-  <!-- Open Graph -->
-  <meta property="og:title" content="<%= title %>">
-  <meta property="og:description" content="浏览我的作品集，展示设计和开发项目">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/works">
-  <meta property="og:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/images/logo.png">
-
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="<%= title %>">
-  <meta name="twitter:description" content="浏览我的作品集，展示设计和开发项目">
-  <meta name="twitter:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/images/logo.png">
-
-  <link rel="icon" type="image/png" href="/images/logo.png">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Lora:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/main.css?v=4">
-  <link rel="stylesheet" href="/css/works.css?v=4">
+<%- include('partials/public-head', {
+  title: title,
+  description: '浏览我的作品集，展示设计和开发项目',
+  canonicalPath: '/works',
+  twitterCard: 'summary',
+  extraCss: ['/css/works-v2.css']
+}) %>
 </head>
-<body>
-  <header class="site-header">
-    <nav class="nav-container">
-      <a href="/" class="nav-logo">
-        <span>Aeoleaf <span class="nav-logo-zh">风叶</span></span>
-      </a>
-      <div class="nav-right">
-        <ul class="nav-links">
-          <li><a href="/blog">Blog</a></li>
-          <li><a href="/works">Works</a></li>
-          <li><a href="/about">About</a></li>
-        </ul>
-        <button id="search-toggle" class="search-toggle" aria-label="Toggle search">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <path d="m21 21-4.35-4.35"></path>
-          </svg>
+<body class="works-page">
+  <%- include('partials/public-header') %>
+  <main id="main" class="site-main site-main--no-pad">
+
+    <!-- INTRO ========================================================= -->
+    <header class="works-intro">
+      <span class="works-intro__eyebrow">Portfolio · 作品集</span>
+      <h1 class="works-intro__title">Works</h1>
+      <p class="works-intro__desc">
+        设计与开发项目的集合。每一件都是一段相对完整的"能跑起来的想法"，顺序按时间和精选度排列。
+      </p>
+    </header>
+
+    <!-- TAG FILTER ==================================================== -->
+    <% if (allTags.length > 0) { %>
+    <nav class="works-tagbar" aria-label="按标签筛选">
+      <div class="works-tagbar__inner" role="tablist">
+        <button type="button" class="tag-btn tag-v2" data-tag="all" role="tab" aria-selected="true">
+          <span class="tag-btn__label">全部</span>
+          <span class="tag-btn__count"><%= works.length %></span>
         </button>
-        <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line>
-            <line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-          </svg>
+        <% allTags.forEach(function (tag) { %>
+        <button type="button" class="tag-btn tag-v2" data-tag="<%= tag %>" role="tab" aria-selected="false">
+          <span class="tag-btn__label"><%= tag %></span>
+          <span class="tag-btn__count"><%= tagCounts[tag] || 0 %></span>
         </button>
-      </div>
-    </nav>
-  </header>
-  <div id="search-modal" class="search-modal">
-    <div class="search-modal-content">
-      <div class="search-box">
-        <input type="text" id="search-input" placeholder="搜索文章和作品...">
-        <button id="search-close">✕</button>
-      </div>
-      <div id="search-results"></div>
-    </div>
-  </div>
-  <main class="site-main">
-    <div class="content-container">
-      <h1>Works</h1>
-      <% if (allTags.length > 0) { %>
-      <div class="tag-filter">
-        <button class="tag-btn active" data-tag="all">All</button>
-        <% allTags.forEach(tag => { %>
-        <button class="tag-btn" data-tag="<%= tag %>"><%= tag %></button>
         <% }); %>
       </div>
-      <% } %>
-      <div class="works-grid" id="works-grid">
-        <% works.forEach(work => { %>
-        <a href="/works/<%= work.slug %>" class="work-card" data-tags="<%= work.tags.join(',') %>">
-          <% if (work.cover_image) { %>
-          <img src="<%= work.cover_image %>" alt="<%= work.title %>" class="work-image">
+    </nav>
+    <% } %>
+
+    <!-- BENTO GRID ==================================================== -->
+    <section class="works-bento">
+      <% if (works.length === 0) { %>
+        <div class="works-empty-v2">
+          <h3>尚未有公开作品</h3>
+          <p>第一片叶还在长。先去后台 <code>/admin/works</code> 新建一件。</p>
+        </div>
+      <% } else { %>
+      <div class="bento-grid" id="works-grid">
+        <%
+          var _toneRing = ['rose', 'sky', 'lime', 'violet', 'mint', 'amber'];
+          works.forEach(function (work, i) {
+            var isFeat   = !!work.spanFeature;
+            var hasCover = !!work.cover_image;
+            var mono     = (work.title || '·').trim().charAt(0).toUpperCase();
+            var tone     = _toneRing[i % _toneRing.length];
+
+            // Cell geometry: featured cell spans 8 cols, others span 4.
+            var cellClass  = 'bento-cell ' + (isFeat ? 'bento-cell--8' : 'bento-cell--4') + ' bento-cell--' + tone;
+            var cardClass  = 'card-v2 work-card ' + (isFeat ? 'work-card--feature-v2' : 'work-card-v2');
+            // ARIA: each cover-linked card labels itself with its title.
+            var workLabel = 'work-' + work.id + '-title';
+        %>
+        <a href="/works/<%= work.slug %>"
+           class="<%= cellClass %> <%= cardClass %>"
+           data-tags="<%= work.tags.join(',') %>"
+           aria-labelledby="<%= workLabel %>">
+
+          <% if (Number(work.featured) === 1 && !isFeat) { %>
+          <span class="work-card__badge-v2" aria-label="精选作品">Featured</span>
           <% } %>
-          <h3 class="work-title"><%= work.title %></h3>
+
+          <% if (hasCover) { %>
+          <div class="work-card__cover-v2">
+            <img src="<%= work.cover_image %>"
+                 alt="<%= work.title %>"
+                 loading="<%= i < 3 ? 'eager' : 'lazy' %>"
+                 decoding="async"
+                 width="1200" height="750">
+          </div>
+          <% } else { %>
+          <div class="work-card__cover-v2 work-card__mono-v2" aria-hidden="true"><%= mono %></div>
+          <% } %>
+
+          <span class="card-v2__eyebrow">
+            Work<% if (work.date) { %> · <%= work.date %><% } else if (work.year) { %> · <%= work.year %><% } %>
+          </span>
+          <h3 class="card-v2__title" id="<%= workLabel %>"><%= work.title %></h3>
           <% if (work.description) { %>
-          <p class="work-description"><%= work.description %></p>
+          <p class="card-v2__desc">
+            <% var _wd = work.description.trim(); %>
+            <%= _wd.length > (isFeat ? 160 : 90) ? _wd.slice(0, isFeat ? 160 : 90) + '…' : _wd %>
+          </p>
           <% } %>
-          <span class="work-year"><%= work.date || new Date(work.created_at).toLocaleDateString('zh-CN', {year:'numeric',month:'long'}) %></span>
+
+          <% if (work.tags && work.tags.length) { %>
+          <div class="work-card__tags-v2" aria-hidden="true">
+            <% work.tags.slice(0, 4).forEach(function (t) { %>
+            <span class="tag-v2"><%= t %></span>
+            <% }); %>
+          </div>
+          <% } %>
         </a>
         <% }); %>
       </div>
-    </div>
+      <% } %>
+    </section>
+
   </main>
-  <footer class="site-footer">
-    <div class="footer-content">
-      <div class="footer-section">
-        <h3>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-            <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
-          </svg>
-          aeoleaf 风叶
-        </h3>
-        <p>个人博客与作品集</p>
-      </div>
-      <div class="footer-section">
-        <h3>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
-          导航
-        </h3>
-        <ul>
-          <li><a href="/">首页</a></li>
-          <li><a href="/blog">博客</a></li>
-          <li><a href="/works">作品</a></li>
-          <li><a href="/about">关于</a></li>
-        </ul>
-      </div>
-      <div class="footer-section">
-        <h3>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-            <polyline points="22,6 12,13 2,6"></polyline>
-          </svg>
-          联系
-        </h3>
-        <ul>
-          <li>
-            <a href="mailto:xiner521@aliyun.com">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="4"></circle>
-                <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
-              </svg>
-              邮箱
-            </a>
-          </li>
-          <li>
-            <a href="https://github.com/Cnn77421" target="_blank" rel="noopener">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
-              </svg>
-              GitHub
-            </a>
-          </li>
-        </ul>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <p>&copy; <%= new Date().getFullYear() %> aeoleaf. All rights reserved.</p>
-      <p><a href="/admin/login" style="opacity:0;font-size:0;user-select:none;">.</a></p>
-    </div>
-  </footer>
-  <button id="back-to-top" aria-label="Back to top">↑</button>
-  <script src="/js/main.js"></script>
-  <script src="/js/tracker.js" async defer></script>
+  <%- include('partials/public-footer') %>
 </body>
 </html>

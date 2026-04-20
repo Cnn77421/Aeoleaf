@@ -1,0 +1,60 @@
+<%
+  // Shared site footer.
+  // Optional locals:
+  //   contactEmail, contactQq, socialLinks  — as used by the /about route;
+  //   when absent, fall back to hard-coded contacts so other pages still render.
+  var _fce = (typeof contactEmail !== 'undefined' && contactEmail) ? String(contactEmail).trim() : '';
+  var _fcq = (typeof contactQq !== 'undefined' && contactQq) ? String(contactQq).trim() : '';
+  var _fsl = Array.isArray(typeof socialLinks !== 'undefined' ? socialLinks : null) ? socialLinks : [];
+  var _fallbackEmail = 'xiner521@aliyun.com';
+  var _fallbackGithub = 'https://github.com/Cnn77421';
+  var _hasAny = _fce || _fsl.length || _fcq;
+%>
+<footer class="site-footer">
+  <div class="footer-wave" aria-hidden="true">
+    <svg viewBox="0 0 1440 48" preserveAspectRatio="none"><path d="M0 24C180 8 360 40 540 28C720 16 900 36 1080 26C1260 16 1320 20 1440 14V48H0V24Z" fill="currentColor"/></svg>
+  </div>
+  <div class="footer-content">
+    <div class="footer-section footer-section--brand">
+      <h3 class="footer-brand">aeoleaf <span class="footer-brand__zh">风叶</span></h3>
+      <p class="footer-tagline">个人博客与作品集</p>
+    </div>
+    <div class="footer-section">
+      <h3 class="footer-heading">导航</h3>
+      <ul>
+        <li><a href="/">首页</a></li>
+        <li><a href="/blog">博客</a></li>
+        <li><a href="/works">作品</a></li>
+        <li><a href="/about">关于</a></li>
+      </ul>
+    </div>
+    <div class="footer-section">
+      <h3 class="footer-heading">联系</h3>
+      <ul class="footer-contact-list">
+        <% if (_hasAny) { %>
+          <% if (_fce) { %>
+          <li><a href="mailto:<%= _fce %>"><svg class="footer-icon" width="16" height="16" aria-hidden="true"><use href="#icon-mail"/></svg>邮箱</a></li>
+          <% } %>
+          <% _fsl.forEach(function (s) { %>
+          <li><a href="<%= s.url %>" target="_blank" rel="noopener noreferrer"><svg class="footer-icon" width="16" height="16" aria-hidden="true"><use href="#icon-arrow-right"/></svg><%= s.label %></a></li>
+          <% }); %>
+          <% if (_fcq) { %>
+          <li><span class="footer-qq">QQ <%= _fcq %></span></li>
+          <% } %>
+        <% } else { %>
+          <li><a href="mailto:<%= _fallbackEmail %>"><svg class="footer-icon" width="16" height="16" aria-hidden="true"><use href="#icon-mail"/></svg>邮箱</a></li>
+          <li><a href="<%= _fallbackGithub %>" target="_blank" rel="noopener"><svg class="footer-icon" width="16" height="16" aria-hidden="true"><use href="#icon-github"/></svg>GitHub</a></li>
+        <% } %>
+        <li><a href="/rss.xml"><svg class="footer-icon" width="16" height="16" aria-hidden="true"><use href="#icon-rss"/></svg>RSS</a></li>
+        <li><a href="/sitemap.xml"><svg class="footer-icon" width="16" height="16" aria-hidden="true"><use href="#icon-sitemap"/></svg>Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>&copy; <%= new Date().getFullYear() %> aeoleaf. All rights reserved.</p>
+    <p><a href="/admin/login" class="footer-admin-link">.</a></p>
+  </div>
+</footer>
+<button id="back-to-top" aria-label="回到顶部">↑</button>
+<script src="<%= asset('/js/main.js') %>"></script>
+<script src="<%= asset('/js/tracker.js') %>" async defer></script>

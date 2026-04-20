@@ -1,0 +1,94 @@
+<%
+  // Shared <head> snippet for every public page.
+  // Callers may pass the following locals (all optional except title):
+  //   title          — page <title>
+  //   description    — meta description / og:description / twitter:description
+  //   canonicalPath  — path (leading `/`) used to build the canonical URL; defaults to req.path
+  //   ogType         — 'website' (default) or 'article'
+  //   ogImagePath    — absolute (`/images/...`) path to OG image; defaults to /images/logo.png
+  //   twitterCard    — 'summary' (default) or 'summary_large_image'
+  //   extraCss       — array of additional CSS paths (e.g. ['/css/blog.css']).
+  //                    Version query is appended automatically via asset().
+  //   extraHead      — raw HTML string to inject before </head>
+  //   noIndex        — true to emit `<meta name="robots" content="noindex">`
+  var _baseUrl = (typeof baseUrl !== 'undefined' && baseUrl) ? baseUrl : 'http://localhost:3000';
+  var _title = (typeof title !== 'undefined' && title) ? title : 'Aeoleaf';
+  var _desc = (typeof description !== 'undefined' && description) ? description : '个人博客与作品集';
+  var _canonicalPath = (typeof canonicalPath !== 'undefined' && canonicalPath)
+    ? canonicalPath
+    : (typeof pagePath !== 'undefined' && pagePath ? pagePath : '/');
+  var _ogType = (typeof ogType !== 'undefined' && ogType) ? ogType : 'website';
+  var _ogImg = (typeof ogImagePath !== 'undefined' && ogImagePath) ? ogImagePath : '/images/logo.png';
+  var _twitterCard = (typeof twitterCard !== 'undefined' && twitterCard) ? twitterCard : 'summary';
+  var _extraCss = Array.isArray(typeof extraCss !== 'undefined' ? extraCss : null) ? extraCss : [];
+  var _extraHead = (typeof extraHead !== 'undefined' && extraHead) ? extraHead : '';
+  var _noIndex = !!(typeof noIndex !== 'undefined' && noIndex);
+%>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    // Pre-paint guards to prevent "每次刷新布局不一样" flashes:
+    //   1. Apply stored theme BEFORE first paint so dark users never see light.
+    //   2. Mark <html> with .js-ready so CSS can safely hide/animate sections.
+    //      Without this class, reveal-sections and hero animations stay in
+    //      their final (visible) state — robust when JS is slow or disabled.
+    (function () {
+      // North Star: dark is the default. Explicit user choice (localStorage)
+      // still wins. On first visit we honor `prefers-color-scheme: light` to
+      // respect the OS, otherwise fall back to dark.
+      var stored = null;
+      try { stored = localStorage.getItem('theme'); } catch (_e) { /* ignore */ }
+      var chosen;
+      if (stored === 'dark' || stored === 'light') {
+        chosen = stored;
+      } else {
+        try {
+          chosen = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)
+            ? 'light' : 'dark';
+        } catch (_e) { chosen = 'dark'; }
+      }
+      document.documentElement.setAttribute('data-theme', chosen);
+      document.documentElement.classList.add('js-ready');
+    })();
+  </script>
+  <title><%= _title %></title>
+  <meta name="description" content="<%= _desc %>">
+  <meta name="author" content="aeoleaf">
+  <meta name="theme-color" content="#8B3A2E">
+  <meta name="color-scheme" content="light dark">
+  <% if (_noIndex) { %><meta name="robots" content="noindex"><% } %>
+  <link rel="canonical" href="<%= _baseUrl %><%= _canonicalPath %>">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="<%= _title %>">
+  <meta property="og:description" content="<%= _desc %>">
+  <meta property="og:type" content="<%= _ogType %>">
+  <meta property="og:url" content="<%= _baseUrl %><%= _canonicalPath %>">
+  <meta property="og:image" content="<%= _baseUrl %><%= _ogImg %>">
+  <meta property="og:site_name" content="aeoleaf 风叶">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="<%= _twitterCard %>">
+  <meta name="twitter:title" content="<%= _title %>">
+  <meta name="twitter:description" content="<%= _desc %>">
+  <meta name="twitter:image" content="<%= _baseUrl %><%= _ogImg %>">
+
+  <link rel="icon" type="image/svg+xml" href="/images/favicon.svg">
+  <link rel="alternate icon" href="/favicon.ico">
+  <link rel="alternate" type="application/rss+xml" title="aeoleaf RSS Feed" href="/rss.xml">
+
+  <!-- Fonts: Fraunces (display / C2 portfolio) + Noto Serif SC + Inter + Noto Sans SC + JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="<%= asset('/css/main.css') %>">
+  <% _extraCss.forEach(function (href) { %>
+  <link rel="stylesheet" href="<%= asset(href) %>">
+  <% }); %>
+  <link rel="stylesheet" href="<%= asset('/css/editorial.css') %>">
+  <!-- North Star tokens + Bento — loaded last so they win the cascade over
+       main.css and any page-scoped CSS above. -->
+  <link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/bento.css') %>">
+  <%- _extraHead %>

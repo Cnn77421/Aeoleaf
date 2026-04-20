@@ -1,0 +1,273 @@
+/* Aeoleaf · Bento Grid + v2 Components (North Star · Phase 1a)
+ *
+ * Zero reliance on legacy classes — these are NEW building blocks used by
+ * Phase 1b (home page rebuild) and onwards. Adding this file to a page does
+ * nothing until markup opts-in via `.bento-grid`, `.card-v2`, `.btn-v2`, etc.
+ */
+
+/* ===== Bento grid ===== */
+.bento-grid {
+  display: grid;
+  gap: var(--space-4, 16px);
+  grid-template-columns: repeat(12, 1fr);
+  grid-auto-rows: minmax(120px, auto);
+}
+
+.bento-cell {
+  grid-column: span 12;
+  grid-row: span 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Column spans (mobile-first: default = full width; upgrade at md) */
+@media (min-width: 640px) {
+  .bento-cell--2  { grid-column: span 6; }
+  .bento-cell--3  { grid-column: span 6; }
+  .bento-cell--4  { grid-column: span 6; }
+  .bento-cell--6  { grid-column: span 12; }
+  .bento-cell--8  { grid-column: span 12; }
+  .bento-cell--12 { grid-column: span 12; }
+}
+@media (min-width: 960px) {
+  .bento-cell--2  { grid-column: span 2; }
+  .bento-cell--3  { grid-column: span 3; }
+  .bento-cell--4  { grid-column: span 4; }
+  .bento-cell--6  { grid-column: span 6; }
+  .bento-cell--8  { grid-column: span 8; }
+  .bento-cell--12 { grid-column: span 12; }
+}
+
+/* Row spans */
+.bento-cell--tall   { grid-row: span 2; }
+.bento-cell--x-tall { grid-row: span 3; }
+
+/* Tonal variants — lift with soft accent backgrounds on hover */
+.bento-cell--violet { --tone: var(--accent); }
+.bento-cell--mint   { --tone: var(--accent-secondary); }
+.bento-cell--amber  { --tone: var(--accent-tertiary); }
+.bento-cell--rose   { --tone: var(--accent-alt-rose); }
+.bento-cell--sky    { --tone: var(--accent-alt-sky); }
+.bento-cell--lime   { --tone: var(--accent-alt-lime); }
+
+/* ===== Card v2 — the atomic surface inside a bento cell ===== */
+.card-v2 {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: clamp(20px, 2.2vw, 32px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--bg-elev-1);
+  color: var(--text);
+  overflow: hidden;
+  isolation: isolate;
+  text-decoration: none;
+  transition:
+    border-color var(--transition),
+    transform var(--transition),
+    box-shadow var(--transition),
+    background-color var(--transition);
+}
+
+.card-v2::before {
+  /* Sheen from a tonal accent — invisible until hover */
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(120% 120% at 0% 0%, color-mix(in oklab, var(--tone, var(--accent)) 22%, transparent) 0%, transparent 55%);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+a.card-v2:hover,
+.card-v2--interactive:hover {
+  border-color: color-mix(in oklab, var(--tone, var(--accent)) 50%, var(--border));
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+a.card-v2:hover::before,
+.card-v2--interactive:hover::before {
+  opacity: 1;
+}
+
+a.card-v2:focus-visible,
+.card-v2--interactive:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring), var(--shadow-md);
+}
+
+/* Muted / ghost / feature flavors */
+.card-v2--muted { background: transparent; }
+.card-v2--solid { background: var(--bg-elev-2); }
+.card-v2--feature {
+  background: linear-gradient(135deg,
+    color-mix(in oklab, var(--tone, var(--accent)) 14%, var(--bg-elev-1)) 0%,
+    var(--bg-elev-1) 60%);
+}
+
+/* Card anatomy helpers */
+.card-v2__eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-v2__title {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2.2vw, 32px);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin: 10px 0 8px;
+}
+.card-v2__desc {
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.card-v2__meta {
+  margin-top: auto;
+  padding-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-subtle);
+}
+.card-v2__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-weight: 500;
+  font-size: 14px;
+  margin-top: 16px;
+}
+.card-v2__cta::after {
+  content: "→";
+  transition: transform var(--transition);
+}
+a.card-v2:hover .card-v2__cta::after { transform: translateX(4px); }
+
+/* ===== Button v2 ===== */
+.btn-v2 {
+  --btn-h: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--btn-h);
+  padding: 0 18px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background-color var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    box-shadow var(--transition),
+    transform var(--transition);
+}
+.btn-v2--primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-v2--primary:hover { background: var(--accent-hover); }
+.btn-v2--primary:active { background: var(--accent-pressed); transform: translateY(1px); }
+
+.btn-v2--ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.btn-v2--ghost:hover {
+  background: var(--bg-elev-1);
+  border-color: color-mix(in oklab, var(--accent) 50%, var(--border-strong));
+}
+
+.btn-v2--sm { --btn-h: 32px; font-size: 13px; padding: 0 14px; }
+.btn-v2--lg { --btn-h: 48px; font-size: 15px; padding: 0 22px; }
+.btn-v2:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* ===== Tag v2 — chip used for taxonomy / meta ===== */
+.tag-v2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition:
+    background-color var(--transition),
+    color var(--transition),
+    border-color var(--transition);
+}
+.tag-v2:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.tag-v2--active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--border));
+}
+.tag-v2 .tag-v2__count {
+  color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Section scaffolding used by new pages ===== */
+.section-v2 {
+  padding-block: clamp(48px, 6vw, 96px);
+}
+.section-v2__head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: clamp(20px, 2vw, 32px);
+  flex-wrap: wrap;
+}
+.section-v2__eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.section-v2__title {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3.5vw, 48px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+  color: var(--text);
+}
+
+/* ===== Visually-hidden utility (a11y) ===== */
+.vh {
+  position: absolute !important;
+  clip: rect(1px, 1px, 1px, 1px);
+  overflow: hidden;
+  width: 1px; height: 1px;
+  white-space: nowrap;
+}

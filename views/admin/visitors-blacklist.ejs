@@ -6,8 +6,10 @@
   <meta name="view-transition" content="same-origin">
   <title><%= title %></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/main.css">
-  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="stylesheet" href="<%= asset('/css/main.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/admin.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/admin-v2.css') %>">
 </head>
 <body class="admin-body">
   <aside class="admin-sidebar">
@@ -113,7 +115,7 @@
       } catch (err) { alert('网络错误'); }
     }
   </script>
-  <script src="/js/toast.js"></script>
-  <script src="/js/admin.js"></script>
+  <script src="<%= asset('/js/toast.js') %>"></script>
+  <script src="<%= asset('/js/admin.js') %>"></script>
 </body>
 </html>

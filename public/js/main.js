@@ -4,6 +4,7 @@
   var DURATION = 180;
   var _busy = false;
   var _loadedScripts = {};
+  var _loadedStyles = {};
 
   function prefersReducedMotion() {
     return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -67,6 +68,53 @@
       document.head.appendChild(s);
     });
     _loadedScripts[src] = p;
+    return p;
+  }
+
+  // Append a <link rel="stylesheet"> and resolve when it has loaded. Used
+  // during PJAX navigations so page-specific CSS (home.css, works-v2.css,
+  // blog.css, …) is injected into the live document before the main swap.
+  // Without this, navigating into a page whose `extraCss` adds a new
+  // stylesheet leaves the previous stylesheet in effect and the target page
+  // renders unstyled — only a hard reload fixes it.
+  function loadStylesheet(href) {
+    if (!href) return Promise.resolve();
+    if (_loadedStyles[href] === 'loaded') return Promise.resolve();
+    if (_loadedStyles[href] && _loadedStyles[href].then) return _loadedStyles[href];
+    // Already in the DOM? Compare the element's resolved .href (always
+    // absolute) rather than the authored attribute; a CSS selector like
+    // link[href="..."] would only match the raw attribute string.
+    var nodes = document.querySelectorAll('link[rel="stylesheet"]');
+    for (var x = 0; x < nodes.length; x++) {
+      if (nodes[x].href === href) { _loadedStyles[href] = 'loaded'; return Promise.resolve(); }
+    }
+    var p = new Promise(function (resolve) {
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = href;
+      // Never block PJAX on a bad CSS URL: always resolve. A broken stylesheet
+      // is far less harmful than a permanently hung navigation.
+      link.onload = function () { _loadedStyles[href] = 'loaded'; resolve(); };
+      link.onerror = function () { delete _loadedStyles[href]; resolve(); };
+
+      // CRITICAL — cascade anchor.
+      // tokens.css and bento.css are authored as the "override layer" and
+      // MUST remain last in the cascade. A naive appendChild() would push
+      // page-specific stylesheets (home.css, blog.css, works-v2.css…) after
+      // those anchors and silently break anything tokens.css re-points or
+      // bento.css supplies, which is what users see as a "half-styled" page.
+      // Insert before the first override-layer link instead.
+      var anchor = document.querySelector(
+        'link[rel="stylesheet"][href*="/css/tokens.css"], ' +
+        'link[rel="stylesheet"][href*="/css/bento.css"]'
+      );
+      if (anchor) {
+        document.head.insertBefore(link, anchor);
+      } else {
+        document.head.appendChild(link);
+      }
+    });
+    _loadedStyles[href] = p;
     return p;
   }
 
@@ -141,11 +189,21 @@
     tagBtns.forEach(function (btn) {
       btn.addEventListener('click', function () {
         var tag = btn.dataset.tag;
-        tagBtns.forEach(function (b) { b.classList.remove('active'); });
+        tagBtns.forEach(function (b) {
+          b.classList.remove('active');
+          b.setAttribute('aria-selected', 'false');
+        });
         btn.classList.add('active');
+        btn.setAttribute('aria-selected', 'true');
         workCards.forEach(function (card) {
-          if (tag === 'all') { card.style.display = 'block'; }
-          else { card.style.display = card.dataset.tags.split(',').includes(tag) ? 'block' : 'none'; }
+          // Restore to CSS default ('' clears the inline style) so cards that
+          // use flex / grid layout (e.g. .card-v2 in works-v2) keep their
+          // layout contract. Only hiding needs an inline value.
+          if (tag === 'all') { card.style.display = ''; }
+          else {
+            var tags = (card.dataset.tags || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+            card.style.display = tags.indexOf(tag) !== -1 ? '' : 'none';
+          }
         });
       });
     });
@@ -237,6 +295,18 @@
       var newMain = doc.querySelector(MAIN_SEL);
       if (!newMain) throw new Error('no main');
 
+      // Inject stylesheets from the target page that aren't on the current
+      // page yet (e.g. /css/home.css when arriving at "/" via PJAX). Done
+      // BEFORE swapping main so the new markup paints with correct styles
+      // on the first frame — otherwise users see a flash of unstyled or
+      // half-styled content that only a hard reload fixes.
+      var headLinks = doc.querySelectorAll('head link[rel="stylesheet"]');
+      for (var sLi = 0; sLi < headLinks.length; sLi++) {
+        // Using .href (absolute) makes comparison with existing <link> nodes
+        // consistent regardless of how the source was authored.
+        await loadStylesheet(headLinks[sLi].href);
+      }
+
       var headScripts = doc.querySelectorAll('head script[src]');
       for (var i = 0; i < headScripts.length; i++) {
         await loadScript(headScripts[i].src);
@@ -305,8 +375,7 @@
     pjaxNavigate(location.href, false);
   });
 
-  initRevealSections();
-  initStatsCounters();
+  reinitPageFeatures();
 })();
 
 // Theme toggle
@@ -325,17 +394,87 @@ if (themeToggle) {
   });
 }
 
-// Scroll header effect
+// Scroll header effect — kick in after the hero area so the style change is deliberate.
 const header = document.querySelector('.site-header');
+if (header) {
+  const SCROLL_THRESHOLD = 120;
+  let scrolledState = false;
+  const updateHeaderScroll = () => {
+    const shouldBeScrolled = window.pageYOffset > SCROLL_THRESHOLD;
+    if (shouldBeScrolled === scrolledState) return;
+    scrolledState = shouldBeScrolled;
+    header.classList.toggle('scrolled', shouldBeScrolled);
+  };
+  updateHeaderScroll();
+  window.addEventListener('scroll', updateHeaderScroll, { passive: true });
+}
 
-window.addEventListener('scroll', () => {
-  const currentScroll = window.pageYOffset;
-  if (currentScroll > 50) {
-    header.classList.add('scrolled');
-  } else {
-    header.classList.remove('scrolled');
+// Homepage hero parallax — nudges the hero leaf downward at ~0.25x of the
+// page scroll so it feels anchored to the page, not pinned. Only runs on
+// pages that actually have a .hero__leaf, and respects reduced-motion.
+(function () {
+  const leaf = document.querySelector('.hero__leaf-shift');
+  if (!leaf) return;
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced) return;
+  const MAX_OFFSET = 60;
+  let ticking = false;
+  function apply() {
+    ticking = false;
+    const y = Math.min(window.pageYOffset * 0.25, MAX_OFFSET);
+    leaf.style.transform = 'translate3d(0,' + y.toFixed(1) + 'px,0)';
   }
-}, { passive: true });
+  function onScroll() {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(apply);
+  }
+  apply();
+  window.addEventListener('scroll', onScroll, { passive: true });
+})();
+
+(function initHeroCarousel() {
+  var root = document.getElementById('hero-carousel');
+  if (!root) return;
+  var slides = Array.prototype.slice.call(root.querySelectorAll('.hero-carousel__slide'));
+  if (slides.length <= 1) return;
+  var dots = Array.prototype.slice.call(root.querySelectorAll('.hero-carousel__dot'));
+  var prevBtn = root.querySelector('.hero-carousel__btn--prev');
+  var nextBtn = root.querySelector('.hero-carousel__btn--next');
+  var idx = 0;
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function go(n) {
+    idx = (n + slides.length) % slides.length;
+    slides.forEach(function (s, i) {
+      s.classList.toggle('is-active', i === idx);
+    });
+    dots.forEach(function (d, i) {
+      var on = i === idx;
+      d.classList.toggle('is-active', on);
+      d.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
+
+  if (prevBtn) prevBtn.addEventListener('click', function () { go(idx - 1); });
+  if (nextBtn) nextBtn.addEventListener('click', function () { go(idx + 1); });
+  dots.forEach(function (d) {
+    d.addEventListener('click', function () {
+      var t = parseInt(d.getAttribute('data-hero-slide-to'), 10);
+      if (!isNaN(t)) go(t);
+    });
+  });
+
+  var timer = null;
+  if (!reduced) {
+    timer = window.setInterval(function () { go(idx + 1); }, 5500);
+  }
+  root.addEventListener('mouseenter', function () { if (timer) window.clearInterval(timer); timer = null; });
+  root.addEventListener('mouseleave', function () {
+    if (reduced) return;
+    if (!timer) timer = window.setInterval(function () { go(idx + 1); }, 5500);
+  });
+})();
 
 // Navigation toggle
 const navToggle = document.querySelector('.nav-toggle');
@@ -367,28 +506,6 @@ if (navToggle && navLinks) {
   });
 }
 
-// Tag filter for works page
-const tagBtns = document.querySelectorAll('.tag-btn');
-const workCards = document.querySelectorAll('.work-card');
-
-tagBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    const tag = btn.dataset.tag;
-
-    tagBtns.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-
-    workCards.forEach(card => {
-      if (tag === 'all') {
-        card.style.display = 'block';
-      } else {
-        const tags = card.dataset.tags.split(',');
-        card.style.display = tags.includes(tag) ? 'block' : 'none';
-      }
-    });
-  });
-});
-
 // Auto-generate slug from title
 const titleInput = document.querySelector('input[name="title"]');
 const slugInput = document.querySelector('input[name="slug"]');
@@ -408,37 +525,9 @@ if (titleInput && slugInput) {
   });
 }
 
-// Lazy load images
-const lazyImages = document.querySelectorAll('img[data-src]');
-if ('IntersectionObserver' in window) {
-  const imageObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const img = entry.target;
-        img.classList.add('loading');
-        img.src = img.dataset.src;
-        img.onload = () => {
-          img.classList.remove('loading');
-          img.classList.add('loaded');
-        };
-        img.onerror = () => {
-          img.classList.remove('loading');
-          img.classList.add('error');
-        };
-        img.removeAttribute('data-src');
-        imageObserver.unobserve(img);
-      }
-    });
-  }, {
-    rootMargin: '50px'
-  });
-  lazyImages.forEach(img => imageObserver.observe(img));
-} else {
-  lazyImages.forEach(img => {
-    img.src = img.dataset.src;
-    img.removeAttribute('data-src');
-  });
-}
+// Lazy image loading is handled inside `reinitPageFeatures()` (invoked on
+// initial load and after every PJAX navigation), so no duplicate observer
+// is needed here.
 
 // Smooth scroll for anchor links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -627,43 +716,20 @@ async function performSearch() {
   }
 }
 
-// Scroll animations (initial page load; PJAX uses reinitPageFeatures)
-const animateOnScroll = () => {
-  const elements = document.querySelectorAll('.post-item, .work-card, .blog-item');
-  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  if (reduced) {
-    elements.forEach(el => {
-      el.classList.add('animate-on-scroll', 'visible');
-    });
-    return;
+(function initSearchFromHomeQuery() {
+  if (!searchModal || !searchInput) return;
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('openSearch') !== '1') return;
+  var q = params.get('q') || '';
+  openSearchModal();
+  if (q) {
+    searchInput.value = q;
+    void performSearch();
   }
-
-  if ('IntersectionObserver' in window) {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('animate-on-scroll', 'visible');
-          observer.unobserve(entry.target);
-        }
-      });
-    }, {
-      threshold: 0.1,
-      rootMargin: '0px 0px -50px 0px'
-    });
-
-    elements.forEach(el => {
-      el.classList.add('animate-on-scroll');
-      observer.observe(el);
-    });
-  }
-};
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', animateOnScroll);
-} else {
-  animateOnScroll();
-}
+  try {
+    history.replaceState({}, '', window.location.pathname || '/');
+  } catch (_e) { /* ignore */ }
+})();
 
 // Back to top button
 const backToTop = document.getElementById('back-to-top');

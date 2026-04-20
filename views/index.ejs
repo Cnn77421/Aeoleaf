@@ -1,41 +1,17 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="view-transition" content="same-origin">
-  <title><%= title %></title>
-  <meta name="description" content="<%= subtitle %> - 设计、写作与作品的个人主页">
-  <meta name="keywords" content="博客,作品集,设计,写作,<%= subtitle %>">
-  <meta name="author" content="<%= title %>">
-  <meta name="theme-color" content="#7B2638">
-  <link rel="canonical" href="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/">
-
-  <!-- Open Graph -->
-  <meta property="og:title" content="<%= title %> - <%= subtitle %>">
-  <meta property="og:description" content="Aeoleaf 风叶：个人博客与作品集，记录设计与技术笔记。">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/">
-  <meta property="og:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/images/logo.png">
-  <meta property="og:site_name" content="<%= title %>">
-
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="<%= title %> - <%= subtitle %>">
-  <meta name="twitter:description" content="Aeoleaf 风叶：个人博客与作品集，记录设计与技术笔记。">
-  <meta name="twitter:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/images/logo.png">
-
-  <!-- RSS Feed -->
-  <link rel="alternate" type="application/rss+xml" title="RSS Feed" href="/rss.xml">
-
-  <link rel="icon" type="image/png" href="/images/logo.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Lora:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/main.css?v=10">
-  <link rel="stylesheet" href="/css/blog.css?v=10">
-  <link rel="stylesheet" href="/css/works.css?v=10">
-
+<%- include('partials/public-head', {
+  title: title + ' — ' + subtitle,
+  description: 'Aeoleaf 风叶：' + subtitle + ' — 个人博客与作品集，记录设计与技术笔记。',
+  canonicalPath: '/',
+  ogType: 'website',
+  twitterCard: 'summary_large_image',
+  extraCss: ['/css/home.css']
+}) %>
+  <% if (featuredPost && featuredPost.cover_image) { %>
+  <link rel="preload" as="image" href="<%= featuredPost.cover_image %>" fetchpriority="high">
+  <% } %>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -43,210 +19,238 @@
     "name": "<%= title %>",
     "url": "<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/",
     "description": "Aeoleaf 风叶：个人博客与作品集，记录设计与技术笔记。",
-    "author": {
-      "@type": "Person",
-      "name": "aeoleaf"
-    }
+    "author": { "@type": "Person", "name": "aeoleaf" }
   }
   </script>
 </head>
-<body>
+<body class="home-page">
   <%- include('partials/public-header') %>
   <main id="main" class="site-main site-main--no-pad">
 
-    <section class="hero hero--enhanced">
-      <div class="hero__content">
-        <h1 class="hero-title"><%= title %></h1>
-        <p class="hero-subtitle"><%= subtitle %></p>
-        <p class="hero__tagline">设计 · 写作 · 动手实现</p>
-        <div class="hero__cta">
-          <a href="/works" class="btn-primary">查看作品</a>
-          <a href="/blog" class="btn-outline">阅读博客</a>
-        </div>
-      </div>
-      <div class="hero__visual">
-        <div class="hero__orb hero__orb--1"></div>
-        <div class="hero__orb hero__orb--2"></div>
-        <div class="hero__orb hero__orb--3"></div>
-        <svg class="hero__leaf" width="200" height="200" aria-hidden="true"><use href="#icon-hero-leaf"/></svg>
-      </div>
-    </section>
-
-    <section class="hp-about reveal-section">
-      <div class="hp-about__inner">
-        <% if (aboutImage) { %>
-        <div class="hp-about__avatar slide-from-left">
-          <img data-src="<%= aboutImage %>" alt="About me" class="lazy">
-        </div>
-        <% } else { %>
-        <div class="hp-about__avatar hp-about__avatar--placeholder slide-from-left">
-          <svg viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-            <circle cx="40" cy="30" r="14"/>
-            <path d="M12 72c0-15.5 12.5-28 28-28s28 12.5 28 28"/>
-          </svg>
-        </div>
-        <% } %>
-        <div class="hp-about__text slide-from-right">
-          <h2>关于我</h2>
-          <% if (aboutText) { %>
-            <p><%= aboutText.replace(/[#*_[]()]/g, '').substring(0, 200) %><% if (aboutText.length > 200) { %>…<% } %></p>
-          <% } else { %>
-            <p>这里会显示个人简介摘要；可在后台或关于页编辑内容。</p>
-          <% } %>
-          <a href="/about" class="hp-about__link">了解更多 <span aria-hidden="true">→</span></a>
+    <!-- HERO ========================================================== -->
+    <section class="home-hero">
+      <div class="home-hero__inner">
+        <span class="home-hero__eyebrow">写作 · 作品 · 偶尔实现</span>
+        <%
+          // Render the wordmark as a single, uniform display title. We
+          // intentionally drop the italic gradient accent so the brand
+          // reads as one shape instead of two voices.
+          var _wordmark = (typeof heroTitleMain !== 'undefined' && heroTitleMain)
+            ? heroTitleMain
+            : title;
+          if (typeof heroTitleAccent !== 'undefined' && heroTitleAccent) {
+            _wordmark = _wordmark + ' ' + heroTitleAccent;
+          }
+        %>
+        <h1 class="home-hero__title"><%= _wordmark %></h1>
+        <p class="home-hero__sub">
+          <%= subtitle %> · 个人博客与作品集。记录设计、工程与写作中值得留下的那一点东西，不做惊天动地，只做能看得见的生长。
+        </p>
+        <div class="home-hero__cta">
+          <a href="/works" class="btn-v2 btn-v2--primary btn-v2--lg">查看作品</a>
+          <a href="/blog" class="btn-v2 btn-v2--ghost btn-v2--lg">阅读博客</a>
         </div>
       </div>
     </section>
 
-    <% if (featuredPost) { %>
-    <section class="hp-featured-post reveal-section">
-      <h2 class="hp-section-title">精选文章</h2>
-      <a href="/blog/<%= featuredPost.slug %>" class="hp-featured-post__card stagger-child">
-        <div class="hp-featured-post__img">
-          <img src="<%= featuredPost.cover_image %>" alt="<%= featuredPost.title %>" loading="lazy">
-        </div>
-        <div class="hp-featured-post__body">
-          <div class="hp-featured-post__date"><%= new Date(featuredPost.created_at).toLocaleDateString('zh-CN') %></div>
-          <h3 class="hp-featured-post__title"><%= featuredPost.title %></h3>
-          <p class="hp-featured-post__excerpt"><%= (featuredPost.excerpt || featuredPost.title).substring(0, 160) %><% if ((featuredPost.excerpt || featuredPost.title).length > 160) { %>…<% } %></p>
-          <span class="hp-featured-post__cta">阅读全文 <span aria-hidden="true">→</span></span>
-        </div>
-      </a>
-    </section>
-    <% } %>
+    <!-- BENTO ========================================================= -->
+    <div class="home-bento">
+      <div class="bento-grid">
 
-    <section class="hp-stats reveal-section">
-      <h2 class="hp-section-title">站点数据</h2>
-      <div class="hp-stats__grid">
-        <div class="hp-stats__item stagger-child">
-          <span class="hp-stats__number" data-target="<%= statsData.postsCount %>">0</span>
-          <span class="hp-stats__label">文章</span>
-        </div>
-        <div class="hp-stats__item stagger-child">
-          <span class="hp-stats__number" data-target="<%= statsData.worksCount %>">0</span>
-          <span class="hp-stats__label">作品</span>
-        </div>
-        <div class="hp-stats__item stagger-child">
-          <span class="hp-stats__number" data-target="<%= statsData.totalPV %>">0</span>
-          <span class="hp-stats__label">总访问量</span>
-        </div>
-      </div>
-    </section>
-
-    <% if (featuredWorks.length > 0) { %>
-    <section class="featured-works reveal-section">
-      <h2 class="hp-section-title">精选作品</h2>
-      <div class="works-grid">
-        <% featuredWorks.forEach(work => { %>
-        <a href="/works/<%= work.slug %>" class="work-card stagger-child">
-          <% if (work.cover_image) { %>
-          <div class="work-card__media">
-            <img data-src="<%= work.cover_image %>" alt="<%= work.title %>" class="work-image lazy">
+        <!-- Featured post (8 wide × 2 tall) =========================== -->
+        <% if (featuredPost) { %>
+        <a href="/blog/<%= featuredPost.slug %>"
+           class="bento-cell bento-cell--8 bento-cell--tall bento-cell--violet card-v2 home-featured-post">
+          <% if (featuredPost.cover_image) { %>
+          <div class="home-featured-post__media">
+            <img src="<%= featuredPost.cover_image %>" alt="" loading="eager" decoding="async" width="1200" height="720">
           </div>
           <% } %>
-          <h3 class="work-title"><%= work.title %></h3>
-          <% if (work.year) { %><span class="work-year"><%= work.year %></span><% } %>
+          <span class="card-v2__eyebrow">● Featured · 精选文章</span>
+          <h2 class="card-v2__title"><%= featuredPost.title %></h2>
+          <% var _fpExcerpt = (featuredPost.excerpt || '').trim(); %>
+          <% if (_fpExcerpt) { %>
+          <p class="card-v2__desc"><%= _fpExcerpt.length > 140 ? _fpExcerpt.slice(0, 140) + '…' : _fpExcerpt %></p>
+          <% } %>
+          <div class="card-v2__meta">
+            <time><%= new Date(featuredPost.created_at).toLocaleDateString('zh-CN') %></time>
+            <% if (featuredPost.tags && featuredPost.tags.length) { %>
+            <span>·</span><span><%= featuredPost.tags[0] %></span>
+            <% } %>
+          </div>
+        </a>
+        <% } else { %>
+        <div class="bento-cell bento-cell--8 bento-cell--tall bento-cell--violet card-v2 card-v2--feature home-featured-post home-featured-post--empty">
+          <span class="card-v2__eyebrow">Welcome</span>
+          <h2 class="card-v2__title">新的一叶，还没落下</h2>
+          <p class="card-v2__desc">首页精选会在发布第一篇带封面的文章后自动出现。</p>
+        </div>
+        <% } %>
+
+        <!-- About summary (4 wide × 1 tall) =========================== -->
+        <div class="bento-cell bento-cell--4 card-v2">
+          <span class="card-v2__eyebrow">About · 关于</span>
+          <h3 class="card-v2__title">嗨，我在这里写东西</h3>
+          <p class="card-v2__desc">
+            <% if (typeof aboutSummary !== 'undefined' && aboutSummary) { %>
+              <%= aboutSummary.length > 180 ? aboutSummary.slice(0, 180) + '…' : aboutSummary %>
+            <% } else { %>
+              这里会显示个人简介摘要；可在后台 Settings 里编辑。
+            <% } %>
+          </p>
+          <a href="/about" class="card-v2__cta">了解更多</a>
+        </div>
+
+        <!-- Stats (4 wide × 1 tall) =================================== -->
+        <div class="bento-cell bento-cell--4 bento-cell--mint card-v2 card-v2--solid">
+          <span class="card-v2__eyebrow">Stats · 站点</span>
+          <dl class="home-stats" aria-label="站点概览">
+            <div>
+              <dt>文章</dt>
+              <dd><span class="hp-stats__number" data-target="<%= statsData.postsCount %>">0</span></dd>
+            </div>
+            <div>
+              <dt>作品</dt>
+              <dd><span class="hp-stats__number" data-target="<%= statsData.worksCount %>">0</span></dd>
+            </div>
+            <div>
+              <dt>访问</dt>
+              <dd><span class="hp-stats__number" data-target="<%= statsData.totalPV %>">0</span></dd>
+            </div>
+          </dl>
+        </div>
+
+        <!-- Featured works (three 4-wide cards) ======================= -->
+        <%
+          var _toneRing = ['rose', 'sky', 'lime'];
+          var _picks = (featuredWorks || []).slice(0, 3);
+          _picks.forEach(function (work, i) {
+            var tone = _toneRing[i % _toneRing.length];
+            var mono = (work.title || '·').trim().charAt(0).toUpperCase();
+        %>
+        <a href="/works/<%= work.slug %>"
+           class="bento-cell bento-cell--4 bento-cell--<%= tone %> card-v2">
+          <% if (work.cover_image) { %>
+          <div class="home-work__cover">
+            <img src="<%= work.cover_image %>" alt="<%= work.title %>" loading="lazy" decoding="async">
+          </div>
+          <% } else { %>
+          <div class="home-work__cover home-work__mono" aria-hidden="true"><%= mono %></div>
+          <% } %>
+          <span class="card-v2__eyebrow">
+            Work<% if (work.year) { %> · <%= work.year %><% } %>
+            <% if (work.tags && work.tags.length) { %> · <%= work.tags[0] %><% } %>
+          </span>
+          <h3 class="card-v2__title"><%= work.title %></h3>
+          <% if (work.description) { %>
+          <p class="card-v2__desc"><%= work.description.length > 80 ? work.description.slice(0, 80) + '…' : work.description %></p>
+          <% } %>
+          <span class="card-v2__cta">查看项目</span>
         </a>
         <% }); %>
-      </div>
-    </section>
-    <% } %>
 
-    <% if (recentPosts.length > 0) { %>
-    <section class="recent-posts reveal-section">
-      <h2 class="hp-section-title">最近文章</h2>
-      <div class="posts-list">
-        <% recentPosts.forEach(post => { %>
-        <article class="post-item stagger-child">
-          <time class="post-date"><%= new Date(post.created_at).toLocaleDateString('zh-CN') %></time>
-          <a href="/blog/<%= post.slug %>" class="post-title"><%= post.title %></a>
-        </article>
-        <% }); %>
-      </div>
-      <p style="text-align:center;margin-top:var(--space-6);"><a href="/blog" class="hp-about__link">查看全部文章 <span aria-hidden="true">→</span></a></p>
-    </section>
-    <% } %>
+        <!-- Recent posts list (8 wide × 2 tall) ====================== -->
+        <% if (recentPosts.length > 0) { %>
+        <div class="bento-cell bento-cell--8 bento-cell--tall card-v2">
+          <div class="home-list__head">
+            <div>
+              <span class="card-v2__eyebrow">Recent · 最近文章</span>
+              <h3 class="card-v2__title" style="font-size: clamp(20px, 2vw, 26px); margin-top: 6px;">近期更新</h3>
+            </div>
+            <a href="/blog" class="home-list__more">全部文章 →</a>
+          </div>
+          <ul class="home-list">
+            <% recentPosts.slice(0, 5).forEach(function (post) { %>
+            <li class="home-list__item">
+              <a href="/blog/<%= post.slug %>" class="home-list__link">
+                <time class="home-list__date"><%= new Date(post.created_at).toLocaleDateString('zh-CN') %></time>
+                <span class="home-list__title"><%= post.title %></span>
+                <% if (post.tags && post.tags.length) { %>
+                <span class="tag-v2"><%= post.tags[0] %></span>
+                <% } else { %>
+                <span></span>
+                <% } %>
+              </a>
+            </li>
+            <% }); %>
+          </ul>
+        </div>
+        <% } %>
 
-    <section class="hp-contact reveal-section">
-      <div class="hp-contact__inner">
-        <h2>联系我</h2>
-        <p>有合作、反馈或想聊聊项目，欢迎发邮件。</p>
-        <a href="mailto:xiner521@aliyun.com" class="hp-contact__btn">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-            <polyline points="22,6 12,13 2,6"></polyline>
-          </svg>
-          发送邮件
-        </a>
+        <!-- Contact (4 wide × 2 tall) ================================ -->
+        <div class="bento-cell bento-cell--4 bento-cell--tall bento-cell--amber card-v2 card-v2--feature">
+          <span class="card-v2__eyebrow">Contact · 一起聊聊</span>
+          <h3 class="card-v2__title">合作或闲聊，都欢迎</h3>
+          <p class="card-v2__desc">不定期回复。想交换设计、写作、工程上的一点想法都行。</p>
+          <%
+            // Heuristic: map a few common labels to the icon sprite so the
+            // list stays visually coherent. Anything unmatched falls back
+            // to the generic external-link look (no icon block rendered).
+            function _iconIdFor(label) {
+              var s = String(label || '').toLowerCase();
+              if (/github/.test(s)) return 'icon-github';
+              if (/mail|email|邮箱/.test(s)) return 'icon-mail';
+              if (/rss|订阅/.test(s)) return 'icon-rss';
+              return null;
+            }
+            var _email = (typeof contactEmail !== 'undefined') ? contactEmail : '';
+            var _qq = (typeof contactQq !== 'undefined') ? contactQq : '';
+            var _links = Array.isArray(typeof socialLinks !== 'undefined' ? socialLinks : null) ? socialLinks : [];
+            var _hasAny = _email || _qq || _links.length;
+          %>
+          <ul class="home-contact">
+            <% if (_email) { %>
+            <li>
+              <a href="mailto:<%= _email %>">
+                <svg width="18" height="18" aria-hidden="true"><use href="#icon-mail"/></svg>
+                <span class="home-contact__label">Email</span>
+                <span class="home-contact__val"><%= _email %></span>
+              </a>
+            </li>
+            <% } %>
+            <% _links.forEach(function (lnk) {
+                 var iconId = _iconIdFor(lnk.label);
+                 var isExternal = /^https?:\/\//i.test(lnk.url);
+            %>
+            <li>
+              <a href="<%= lnk.url %>"<% if (isExternal) { %> target="_blank" rel="noopener"<% } %>>
+                <% if (iconId) { %>
+                <svg width="18" height="18" aria-hidden="true"><use href="#<%= iconId %>"/></svg>
+                <% } else { %>
+                <span class="home-contact__bullet" aria-hidden="true">→</span>
+                <% } %>
+                <span class="home-contact__label"><%= lnk.label %></span>
+              </a>
+            </li>
+            <% }); %>
+            <% if (_qq) { %>
+            <li>
+              <a href="#" onclick="return false" aria-label="QQ 号码">
+                <span class="home-contact__bullet" aria-hidden="true">QQ</span>
+                <span class="home-contact__label">QQ</span>
+                <span class="home-contact__val"><%= _qq %></span>
+              </a>
+            </li>
+            <% } %>
+            <li>
+              <a href="/rss.xml">
+                <svg width="18" height="18" aria-hidden="true"><use href="#icon-rss"/></svg>
+                <span class="home-contact__label">RSS</span>
+                <span class="home-contact__val">订阅更新</span>
+              </a>
+            </li>
+            <% if (!_hasAny) { %>
+            <li class="home-contact__hint">
+              <span class="home-contact__label">后台 Settings 里填写联系方式即可显示在这里。</span>
+            </li>
+            <% } %>
+          </ul>
+        </div>
+
       </div>
-    </section>
+    </div>
 
   </main>
-  <%- include('partials/brand-wave') %>
-  <footer class="site-footer">
-    <div class="footer-content">
-      <div class="footer-section">
-        <h3>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-            <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
-          </svg>
-          aeoleaf 风叶
-        </h3>
-        <p>个人博客与作品集</p>
-      </div>
-      <div class="footer-section">
-        <h3>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
-          导航
-        </h3>
-        <ul>
-          <li><a href="/">首页</a></li>
-          <li><a href="/blog">博客</a></li>
-          <li><a href="/works">作品</a></li>
-          <li><a href="/about">关于</a></li>
-        </ul>
-      </div>
-      <div class="footer-section">
-        <h3>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-            <polyline points="22,6 12,13 2,6"></polyline>
-          </svg>
-          联系
-        </h3>
-        <ul>
-          <li>
-            <a href="mailto:xiner521@aliyun.com">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <circle cx="12" cy="12" r="4"></circle>
-                <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
-              </svg>
-              邮箱
-            </a>
-          </li>
-          <li>
-            <a href="https://github.com/Cnn77421" target="_blank" rel="noopener">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
-              </svg>
-              GitHub
-            </a>
-          </li>
-        </ul>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <p>&copy; <%= new Date().getFullYear() %> aeoleaf. All rights reserved.</p>
-      <p><a href="/admin/login" style="opacity:0;font-size:0;user-select:none;">.</a></p>
-    </div>
-  </footer>
-  <button id="back-to-top" aria-label="回到顶部">↑</button>
-  <script src="/js/main.js" defer></script>
-  <script src="/js/tracker.js" async defer></script>
+  <%- include('partials/public-footer') %>
 </body>
 </html>

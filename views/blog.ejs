@@ -1,172 +1,138 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= title %></title>
-  <meta name="description" content="浏览所有博客文章，分享技术见解和创意思考">
-  <meta name="keywords" content="博客,文章,技术博客,编程">
-  <meta name="author" content="aeoleaf">
-  <meta name="theme-color" content="#7B2638">
-  <link rel="canonical" href="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/blog">
-
-  <!-- Open Graph -->
-  <meta property="og:title" content="<%= title %>">
-  <meta property="og:description" content="浏览所有博客文章，分享技术见解和创意思考">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/blog">
-  <meta property="og:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/images/logo.png">
-
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="<%= title %>">
-  <meta name="twitter:description" content="浏览所有博客文章，分享技术见解和创意思考">
-  <meta name="twitter:image" content="<%= typeof baseUrl !== 'undefined' ? baseUrl : 'http://localhost:3000' %>/images/logo.png">
-
-  <!-- RSS Feed -->
-  <link rel="alternate" type="application/rss+xml" title="RSS Feed" href="/rss.xml">
-
-  <link rel="icon" type="image/png" href="/images/logo.png">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Lora:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/main.css?v=4">
-  <link rel="stylesheet" href="/css/blog.css?v=4">
+<%- include('partials/public-head', {
+  title: title,
+  description: (typeof description !== 'undefined' && description) ? description : '浏览所有博客文章，分享技术见解和创意思考',
+  canonicalPath: '/blog',
+  twitterCard: 'summary',
+  extraCss: ['/css/blog-v2.css']
+}) %>
 </head>
-<body>
-  <header class="site-header">
-    <nav class="nav-container">
-      <a href="/" class="nav-logo">
-        <span>Aeoleaf <span class="nav-logo-zh">风叶</span></span>
-      </a>
-      <div class="nav-right">
-        <ul class="nav-links">
-          <li><a href="/blog">Blog</a></li>
-          <li><a href="/works">Works</a></li>
-          <li><a href="/about">About</a></li>
-        </ul>
-        <button id="search-toggle" class="search-toggle" aria-label="Toggle search">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <path d="m21 21-4.35-4.35"></path>
-          </svg>
-        </button>
-        <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line>
-            <line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-          </svg>
-        </button>
-      </div>
-    </nav>
-  </header>
-  <div id="search-modal" class="search-modal">
-    <div class="search-modal-content">
-      <div class="search-box">
-        <input type="text" id="search-input" placeholder="搜索文章和作品...">
-        <button id="search-close">✕</button>
-      </div>
-      <div id="search-results"></div>
-    </div>
-  </div>
-  <main class="site-main">
-    <div class="content-container">
-      <h1>Blog</h1>
+<body class="blog-v2">
+  <%- include('partials/public-header') %>
+  <main id="main" class="site-main">
+    <div class="bl-shell">
+
+      <!-- Intro -->
+      <header class="bl-intro">
+        <div class="bl-intro__eyebrow"><span class="bl-intro__dot"></span>Journal</div>
+        <h1 class="bl-intro__title">Blog</h1>
+        <p class="bl-intro__desc">技术见解与创意思考。</p>
+      </header>
+
+      <%
+        const _hasTag = typeof activeTag !== 'undefined' && activeTag;
+        const _tagQ   = _hasTag ? ('&tag=' + encodeURIComponent(activeTag)) : '';
+        const _allTags = typeof allTags !== 'undefined' ? allTags : [];
+        const _activeTag = typeof activeTag !== 'undefined' ? activeTag : '';
+      %>
+
+      <!-- Filter bar -->
+      <% if (_allTags.length > 0 || _hasTag) { %>
+      <nav class="bl-filter" aria-label="标签筛选">
+        <a href="/blog" class="bl-filter__btn<%= !_hasTag ? ' bl-filter__btn--active' : '' %>">全部</a>
+        <% _allTags.forEach(tag => { %>
+        <a href="/blog?tag=<%= encodeURIComponent(tag) %>" class="bl-filter__btn<%= tag === _activeTag ? ' bl-filter__btn--active' : '' %>">#<%= tag %></a>
+        <% }); %>
+        <% if (_hasTag) { %><a href="/blog" class="bl-filter__clear" aria-label="清除筛选">× 清除 #<%= activeTag %></a><% } %>
+      </nav>
+      <% } %>
+
       <% if (posts.length === 0) { %>
-        <p class="empty-state">No posts yet.</p>
+      <div class="bl-empty">
+        <p class="bl-empty__title"><% if (_hasTag) { %>没有找到相关文章<% } else { %>这里还没有文章<% } %></p>
+        <p class="bl-empty__desc">
+          <% if (_hasTag) { %>暂无带 <strong>#<%= activeTag %></strong> 标签的文章。<a href="/blog">查看全部</a>。<% } else { %>第一篇文章正在路上。<% } %>
+        </p>
+      </div>
       <% } else { %>
-        <div class="blog-list">
-          <% posts.forEach(post => { %>
-          <article class="blog-item">
-            <time class="blog-date"><%= new Date(post.created_at).toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'}) %></time>
-            <h2><a href="/blog/<%= post.slug %>"><%= post.title %></a></h2>
-            <% if (post.excerpt) { %><p class="blog-excerpt"><%= post.excerpt %></p><% } %>
-            <% if (post.tags.length > 0) { %>
-            <div class="tags">
-              <% post.tags.forEach(tag => { %><span class="tag"><%= tag %></span><% }); %>
+
+      <%
+        const _featured = posts[0];
+        const _rest     = posts.slice(1);
+        const _fDate    = new Date(_featured.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+        const _fInitial = (_featured.title && String(_featured.title).trim()) ? String(_featured.title).trim().charAt(0) : '?';
+      %>
+
+      <!-- Featured post (Clerk magazine hero) -->
+      <a href="/blog/<%= _featured.slug %>" class="bl-featured">
+        <div class="bl-featured__media">
+          <% if (_featured.cover_image) { %>
+          <img src="<%= _featured.cover_image %>" alt="<%= _featured.title %>" class="bl-featured__img" loading="eager">
+          <% } else { %>
+          <div class="bl-featured__mono"><%= _fInitial %></div>
+          <% } %>
+        </div>
+        <div class="bl-featured__body">
+          <div class="bl-featured__eyebrow">
+            <span style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block;"></span>
+            最新文章
+            <% if (_featured.tags && _featured.tags.length > 0) { %>
+            <span class="bl-featured__tag">#<%= _featured.tags[0] %></span>
+            <% } %>
+          </div>
+          <h2 class="bl-featured__title"><%= _featured.title %></h2>
+          <% if (_featured.excerpt) { %><p class="bl-featured__excerpt"><%= _featured.excerpt %></p><% } %>
+          <div class="bl-featured__meta">
+            <time datetime="<%= _featured.created_at %>"><%= _fDate %></time>
+            <% if (_featured.readMinutes) { %><span>·</span><span>约 <%= _featured.readMinutes %> 分钟</span><% } %>
+          </div>
+        </div>
+      </a>
+
+      <!-- Post list (Vercel rhythm) -->
+      <% if (_rest.length > 0) { %>
+      <div class="bl-list">
+        <% _rest.forEach(post => { %>
+        <%
+          const _d = new Date(post.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+          const _init = (post.title && String(post.title).trim()) ? String(post.title).trim().charAt(0) : '?';
+        %>
+        <a href="/blog/<%= post.slug %>" class="bl-item">
+          <div class="bl-item__body">
+            <div class="bl-item__meta">
+              <time datetime="<%= post.created_at %>"><%= _d %></time>
+              <% if (post.readMinutes) { %><span class="bl-item__dot">·</span><span>约 <%= post.readMinutes %> 分钟</span><% } %>
+            </div>
+            <h2 class="bl-item__title"><%= post.title %></h2>
+            <% if (post.excerpt) { %><p class="bl-item__excerpt"><%= post.excerpt %></p><% } %>
+            <% if (post.tags && post.tags.length > 0) { %>
+            <div class="bl-item__tags">
+              <% post.tags.forEach(tag => { %><span class="bl-item__tag">#<%= tag %></span><% }); %>
             </div>
             <% } %>
-          </article>
-          <% }); %>
-        </div>
-        <% if (totalPages > 1) { %>
-        <nav class="pagination">
-          <% if (page > 1) { %><a href="/blog?page=<%= page - 1 %>">← Newer</a><% } %>
-          <% if (page < totalPages) { %><a href="/blog?page=<%= page + 1 %>">Older →</a><% } %>
-        </nav>
-        <% } %>
+          </div>
+          <div class="bl-item__thumb">
+            <% if (post.cover_image) { %>
+            <img src="<%= post.cover_image %>" alt="" loading="lazy">
+            <% } else { %>
+            <div class="bl-item__thumb-mono"><%= _init %></div>
+            <% } %>
+          </div>
+        </a>
+        <% }); %>
+      </div>
       <% } %>
+
+      <% } %>
+
+      <!-- Pagination -->
+      <% if (typeof pagination !== 'undefined' && pagination) { %>
+      <nav class="bl-pagination" aria-label="分页导航">
+        <% if (pagination.prev) { %><a class="bl-pagination__btn" href="/blog?page=<%= pagination.prev %><%= _tagQ %>" rel="prev">‹</a><% } %>
+        <% pagination.parts.forEach(function(part) { %>
+          <% if (part === 'gap') { %><span class="bl-pagination__gap">…</span>
+          <% } else if (part === page) { %><span class="bl-pagination__btn bl-pagination__btn--active" aria-current="page"><%= part %></span>
+          <% } else { %><a class="bl-pagination__btn" href="/blog?page=<%= part %><%= _tagQ %>"><%= part %></a><% } %>
+        <% }); %>
+        <% if (pagination.next) { %><a class="bl-pagination__btn" href="/blog?page=<%= pagination.next %><%= _tagQ %>" rel="next">›</a><% } %>
+        <span class="bl-pagination__summary"><%= page %> / <%= totalPages %></span>
+      </nav>
+      <% } %>
+
     </div>
   </main>
-  <footer class="site-footer">
-    <div class="footer-content">
-      <div class="footer-section">
-        <h3>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-            <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
-          </svg>
-          aeoleaf 风叶
-        </h3>
-        <p>个人博客与作品集</p>
-      </div>
-      <div class="footer-section">
-        <h3>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
-          导航
-        </h3>
-        <ul>
-          <li><a href="/">首页</a></li>
-          <li><a href="/blog">博客</a></li>
-          <li><a href="/works">作品</a></li>
-          <li><a href="/about">关于</a></li>
-        </ul>
-      </div>
-      <div class="footer-section">
-        <h3>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-            <polyline points="22,6 12,13 2,6"></polyline>
-          </svg>
-          联系
-        </h3>
-        <ul>
-          <li>
-            <a href="mailto:xiner521@aliyun.com">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="4"></circle>
-                <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
-              </svg>
-              邮箱
-            </a>
-          </li>
-          <li>
-            <a href="https://github.com/Cnn77421" target="_blank" rel="noopener">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
-              </svg>
-              GitHub
-            </a>
-          </li>
-        </ul>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <p>&copy; <%= new Date().getFullYear() %> aeoleaf. All rights reserved.</p>
-      <p><a href="/admin/login" style="opacity:0;font-size:0;user-select:none;">.</a></p>
-    </div>
-  </footer>
-  <button id="back-to-top" aria-label="Back to top">↑</button>
-  <script src="/js/main.js"></script>
-  <script src="/js/tracker.js" async defer></script>
+  <%- include('partials/public-footer') %>
 </body>
 </html>

@@ -3,7 +3,7 @@ const { db } = require('../../config/db');
 const slugify = require('slugify');
 const { requireAdmin } = require('../../middleware/auth');
 const { uploadWork, wrapUpload } = require('../../middleware/upload');
-const fs = require('fs');
+const { unlinkPublicUpload } = require('../../lib/safeFs');
 const path = require('path');
 
 function makeSlug(title) {
@@ -148,10 +148,7 @@ router.put('/:id', requireAdmin, optionalWorkCover, (req, res) => {
   );
 
   if (req.file) {
-    if (work.cover_image) {
-      const old = path.join(__dirname, '../../public', work.cover_image);
-      if (fs.existsSync(old)) fs.unlinkSync(old);
-    }
+    unlinkPublicUpload(work.cover_image);
     const coverUrl = '/uploads/works/' + req.file.filename;
     db.prepare('UPDATE works SET cover_image = ? WHERE id = ?').run(coverUrl, work.id);
   }
@@ -166,10 +163,7 @@ router.delete('/:id', requireAdmin, (req, res) => {
   if (!work) return res.status(404).json({ error: 'Not found' });
 
   const images = JSON.parse(work.images || '[]');
-  [work.cover_image, ...images].filter(Boolean).forEach(img => {
-    const filePath = path.join(__dirname, '../../public', img);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  });
+  [work.cover_image, ...images].filter(Boolean).forEach(unlinkPublicUpload);
 
   db.prepare('DELETE FROM works WHERE id = ?').run(work.id);
   res.json({ ok: true });
@@ -181,11 +175,7 @@ router.post('/:id/cover', requireAdmin, wrapUpload(uploadWork.single('cover')), 
   if (!work) return res.status(404).json({ error: 'Not found' });
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-  if (work.cover_image) {
-    const old = path.join(__dirname, '../../public', work.cover_image);
-    if (fs.existsSync(old)) fs.unlinkSync(old);
-  }
-
+  unlinkPublicUpload(work.cover_image);
   const url = '/uploads/works/' + req.file.filename;
   db.prepare('UPDATE works SET cover_image = ? WHERE id = ?').run(url, work.id);
   res.json({ url });
@@ -210,13 +200,22 @@ router.delete('/:id/images/:filename', requireAdmin, (req, res) => {
   const work = db.prepare('SELECT * FROM works WHERE id = ?').get(req.params.id);
   if (!work) return res.status(404).json({ error: 'Not found' });
 
-  const filename = req.params.filename;
-  const imgUrl = '/uploads/works/' + filename;
-  const images = JSON.parse(work.images || '[]').filter(i => i !== imgUrl);
-  db.prepare('UPDATE works SET images = ? WHERE id = ?').run(JSON.stringify(images), work.id);
+  // The filename must be a basename only — reject any attempt to escape the
+  // uploads/works directory via `..`, leading slashes, or null bytes.
+  const rawName = String(req.params.filename || '');
+  if (!rawName || rawName !== path.basename(rawName) || rawName.indexOf('\0') !== -1) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
 
-  const filePath = path.join(__dirname, '../../public', imgUrl);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  const imgUrl = '/uploads/works/' + rawName;
+  const images = JSON.parse(work.images || '[]');
+  if (!images.includes(imgUrl)) {
+    return res.status(404).json({ error: 'Image not attached to this work' });
+  }
+
+  const remaining = images.filter((i) => i !== imgUrl);
+  db.prepare('UPDATE works SET images = ? WHERE id = ?').run(JSON.stringify(remaining), work.id);
+  unlinkPublicUpload(imgUrl);
   res.json({ ok: true });
 });
 

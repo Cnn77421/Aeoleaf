@@ -1,7 +1,11 @@
 (function () {
-  const searchInput = document.getElementById('search-input');
-  const searchBtn = document.getElementById('search-btn');
-  const searchResults = document.getElementById('search-results');
+  // Dedicated IDs for the /search page; the header modal uses #search-input / #search-results.
+  const searchInput = document.getElementById('search-page-input')
+    || document.getElementById('search-input');
+  const searchBtn = document.getElementById('search-page-btn')
+    || document.getElementById('search-btn');
+  const searchResults = document.getElementById('search-page-results')
+    || document.getElementById('search-results');
 
   if (!searchInput || !searchBtn || !searchResults) return;
 

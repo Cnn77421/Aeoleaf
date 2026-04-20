@@ -116,7 +116,14 @@
         mainEl.removeEventListener('animationend', handler);
       });
 
-      window.scrollTo({ top: 0, behavior: 'instant' });
+      var _hash = url.split('#')[1];
+      if (_hash) {
+        var _el = document.getElementById(_hash);
+        if (_el) { _el.scrollIntoView({ behavior: 'instant' }); }
+        else { window.scrollTo({ top: 0, behavior: 'instant' }); }
+      } else {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
     } catch (e) {
       location.href = url;
       return;

@@ -8,8 +8,10 @@
   <title><%= title %></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
-  <link rel="stylesheet" href="/css/main.css">
-  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="stylesheet" href="<%= asset('/css/main.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/admin.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/admin-v2.css') %>">
 </head>
 <body class="admin-body">
   <aside class="admin-sidebar">
@@ -19,7 +21,7 @@
     <nav class="admin-nav">
       <a href="/admin/dashboard">Dashboard</a>
       <a href="/admin/posts">Posts</a>
-      <a href="/admin/works">Works</a>
+      <a href="/admin/works" class="active">Works</a>
       <a href="/admin/visitors">Visitors</a>
       <a href="/admin/settings">Settings</a>
     </nav>
@@ -86,8 +88,8 @@
     </script>
   </main>
   <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
-  <script src="/js/toast.js"></script>
-  <script src="/js/admin.js"></script>
-  <script src="/js/editor.js"></script>
+  <script src="<%= asset('/js/toast.js') %>"></script>
+  <script src="<%= asset('/js/admin.js') %>"></script>
+  <script src="<%= asset('/js/editor.js') %>"></script>
 </body>
 </html>
