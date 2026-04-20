@@ -19,32 +19,33 @@
 
   function collectCurrentScripts() {
     document.querySelectorAll('script[src]').forEach(function (s) {
-      _loadedScripts[s.src] = true;
+      _loadedScripts[s.src] = 'loaded';
     });
   }
 
   function loadScript(src) {
-    if (_loadedScripts[src]) return Promise.resolve();
-    _loadedScripts[src] = true;
-    return new Promise(function (resolve, reject) {
+    if (_loadedScripts[src] === 'loaded') return Promise.resolve();
+    if (_loadedScripts[src] && _loadedScripts[src].then) return _loadedScripts[src];
+    var p = new Promise(function (resolve, reject) {
       var s = document.createElement('script');
       s.src = src;
-      s.onload = resolve;
-      s.onerror = reject;
+      s.onload = function () { _loadedScripts[src] = 'loaded'; resolve(); };
+      s.onerror = function (e) { delete _loadedScripts[src]; reject(e); };
       document.head.appendChild(s);
     });
+    _loadedScripts[src] = p;
+    return p;
   }
 
   function execInlineScripts(container) {
     container.querySelectorAll('script').forEach(function (old) {
       var s = document.createElement('script');
       if (old.src) {
-        if (!_loadedScripts[old.src]) {
-          s.src = old.src;
-          _loadedScripts[old.src] = true;
-        } else {
-          return;
-        }
+        if (_loadedScripts[old.src] === 'loaded') return;
+        s.src = old.src;
+        s.onload = function () { _loadedScripts[old.src] = 'loaded'; };
+        s.onerror = function () { delete _loadedScripts[old.src]; };
+        _loadedScripts[old.src] = 'loaded';
       } else {
         s.textContent = old.textContent;
       }

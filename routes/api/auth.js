@@ -5,35 +5,46 @@ const { rateLimit } = require('../../middleware/rateLimit');
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 12,
-  message: 'Too many login attempts, try again later'
+  message: 'Too many login attempts, try again later',
+  keyPrefix: 'login:'
 });
 
-router.post('/login', loginLimiter, (req, res) => {
-  const { password } = req.body;
+router.post('/login', loginLimiter, (req, res, next) => {
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
   const adminPass = process.env.ADMIN_PASSWORD || '';
 
   if (!password) {
     return res.status(400).json({ error: 'Password required' });
   }
+  if (!adminPass) {
+    return res.status(401).json({ error: 'Admin login disabled' });
+  }
 
   let match = false;
   try {
-    const a = Buffer.from(password.padEnd(adminPass.length));
-    const b = Buffer.from(adminPass.padEnd(password.length));
-    // Use timing-safe comparison on same-length buffers
-    const len = Math.max(a.length, b.length);
-    const ba = Buffer.alloc(len); a.copy(ba);
-    const bb = Buffer.alloc(len); b.copy(bb);
-    match = crypto.timingSafeEqual(ba, bb) && password.length === adminPass.length;
+    const a = Buffer.from(password, 'utf8');
+    const b = Buffer.from(adminPass, 'utf8');
+    if (a.length !== b.length) {
+      const filler = Buffer.alloc(b.length);
+      crypto.timingSafeEqual(filler, b);
+      match = false;
+    } else {
+      match = crypto.timingSafeEqual(a, b);
+    }
   } catch {
     match = false;
   }
 
-  if (match) {
+  if (!match) return res.status(401).json({ error: 'Incorrect password' });
+
+  req.session.regenerate((err) => {
+    if (err) return next(err);
     req.session.admin = true;
-    return res.json({ ok: true });
-  }
-  return res.status(401).json({ error: 'Incorrect password' });
+    req.session.save((err2) => {
+      if (err2) return next(err2);
+      res.json({ ok: true });
+    });
+  });
 });
 
 router.post('/logout', (req, res) => {

@@ -1,18 +1,25 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
-const ALLOWED_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'image/avif',
-  'image/heic',
-  'image/heif',
-  'image/bmp',
-  'image/x-ms-bmp'
-];
+/**
+ * MIME → canonical extension whitelist. The saved filename's extension is
+ * always derived from the MIME type (never the user-supplied filename) so
+ * that e.g. someone cannot upload `evil.html` with `image/png` MIME and have
+ * the static server hand it back as HTML.
+ */
+const MIME_TO_EXT = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'image/avif': '.avif',
+  'image/heic': '.heic',
+  'image/heif': '.heif',
+  'image/bmp': '.bmp',
+  'image/x-ms-bmp': '.bmp'
+};
 
 function makeStorage(subdir) {
   return multer.diskStorage({
@@ -22,16 +29,19 @@ function makeStorage(subdir) {
       cb(null, dir);
     },
     filename(req, file, cb) {
-      const ext = path.extname(file.originalname).toLowerCase();
-      const base = path.basename(file.originalname, ext)
-        .toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 40);
-      cb(null, `${Date.now()}-${base}${ext}`);
+      const ext = MIME_TO_EXT[file.mimetype];
+      if (!ext) return cb(new Error('Unsupported image type'));
+      const origExt = path.extname(file.originalname).toLowerCase();
+      const base = path.basename(file.originalname, origExt)
+        .toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 40) || 'image';
+      const rand = crypto.randomBytes(4).toString('hex');
+      cb(null, `${Date.now()}-${rand}-${base}${ext}`);
     }
   });
 }
 
 function fileFilter(req, file, cb) {
-  if (ALLOWED_TYPES.includes(file.mimetype)) {
+  if (Object.prototype.hasOwnProperty.call(MIME_TO_EXT, file.mimetype)) {
     cb(null, true);
   } else {
     cb(new Error('Only image files are allowed'), false);

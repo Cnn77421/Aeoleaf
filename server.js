@@ -18,6 +18,13 @@ if (isProd) {
     console.error('FATAL: Set SESSION_SECRET to a random string of at least 24 characters in production.');
     process.exit(1);
   }
+  const adminPass = process.env.ADMIN_PASSWORD;
+  if (!adminPass || adminPass.length < 8) {
+    console.error('FATAL: Set ADMIN_PASSWORD to a non-empty string of at least 8 characters in production.');
+    process.exit(1);
+  }
+} else if (!process.env.ADMIN_PASSWORD) {
+  console.warn('[warn] ADMIN_PASSWORD is empty; admin login is disabled.');
 }
 
 (async () => {
@@ -80,10 +87,18 @@ app.get('/robots.txt', (req, res) => {
   );
 });
 
-app.use(express.static(path.join(__dirname, 'public'), {
-  maxAge: '1d',
-  etag: true
-}));
+// Fallback for legacy references to /favicon.ico and /images/logo.png
+// (the canonical assets live at /images/{favicon,logo}.svg).
+const logoSvgPath = path.join(__dirname, 'public', 'images', 'logo.svg');
+const faviconSvgPath = path.join(__dirname, 'public', 'images', 'favicon.svg');
+app.get('/favicon.ico', (req, res) => {
+  res.type('image/svg+xml').setHeader('Cache-Control', 'public, max-age=604800');
+  res.sendFile(faviconSvgPath, (err) => { if (err) res.status(204).end(); });
+});
+app.get('/images/logo.png', (req, res) => {
+  res.type('image/svg+xml').setHeader('Cache-Control', 'public, max-age=604800');
+  res.sendFile(logoSvgPath, (err) => { if (err) res.status(404).end(); });
+});
 
 app.use((req, res, next) => {
   const clientIp = (req.ip || req.socket.remoteAddress || '').replace('::ffff:', '');
@@ -92,6 +107,11 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '1d',
+  etag: true
+}));
 
 const sessionCookieSecure = process.env.SESSION_COOKIE_SECURE === 'true'
   || (isProd && String(process.env.BASE_URL || '').startsWith('https://'));

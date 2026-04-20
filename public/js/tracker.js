@@ -66,7 +66,9 @@
     });
   }
 
+  var _canvasFpCache = null;
   function canvasFingerprint() {
+    if (_canvasFpCache !== null) return _canvasFpCache;
     try {
       var c = document.createElement('canvas'), ctx = c.getContext('2d');
       c.width = 280; c.height = 60;
@@ -75,20 +77,24 @@
       ctx.fillStyle = '#069'; ctx.fillText('aeoleaf-fp', 14, 14);
       ctx.strokeStyle = 'rgba(102, 204, 0, 0.7)';
       ctx.arc(180, 30, 20, 0, Math.PI * 2, true); ctx.stroke();
-      return c.toDataURL();
-    } catch (e) { return 'canvas-unavailable'; }
+      _canvasFpCache = c.toDataURL();
+    } catch (e) { _canvasFpCache = 'canvas-unavailable'; }
+    return _canvasFpCache;
   }
 
+  var _webglFpCache = null;
   function webglFingerprint() {
+    if (_webglFpCache !== null) return _webglFpCache;
     try {
       var c = document.createElement('canvas');
       var gl = c.getContext('webgl') || c.getContext('experimental-webgl');
-      if (!gl) return 'webgl-unavailable';
+      if (!gl) { _webglFpCache = 'webgl-unavailable'; return _webglFpCache; }
       var d = gl.getExtension('WEBGL_debug_renderer_info');
       var vendor = d ? gl.getParameter(d.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR);
       var renderer = d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
-      return vendor + '::' + renderer;
-    } catch (e) { return 'webgl-error'; }
+      _webglFpCache = vendor + '::' + renderer;
+    } catch (e) { _webglFpCache = 'webgl-error'; }
+    return _webglFpCache;
   }
 
   function getPublicIp() {
@@ -106,13 +112,24 @@
     return id;
   }
 
+  var CURRENT_PATH_ENTRY = null;
+  var PATH_HISTORY_CAP = 50;
+
   function trackPath() {
     var list = [];
     try { list = JSON.parse(storageGet(PATH_KEY) || '[]'); if (!Array.isArray(list)) list = []; }
     catch (e) { list = []; }
-    list.push({ path: window.location.pathname, fullUrl: window.location.href, ts: Date.now(), sequenceNo: list.length + 1 });
-    if (list.length > 500) list = list.slice(-500);
+    var lastSeq = list.length ? Number(list[list.length - 1].sequenceNo || list.length) : 0;
+    var entry = {
+      path: window.location.pathname,
+      fullUrl: window.location.href,
+      ts: Date.now(),
+      sequenceNo: lastSeq + 1
+    };
+    list.push(entry);
+    if (list.length > PATH_HISTORY_CAP) list = list.slice(-PATH_HISTORY_CAP);
     storageSet(PATH_KEY, JSON.stringify(list));
+    CURRENT_PATH_ENTRY = entry;
   }
 
   function computeMaxScrollDepth() {
@@ -124,8 +141,9 @@
   }
 
   function getVisitPath() {
-    try { var v = JSON.parse(storageGet(PATH_KEY) || '[]'); return Array.isArray(v) ? v : []; }
-    catch (e) { return []; }
+    // Only send the current page entry to the server to avoid re-inserting
+    // the entire local history into `visitor_paths` on every page view.
+    return CURRENT_PATH_ENTRY ? [CURRENT_PATH_ENTRY] : [];
   }
 
   function getCampaignData() {

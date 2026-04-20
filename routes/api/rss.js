@@ -7,16 +7,14 @@ function getSetting(key) {
 }
 
 router.get('/rss.xml', (req, res) => {
-  const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+  const baseUrl = escapeXml(process.env.BASE_URL || 'http://localhost:3000');
   const siteTitle = getSetting('site_title') || 'aeoleaf';
   const siteSubtitle = getSetting('site_subtitle') || '风叶';
 
-  // Get recent 20 published posts
   const posts = db.prepare(
     "SELECT * FROM posts WHERE status = 'published' ORDER BY created_at DESC LIMIT 20"
   ).all();
 
-  // Build RSS XML
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
   xml += '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n';
   xml += '  <channel>\n';
@@ -26,26 +24,32 @@ router.get('/rss.xml', (req, res) => {
   xml += `    <language>zh-CN</language>\n`;
   xml += `    <atom:link href="${baseUrl}/rss.xml" rel="self" type="application/rss+xml" />\n`;
 
-  posts.forEach(post => {
+  posts.forEach((post) => {
+    const slug = escapeXml(post.slug);
     xml += '    <item>\n';
     xml += `      <title>${escapeXml(post.title)}</title>\n`;
-    xml += `      <link>${baseUrl}/blog/${post.slug}</link>\n`;
-    xml += `      <guid isPermaLink="true">${baseUrl}/blog/${post.slug}</guid>\n`;
-    xml += `      <pubDate>${new Date(post.created_at).toUTCString()}</pubDate>\n`;
+    xml += `      <link>${baseUrl}/blog/${slug}</link>\n`;
+    xml += `      <guid isPermaLink="true">${baseUrl}/blog/${slug}</guid>\n`;
+    const d = new Date(post.created_at);
+    if (!isNaN(d.getTime())) {
+      xml += `      <pubDate>${escapeXml(d.toUTCString())}</pubDate>\n`;
+    }
 
     if (post.excerpt) {
       xml += `      <description>${escapeXml(post.excerpt)}</description>\n`;
     }
 
     if (post.cover_image) {
-      xml += `      <enclosure url="${baseUrl}${post.cover_image}" type="image/jpeg" />\n`;
+      xml += `      <enclosure url="${baseUrl}${escapeXml(post.cover_image)}" type="image/jpeg" />\n`;
     }
 
-    // Add tags as categories
-    const tags = JSON.parse(post.tags || '[]');
-    tags.forEach(tag => {
-      xml += `      <category>${escapeXml(tag)}</category>\n`;
-    });
+    let tags = [];
+    try { tags = JSON.parse(post.tags || '[]'); } catch {}
+    if (Array.isArray(tags)) {
+      tags.forEach((tag) => {
+        xml += `      <category>${escapeXml(tag)}</category>\n`;
+      });
+    }
 
     xml += '    </item>\n';
   });
@@ -53,7 +57,7 @@ router.get('/rss.xml', (req, res) => {
   xml += '  </channel>\n';
   xml += '</rss>';
 
-  res.header('Content-Type', 'application/xml');
+  res.header('Content-Type', 'application/xml; charset=utf-8');
   res.send(xml);
 });
 

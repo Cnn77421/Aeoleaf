@@ -52,32 +52,33 @@
 
   function collectCurrentScripts() {
     document.querySelectorAll('script[src]').forEach(function (s) {
-      _loadedScripts[s.src] = true;
+      _loadedScripts[s.src] = 'loaded';
     });
   }
 
   function loadScript(src) {
-    if (_loadedScripts[src]) return Promise.resolve();
-    _loadedScripts[src] = true;
-    return new Promise(function (resolve, reject) {
+    if (_loadedScripts[src] === 'loaded') return Promise.resolve();
+    if (_loadedScripts[src] && _loadedScripts[src].then) return _loadedScripts[src];
+    var p = new Promise(function (resolve, reject) {
       var s = document.createElement('script');
       s.src = src;
-      s.onload = resolve;
-      s.onerror = reject;
+      s.onload = function () { _loadedScripts[src] = 'loaded'; resolve(); };
+      s.onerror = function (e) { delete _loadedScripts[src]; reject(e); };
       document.head.appendChild(s);
     });
+    _loadedScripts[src] = p;
+    return p;
   }
 
   function execInlineScripts(container) {
     container.querySelectorAll('script').forEach(function (old) {
       var s = document.createElement('script');
       if (old.src) {
-        if (!_loadedScripts[old.src]) {
-          s.src = old.src;
-          _loadedScripts[old.src] = true;
-        } else {
-          return;
-        }
+        if (_loadedScripts[old.src] === 'loaded') return;
+        s.src = old.src;
+        s.onload = function () { _loadedScripts[old.src] = 'loaded'; };
+        s.onerror = function () { delete _loadedScripts[old.src]; };
+        _loadedScripts[old.src] = 'loaded';
       } else {
         s.textContent = old.textContent;
       }
@@ -530,58 +531,99 @@ if (searchToggle && searchModal && searchClose && searchInput && searchResults) 
   });
 }
 
+function clearNode(el) {
+  while (el.firstChild) el.removeChild(el.firstChild);
+}
+
+function buildSearchItem(href, title, subtitle) {
+  const a = document.createElement('a');
+  a.className = 'search-item';
+  a.href = href;
+  const t = document.createElement('div');
+  t.className = 'search-item-title';
+  t.textContent = title || '';
+  a.appendChild(t);
+  if (subtitle) {
+    const s = document.createElement('div');
+    s.className = 'search-item-date';
+    s.textContent = subtitle;
+    a.appendChild(s);
+  }
+  return a;
+}
+
 async function performSearch() {
   const query = searchInput.value.trim();
   if (!query) {
-    searchResults.innerHTML = '';
+    clearNode(searchResults);
     return;
   }
+  if (query.length > 100) return;
 
-  searchResults.innerHTML =
-    '<div class="search-results-loading" role="status">' +
-    '<span class="ui-spinner" aria-hidden="true"></span>' +
-    '<span>搜索中…</span></div>';
+  clearNode(searchResults);
+  const loading = document.createElement('div');
+  loading.className = 'search-results-loading';
+  loading.setAttribute('role', 'status');
+  const spinner = document.createElement('span');
+  spinner.className = 'ui-spinner';
+  spinner.setAttribute('aria-hidden', 'true');
+  const lt = document.createElement('span');
+  lt.textContent = '搜索中…';
+  loading.appendChild(spinner);
+  loading.appendChild(lt);
+  searchResults.appendChild(loading);
 
   try {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error(String(res.status));
     const data = await res.json();
+    const posts = Array.isArray(data.posts) ? data.posts : [];
+    const works = Array.isArray(data.works) ? data.works : [];
 
-    if (data.posts.length === 0 && data.works.length === 0) {
-      searchResults.innerHTML = '<p style="color: var(--text-muted); padding: 1rem;">没有找到相关结果</p>';
+    clearNode(searchResults);
+
+    if (posts.length === 0 && works.length === 0) {
+      const p = document.createElement('p');
+      p.style.cssText = 'color: var(--text-muted); padding: 1rem;';
+      p.textContent = '没有找到相关结果';
+      searchResults.appendChild(p);
       return;
     }
 
-    let html = '';
-
-    if (data.posts.length > 0) {
-      html += '<div class="search-section"><h3>文章 (' + data.posts.length + ')</h3>';
-      data.posts.forEach(post => {
-        html += `
-          <a href="/blog/${post.slug}" class="search-item">
-            <div class="search-item-title">${post.title}</div>
-            <div class="search-item-date">${new Date(post.created_at).toLocaleDateString()}</div>
-          </a>
-        `;
+    if (posts.length > 0) {
+      const sec = document.createElement('div');
+      sec.className = 'search-section';
+      const h = document.createElement('h3');
+      h.textContent = `文章 (${posts.length})`;
+      sec.appendChild(h);
+      posts.forEach((post) => {
+        const date = post.created_at ? new Date(post.created_at).toLocaleDateString() : '';
+        sec.appendChild(buildSearchItem('/blog/' + encodeURIComponent(post.slug || ''), post.title, date));
       });
-      html += '</div>';
+      searchResults.appendChild(sec);
     }
 
-    if (data.works.length > 0) {
-      html += '<div class="search-section"><h3>作品 (' + data.works.length + ')</h3>';
-      data.works.forEach(work => {
-        html += `
-          <a href="/works/${work.slug}" class="search-item">
-            <div class="search-item-title">${work.title}</div>
-            ${work.year ? '<div class="search-item-date">' + work.year + '</div>' : ''}
-          </a>
-        `;
+    if (works.length > 0) {
+      const sec = document.createElement('div');
+      sec.className = 'search-section';
+      const h = document.createElement('h3');
+      h.textContent = `作品 (${works.length})`;
+      sec.appendChild(h);
+      works.forEach((work) => {
+        sec.appendChild(buildSearchItem(
+          '/works/' + encodeURIComponent(work.slug || ''),
+          work.title,
+          work.year ? String(work.year) : ''
+        ));
       });
-      html += '</div>';
+      searchResults.appendChild(sec);
     }
-
-    searchResults.innerHTML = html;
   } catch (error) {
-    searchResults.innerHTML = '<p style="color: var(--text-muted); padding: 1rem;">搜索失败，请重试</p>';
+    clearNode(searchResults);
+    const p = document.createElement('p');
+    p.style.cssText = 'color: var(--text-muted); padding: 1rem;';
+    p.textContent = '搜索失败，请重试';
+    searchResults.appendChild(p);
   }
 }
 

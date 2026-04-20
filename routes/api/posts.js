@@ -29,33 +29,47 @@ function optionalPostCover(req, res, next) {
   next();
 }
 
+function isAdmin(req) {
+  return !!(req.session && req.session.admin === true);
+}
+
 // GET /api/posts — list posts
 router.get('/', (req, res) => {
-  const { status, tag, page = 1, limit = 10 } = req.query;
-  const offset = (parseInt(page) - 1) * parseInt(limit);
+  const admin = isAdmin(req);
+  const { status, tag } = req.query;
+  const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+  const offset = (pageNum - 1) * limitNum;
 
   let query = 'SELECT * FROM posts WHERE 1=1';
   const params = [];
 
-  if (status) { query += ' AND status = ?'; params.push(status); }
+  if (admin) {
+    if (status) { query += ' AND status = ?'; params.push(status); }
+  } else {
+    query += " AND status = 'published'";
+  }
   if (tag) { query += ' AND tags LIKE ?'; params.push(`%"${tag}"%`); }
 
   const total = db.prepare(query.replace('SELECT *', 'SELECT COUNT(*) as cnt')).get(...params).cnt;
   query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-  params.push(parseInt(limit), offset);
+  params.push(limitNum, offset);
 
   const posts = db.prepare(query).all(...params).map(p => ({
     ...p,
     tags: JSON.parse(p.tags || '[]')
   }));
 
-  res.json({ posts, total, page: parseInt(page), limit: parseInt(limit) });
+  res.json({ posts, total, page: pageNum, limit: limitNum });
 });
 
 // GET /api/posts/:slug
 router.get('/:slug', (req, res) => {
   const post = db.prepare('SELECT * FROM posts WHERE slug = ?').get(req.params.slug);
   if (!post) return res.status(404).json({ error: 'Not found' });
+  if (!isAdmin(req) && post.status !== 'published') {
+    return res.status(404).json({ error: 'Not found' });
+  }
   res.json({ ...post, tags: JSON.parse(post.tags || '[]') });
 });
 

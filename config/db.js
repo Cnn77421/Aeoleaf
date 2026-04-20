@@ -18,22 +18,44 @@ function exportDbBuffer() {
   return Buffer.from(db.export());
 }
 
+function atomicWriteSync(target, buf) {
+  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, buf);
+  fs.renameSync(tmp, target);
+}
+
+async function atomicWrite(target, buf) {
+  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
+  await fsp.writeFile(tmp, buf);
+  await fsp.rename(tmp, target);
+}
+
 function saveDBSync() {
   if (saveDebounceTimer) {
     clearTimeout(saveDebounceTimer);
     saveDebounceTimer = null;
   }
   if (!db) return;
-  fs.writeFileSync(dbPath, exportDbBuffer());
+  atomicWriteSync(dbPath, exportDbBuffer());
 }
 
 let db;
 const queryCache = new Map();
-const CACHE_TTL = 60000; // 1分钟缓存
+const CACHE_TTL = 60000; // 1 分钟缓存
+const CACHE_MAX_ENTRIES = 500;
 
 /** COUNT(...) 等聚合读不应缓存，避免多进程/写入后长时间读到旧的 0 */
 function skipResultCacheForSql(sql) {
   return typeof sql === 'string' && /\bCOUNT\s*\(/i.test(sql);
+}
+
+function cacheSet(key, value) {
+  // Simple LRU-ish cap: when exceeded, drop the oldest entry (Map keeps insertion order).
+  if (queryCache.size >= CACHE_MAX_ENTRIES) {
+    const firstKey = queryCache.keys().next().value;
+    if (firstKey !== undefined) queryCache.delete(firstKey);
+  }
+  queryCache.set(key, value);
 }
 
 async function initDB() {
@@ -207,14 +229,17 @@ async function initDB() {
     );
   `);
 
-  db.run('CREATE INDEX IF NOT EXISTS idx_visitors_time ON visitors(tracked_at)');
-  db.run('CREATE INDEX IF NOT EXISTS idx_visitors_ip_search ON visitors(ip)');
-  db.run('CREATE INDEX IF NOT EXISTS idx_visitors_fp_search ON visitors(fingerprint_id)');
+  // idx_visitors_tracked_at / idx_visitors_fingerprint / idx_visitors_ip
+  // already created above; avoid duplicates. Only add the new columns' indexes.
   db.run('CREATE INDEX IF NOT EXISTS idx_visitors_url_search ON visitors(full_url)');
   db.run('CREATE INDEX IF NOT EXISTS idx_visitors_request_id ON visitors(request_id)');
   db.run('CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON visitors(visitor_session_id)');
   db.run('CREATE INDEX IF NOT EXISTS idx_visitors_page_view_id ON visitors(page_view_id)');
   db.run('CREATE INDEX IF NOT EXISTS idx_visitor_sessions_fingerprint ON visitor_sessions(fingerprint_id)');
+  // Drop legacy duplicates introduced by earlier versions.
+  try { db.run('DROP INDEX IF EXISTS idx_visitors_time'); } catch (e) {}
+  try { db.run('DROP INDEX IF EXISTS idx_visitors_ip_search'); } catch (e) {}
+  try { db.run('DROP INDEX IF EXISTS idx_visitors_fp_search'); } catch (e) {}
 
   db.run(`
     CREATE TABLE IF NOT EXISTS ip_blacklist (
@@ -237,7 +262,7 @@ function saveDB() {
   saveDebounceTimer = setTimeout(() => {
     saveDebounceTimer = null;
     const buf = exportDbBuffer();
-    fsp.writeFile(dbPath, buf).catch((err) => {
+    atomicWrite(dbPath, buf).catch((err) => {
       console.error('Database write failed:', err);
     });
   }, SAVE_DEBOUNCE_MS);
@@ -249,7 +274,7 @@ async function flushDB() {
     saveDebounceTimer = null;
   }
   if (!db) return;
-  await fsp.writeFile(dbPath, exportDbBuffer());
+  await atomicWrite(dbPath, exportDbBuffer());
 }
 
 const dbWrapper = {
@@ -271,7 +296,7 @@ const dbWrapper = {
         stmt.free();
 
         if (!noCache) {
-          queryCache.set(cacheKey, { data: result, time: Date.now() });
+          cacheSet(cacheKey, { data: result, time: Date.now() });
         }
         return result;
       },
@@ -292,7 +317,7 @@ const dbWrapper = {
         stmt.free();
 
         if (!noCache) {
-          queryCache.set(cacheKey, { data: results, time: Date.now() });
+          cacheSet(cacheKey, { data: results, time: Date.now() });
         }
         return results;
       },

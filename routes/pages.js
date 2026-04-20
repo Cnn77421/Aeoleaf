@@ -18,7 +18,15 @@ const {
   getBlacklistIps
 } = require('../config/db');
 const { requireAdmin } = require('../middleware/auth');
+const { rateLimit } = require('../middleware/rateLimit');
 const { marked } = require('marked');
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 12,
+  message: 'Too many login attempts, try again later',
+  keyPrefix: 'login:'
+});
 const createDOMPurify = require('dompurify');
 const { JSDOM } = require('jsdom');
 
@@ -247,24 +255,39 @@ router.get('/admin/login', (req, res) => {
   res.render('admin/login', { title: 'Login — aeoleaf', error: null });
 });
 
-router.post('/admin/login', (req, res) => {
+router.post('/admin/login', loginLimiter, (req, res, next) => {
   const crypto = require('crypto');
-  const { password } = req.body;
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
   const adminPass = process.env.ADMIN_PASSWORD || '';
+
+  const renderFail = () =>
+    res.status(401).render('admin/login', { title: 'Login — aeoleaf', error: 'Incorrect password' });
+
+  if (!password || !adminPass) return renderFail();
 
   let match = false;
   try {
-    const len = Math.max(password.length, adminPass.length);
-    const ba = Buffer.alloc(len); Buffer.from(password).copy(ba);
-    const bb = Buffer.alloc(len); Buffer.from(adminPass).copy(bb);
-    match = crypto.timingSafeEqual(ba, bb) && password.length === adminPass.length;
+    const a = Buffer.from(password, 'utf8');
+    const b = Buffer.from(adminPass, 'utf8');
+    if (a.length !== b.length) {
+      const filler = Buffer.alloc(b.length);
+      crypto.timingSafeEqual(filler, b);
+      match = false;
+    } else {
+      match = crypto.timingSafeEqual(a, b);
+    }
   } catch { match = false; }
 
-  if (match) {
+  if (!match) return renderFail();
+
+  req.session.regenerate((err) => {
+    if (err) return next(err);
     req.session.admin = true;
-    return res.redirect('/admin/dashboard');
-  }
-  res.render('admin/login', { title: 'Login — aeoleaf', error: 'Incorrect password' });
+    req.session.save((err2) => {
+      if (err2) return next(err2);
+      res.redirect('/admin/dashboard');
+    });
+  });
 });
 
 router.post('/admin/logout', requireAdmin, (req, res) => {

@@ -5,65 +5,146 @@
 
   if (!searchInput || !searchBtn || !searchResults) return;
 
+  function clear(el) {
+    while (el.firstChild) el.removeChild(el.firstChild);
+  }
+
+  function showMessage(text) {
+    clear(searchResults);
+    const p = document.createElement('p');
+    p.style.color = 'var(--text-muted)';
+    p.textContent = text;
+    searchResults.appendChild(p);
+  }
+
+  function showLoading() {
+    clear(searchResults);
+    const wrap = document.createElement('div');
+    wrap.className = 'search-results-loading';
+    wrap.setAttribute('role', 'status');
+    const spinner = document.createElement('span');
+    spinner.className = 'ui-spinner';
+    spinner.setAttribute('aria-hidden', 'true');
+    const txt = document.createElement('span');
+    txt.textContent = '搜索中…';
+    wrap.appendChild(spinner);
+    wrap.appendChild(txt);
+    searchResults.appendChild(wrap);
+  }
+
+  function renderPosts(posts) {
+    const h2 = document.createElement('h2');
+    h2.style.marginTop = '2rem';
+    h2.textContent = `文章 (${posts.length})`;
+    searchResults.appendChild(h2);
+
+    const list = document.createElement('div');
+    list.className = 'posts-list';
+    posts.forEach((post) => {
+      const article = document.createElement('article');
+      article.className = 'post-item';
+
+      const time = document.createElement('time');
+      time.className = 'post-date';
+      time.textContent = post.created_at ? new Date(post.created_at).toLocaleDateString() : '';
+      article.appendChild(time);
+
+      const a = document.createElement('a');
+      a.className = 'post-title';
+      a.href = '/blog/' + encodeURIComponent(post.slug || '');
+      a.textContent = post.title || '';
+      article.appendChild(a);
+
+      if (post.excerpt) {
+        const p = document.createElement('p');
+        p.style.color = 'var(--text-muted)';
+        p.style.marginTop = '0.5rem';
+        p.textContent = post.excerpt;
+        article.appendChild(p);
+      }
+
+      list.appendChild(article);
+    });
+    searchResults.appendChild(list);
+  }
+
+  function renderWorks(works) {
+    const h2 = document.createElement('h2');
+    h2.style.marginTop = '2rem';
+    h2.textContent = `作品 (${works.length})`;
+    searchResults.appendChild(h2);
+
+    const grid = document.createElement('div');
+    grid.className = 'works-grid';
+    works.forEach((work) => {
+      const a = document.createElement('a');
+      a.className = 'work-card';
+      a.href = '/works/' + encodeURIComponent(work.slug || '');
+
+      if (work.cover_image) {
+        const media = document.createElement('div');
+        media.className = 'work-card__media';
+        const img = document.createElement('img');
+        img.src = work.cover_image;
+        img.alt = work.title || '';
+        img.className = 'work-image';
+        img.loading = 'lazy';
+        media.appendChild(img);
+        a.appendChild(media);
+      }
+
+      const h3 = document.createElement('h3');
+      h3.className = 'work-title';
+      h3.textContent = work.title || '';
+      a.appendChild(h3);
+
+      if (work.year) {
+        const yr = document.createElement('span');
+        yr.className = 'work-year';
+        yr.textContent = String(work.year);
+        a.appendChild(yr);
+      }
+
+      grid.appendChild(a);
+    });
+    searchResults.appendChild(grid);
+  }
+
   async function performSearch() {
     const query = searchInput.value.trim();
     if (!query) {
-      searchResults.innerHTML = '<p style="color: var(--text-muted);">请输入搜索关键词</p>';
+      showMessage('请输入搜索关键词');
+      return;
+    }
+    if (query.length > 100) {
+      showMessage('关键词过长');
       return;
     }
 
-    searchResults.innerHTML =
-      '<div class="search-results-loading" role="status">' +
-      '<span class="ui-spinner" aria-hidden="true"></span>' +
-      '<span>搜索中…</span></div>';
+    showLoading();
 
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, { credentials: 'same-origin' });
+      if (!res.ok) throw new Error(String(res.status));
       const data = await res.json();
+      const posts = Array.isArray(data.posts) ? data.posts : [];
+      const works = Array.isArray(data.works) ? data.works : [];
 
-      if (data.posts.length === 0 && data.works.length === 0) {
-        searchResults.innerHTML = '<p style="color: var(--text-muted);">没有找到相关结果</p>';
+      if (posts.length === 0 && works.length === 0) {
+        showMessage('没有找到相关结果');
         return;
       }
 
-      let html = '';
-
-      if (data.posts.length > 0) {
-        html += '<h2 style="margin-top: 2rem;">文章 (' + data.posts.length + ')</h2><div class="posts-list">';
-        data.posts.forEach(post => {
-          html += `
-          <article class="post-item">
-            <time class="post-date">${new Date(post.created_at).toLocaleDateString()}</time>
-            <a href="/blog/${post.slug}" class="post-title">${post.title}</a>
-            ${post.excerpt ? '<p style="color: var(--text-muted); margin-top: 0.5rem;">' + post.excerpt + '</p>' : ''}
-          </article>
-        `;
-        });
-        html += '</div>';
-      }
-
-      if (data.works.length > 0) {
-        html += '<h2 style="margin-top: 2rem;">作品 (' + data.works.length + ')</h2><div class="works-grid">';
-        data.works.forEach(work => {
-          html += `
-          <a href="/works/${work.slug}" class="work-card">
-            ${work.cover_image ? '<div class="work-card__media"><img src="' + work.cover_image + '" alt="' + work.title + '" class="work-image" loading="lazy"></div>' : ''}
-            <h3 class="work-title">${work.title}</h3>
-            ${work.year ? '<span class="work-year">' + work.year + '</span>' : ''}
-          </a>
-        `;
-        });
-        html += '</div>';
-      }
-
-      searchResults.innerHTML = html;
-    } catch (error) {
-      searchResults.innerHTML = '<p style="color: var(--text-muted);">搜索失败，请重试</p>';
+      clear(searchResults);
+      if (posts.length > 0) renderPosts(posts);
+      if (works.length > 0) renderWorks(works);
+    } catch (err) {
+      showMessage('搜索失败，请重试');
     }
   }
 
   searchBtn.addEventListener('click', performSearch);
-  searchInput.addEventListener('keypress', (e) => {
+  searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') performSearch();
   });
 
