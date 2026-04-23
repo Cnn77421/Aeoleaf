@@ -109,7 +109,7 @@ router.put('/:id', requireAdmin, optionalPostCover, (req, res) => {
   }
 
   db.prepare(
-    `UPDATE posts SET title=?, slug=?, excerpt=?, content=?, tags=?, status=?
+    `UPDATE posts SET title=?, slug=?, excerpt=?, content=?, tags=?, status=?, updated_at=datetime('now')
      WHERE id=?`
   ).run(
     title ?? post.title,
@@ -124,7 +124,7 @@ router.put('/:id', requireAdmin, optionalPostCover, (req, res) => {
   if (req.file) {
     unlinkPublicUpload(post.cover_image);
     const coverUrl = '/uploads/posts/' + req.file.filename;
-    db.prepare('UPDATE posts SET cover_image = ? WHERE id = ?').run(coverUrl, post.id);
+    db.prepare("UPDATE posts SET cover_image = ?, updated_at = datetime('now') WHERE id = ?").run(coverUrl, post.id);
   }
 
   const updated = db.prepare('SELECT * FROM posts WHERE id = ?').get(post.id);
@@ -149,7 +149,7 @@ router.post('/:id/cover', requireAdmin, wrapUpload(uploadPost.single('cover')), 
 
   unlinkPublicUpload(post.cover_image);
   const url = '/uploads/posts/' + req.file.filename;
-  db.prepare('UPDATE posts SET cover_image = ? WHERE id = ?').run(url, post.id);
+  db.prepare("UPDATE posts SET cover_image = ?, updated_at = datetime('now') WHERE id = ?").run(url, post.id);
   res.json({ url });
 });
 

@@ -21,8 +21,14 @@ function toW3CDate(s) {
   return str;
 }
 
+function resolveBaseUrl(req) {
+  const configured = String(process.env.BASE_URL || '').trim();
+  if (configured) return configured.replace(/\/+$/, '');
+  return `${req.protocol}://${req.get('host')}`;
+}
+
 router.get('/sitemap.xml', (req, res) => {
-  const baseUrl = escapeXml(process.env.BASE_URL || 'http://localhost:3000');
+  const baseUrl = escapeXml(resolveBaseUrl(req));
 
   const posts = db.prepare(
     "SELECT slug, updated_at FROM posts WHERE status = 'published' ORDER BY updated_at DESC"

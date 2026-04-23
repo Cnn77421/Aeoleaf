@@ -104,7 +104,7 @@ router.put('/reorder', requireAdmin, (req, res) => {
   const { order } = req.body;
   if (!Array.isArray(order)) return res.status(400).json({ error: 'order array required' });
 
-  const stmt = db.prepare('UPDATE works SET sort_order = ? WHERE id = ?');
+  const stmt = db.prepare("UPDATE works SET sort_order = ?, updated_at = datetime('now') WHERE id = ?");
   const update = db.transaction(() => order.forEach(({ id, sort_order }) => stmt.run(sort_order, id)));
   update();
   res.json({ ok: true });
@@ -133,7 +133,7 @@ router.put('/:id', requireAdmin, optionalWorkCover, (req, res) => {
     : work.sort_order;
 
   db.prepare(
-    `UPDATE works SET title=?, slug=?, description=?, content=?, tags=?, url=?, year=?, date=?, featured=?, sort_order=?
+    `UPDATE works SET title=?, slug=?, description=?, content=?, tags=?, url=?, year=?, date=?, featured=?, sort_order=?, updated_at=datetime('now')
      WHERE id=?`
   ).run(
     title ?? work.title, newSlug,
@@ -150,7 +150,7 @@ router.put('/:id', requireAdmin, optionalWorkCover, (req, res) => {
   if (req.file) {
     unlinkPublicUpload(work.cover_image);
     const coverUrl = '/uploads/works/' + req.file.filename;
-    db.prepare('UPDATE works SET cover_image = ? WHERE id = ?').run(coverUrl, work.id);
+    db.prepare("UPDATE works SET cover_image = ?, updated_at = datetime('now') WHERE id = ?").run(coverUrl, work.id);
   }
 
   const updated = db.prepare('SELECT * FROM works WHERE id = ?').get(work.id);
@@ -177,7 +177,7 @@ router.post('/:id/cover', requireAdmin, wrapUpload(uploadWork.single('cover')), 
 
   unlinkPublicUpload(work.cover_image);
   const url = '/uploads/works/' + req.file.filename;
-  db.prepare('UPDATE works SET cover_image = ? WHERE id = ?').run(url, work.id);
+  db.prepare("UPDATE works SET cover_image = ?, updated_at = datetime('now') WHERE id = ?").run(url, work.id);
   res.json({ url });
 });
 
@@ -189,7 +189,7 @@ router.post('/:id/images', requireAdmin, wrapUpload(uploadWork.array('images', 1
 
   const existing = JSON.parse(work.images || '[]');
   const newUrls = req.files.map(f => '/uploads/works/' + f.filename);
-  db.prepare('UPDATE works SET images = ? WHERE id = ?').run(
+  db.prepare("UPDATE works SET images = ?, updated_at = datetime('now') WHERE id = ?").run(
     JSON.stringify([...existing, ...newUrls]), work.id
   );
   res.json({ urls: newUrls });
@@ -214,7 +214,7 @@ router.delete('/:id/images/:filename', requireAdmin, (req, res) => {
   }
 
   const remaining = images.filter((i) => i !== imgUrl);
-  db.prepare('UPDATE works SET images = ? WHERE id = ?').run(JSON.stringify(remaining), work.id);
+  db.prepare("UPDATE works SET images = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(remaining), work.id);
   unlinkPublicUpload(imgUrl);
   res.json({ ok: true });
 });

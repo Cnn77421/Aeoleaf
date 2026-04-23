@@ -13,6 +13,12 @@ app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const isProd = process.env.NODE_ENV === 'production';
 
+function resolveBaseUrl(req) {
+  const configured = String(process.env.BASE_URL || '').trim();
+  if (configured) return configured.replace(/\/+$/, '');
+  return `${req.protocol}://${req.get('host')}`;
+}
+
 if (isProd) {
   const sec = process.env.SESSION_SECRET;
   if (!sec || sec === 'change-this-secret' || sec.length < 24) {
@@ -94,8 +100,11 @@ app.use(helmet(helmetOpts));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-app.locals.baseUrl = process.env.BASE_URL || 'http://localhost:3000';
 app.locals.asset = asset;
+app.use((req, res, next) => {
+  res.locals.baseUrl = resolveBaseUrl(req);
+  next();
+});
 
 // Size-appropriate body parsers: keep tracker tiny (beacons should never
 // exceed a few KB) and cap JSON by route family. Content endpoints that
@@ -129,7 +138,7 @@ app.use((req, res, next) => {
 });
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.get('/robots.txt', (req, res) => {
-  const base = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+  const base = resolveBaseUrl(req);
   res.type('text/plain').send(
     `User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /api/\n\nSitemap: ${base}/sitemap.xml\n`
   );

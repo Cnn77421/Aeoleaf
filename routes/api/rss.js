@@ -6,8 +6,14 @@ function getSetting(key) {
   return row ? row.value : '';
 }
 
+function resolveBaseUrl(req) {
+  const configured = String(process.env.BASE_URL || '').trim();
+  if (configured) return configured.replace(/\/+$/, '');
+  return `${req.protocol}://${req.get('host')}`;
+}
+
 router.get('/rss.xml', (req, res) => {
-  const baseUrl = escapeXml(process.env.BASE_URL || 'http://localhost:3000');
+  const baseUrl = escapeXml(resolveBaseUrl(req));
   const siteTitle = getSetting('site_title') || 'aeoleaf';
   const siteSubtitle = getSetting('site_subtitle') || '风叶';
 
