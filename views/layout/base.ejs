@@ -22,8 +22,32 @@
   <link rel="stylesheet" href="<%= asset('/css/main.css') %>">
   <link rel="stylesheet" href="<%= asset('/css/blog.css') %>">
   <link rel="stylesheet" href="<%= asset('/css/works.css') %>">
+  <% if (typeof isBirthday !== 'undefined' && isBirthday) { %>
+  <link rel="stylesheet" href="<%= asset('/css/birthday.css') %>">
+  <% } %>
 </head>
-<body>
+<body<% if (typeof isBirthday !== 'undefined' && isBirthday) { %> class="has-birthday-banner"<% } %>>
+  <% if (typeof isBirthday !== 'undefined' && isBirthday) { %>
+  <div class="birthday-banner">
+    <span class="birthday-banner__emoji">🎂</span>
+    <span>Happy Birthday! 今天是我的生日 🎉</span>
+    <button class="birthday-banner__close" aria-label="关闭">✕</button>
+  </div>
+  <div class="birthday-decorations" aria-hidden="true"></div>
+  <div class="birthday-cake" role="button" aria-label="许个愿吧">
+    <div class="birthday-cake__body">
+      <div class="birthday-cake__layer birthday-cake__layer--bottom"></div>
+      <div class="birthday-cake__layer birthday-cake__layer--top"></div>
+      <div class="birthday-cake__candles">
+        <div class="birthday-candle"><div class="birthday-flame"></div></div>
+        <div class="birthday-candle"><div class="birthday-flame"></div></div>
+        <div class="birthday-candle"><div class="birthday-flame"></div></div>
+      </div>
+    </div>
+    <div class="birthday-cake__tip birthday-cake__tip--ask">🕯️ 点击许个愿吧</div>
+    <div class="birthday-cake__tip birthday-cake__tip--done">✨ 愿望已许下</div>
+  </div>
+  <% } %>
   <header class="site-header">
     <nav class="nav-container">
       <a href="/" class="nav-logo">aeoleaf <span class="nav-logo-zh">风叶</span></a>
@@ -79,5 +103,8 @@
   </footer>
   <script src="<%= asset('/js/main.js') %>"></script>
   <script src="<%= asset('/js/tracker.js') %>" async defer></script>
+  <% if (typeof isBirthday !== 'undefined' && isBirthday) { %>
+  <script src="<%= asset('/js/birthday.js') %>" defer></script>
+  <% } %>
 </body>
 </html>

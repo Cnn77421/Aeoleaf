@@ -67,7 +67,7 @@ const cspDirectives = {
   scriptSrc: ["'self'", "'unsafe-inline'", 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
   styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://unpkg.com'],
   fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
-  imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+  imgSrc: ["'self'", 'data:', 'blob:', 'https:', 'https://ui-avatars.com'],
   connectSrc: ["'self'"],
   baseUri: ["'self'"],
   formAction: ["'self'"],
@@ -103,6 +103,8 @@ app.set('views', path.join(__dirname, 'views'));
 app.locals.asset = asset;
 app.use((req, res, next) => {
   res.locals.baseUrl = resolveBaseUrl(req);
+  const now = new Date();
+  res.locals.isBirthday = (now.getMonth() === 4 && now.getDate() === 21);
   next();
 });
 
@@ -220,6 +222,7 @@ app.use('/api/posts', require('./routes/api/posts'));
 app.use('/api/works', require('./routes/api/works'));
 app.use('/api/search', require('./routes/api/search'));
 app.use('/api/track', require('./routes/api/track'));
+app.use('/api/guestbook', require('./routes/api/guestbook'));
 app.use('/', require('./routes/api/sitemap'));
 app.use('/', require('./routes/api/rss'));
 app.use('/', require('./routes/pages'));

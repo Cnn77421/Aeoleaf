@@ -412,6 +412,15 @@ router.get('/search', (req, res) => {
   res.redirect(302, '/?' + qs.toString());
 });
 
+router.get('/guestbook', (req, res) => {
+  const messages = db.prepare('SELECT * FROM guestbook ORDER BY created_at DESC').all();
+  res.render('guestbook', {
+    title: '留言板 — aeoleaf',
+    messages,
+    extraCss: ['/css/guestbook.css']
+  });
+});
+
 // ─── Admin Pages ──────────────────────────────────────────────────────────────
 
 router.get('/admin', (req, res) => res.redirect('/admin/dashboard'));

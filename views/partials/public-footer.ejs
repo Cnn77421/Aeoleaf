@@ -58,3 +58,6 @@
 <button id="back-to-top" aria-label="回到顶部">↑</button>
 <script src="<%= asset('/js/main.js') %>"></script>
 <script src="<%= asset('/js/tracker.js') %>" async defer></script>
+<% if (typeof isBirthday !== 'undefined' && isBirthday) { %>
+<script src="<%= asset('/js/birthday.js') %>" defer></script>
+<% } %>

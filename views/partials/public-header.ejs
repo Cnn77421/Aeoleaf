@@ -1,3 +1,25 @@
+<% if (typeof isBirthday !== 'undefined' && isBirthday) { %>
+<div class="birthday-banner">
+  <span class="birthday-banner__emoji">🎂</span>
+  <span>Happy Birthday! 今天是我的生日 🎉</span>
+  <a href="/guestbook" class="birthday-banner__link">去留言祝福</a>
+  <button class="birthday-banner__close" aria-label="关闭">✕</button>
+</div>
+<div class="birthday-decorations" aria-hidden="true"></div>
+<div class="birthday-cake" role="button" aria-label="许个愿吧">
+  <div class="birthday-cake__body">
+    <div class="birthday-cake__layer birthday-cake__layer--bottom"></div>
+    <div class="birthday-cake__layer birthday-cake__layer--top"></div>
+    <div class="birthday-cake__candles">
+      <div class="birthday-candle"><div class="birthday-flame"></div></div>
+      <div class="birthday-candle"><div class="birthday-flame"></div></div>
+      <div class="birthday-candle"><div class="birthday-flame"></div></div>
+    </div>
+  </div>
+  <div class="birthday-cake__tip birthday-cake__tip--ask">🕯️ 点击许个愿吧</div>
+  <div class="birthday-cake__tip birthday-cake__tip--done">✨ 愿望已许下</div>
+</div>
+<% } %>
 <a href="#main" class="skip-link">跳到主要内容</a>
 <div id="pjax-progress" class="pjax-progress" aria-hidden="true"></div>
 <%- include('icons-sprite') %>

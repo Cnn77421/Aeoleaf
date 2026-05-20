@@ -91,4 +91,7 @@
        main.css and any page-scoped CSS above. -->
   <link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
   <link rel="stylesheet" href="<%= asset('/css/bento.css') %>">
+  <% if (typeof isBirthday !== 'undefined' && isBirthday) { %>
+  <link rel="stylesheet" href="<%= asset('/css/birthday.css') %>">
+  <% } %>
   <%- _extraHead %>

@@ -29,6 +29,9 @@
 
     <!-- HERO ========================================================== -->
     <section class="home-hero">
+      <% if (typeof isBirthday !== 'undefined' && isBirthday) { %>
+      <div id="birthday-danmaku" class="birthday-danmaku" aria-hidden="true"></div>
+      <% } %>
       <div class="home-hero__inner">
         <span class="home-hero__eyebrow">写作 · 作品 · 偶尔实现</span>
         <%
@@ -44,7 +47,7 @@
         %>
         <h1 class="home-hero__title"><%= _wordmark %></h1>
         <p class="home-hero__sub">
-          <%= subtitle %> · 个人博客与作品集。记录设计、工程与写作中值得留下的那一点东西，不做惊天动地，只做能看得见的生长。
+          <%= subtitle %> · 个人博客与作品集。
         </p>
         <div class="home-hero__cta">
           <a href="/works" class="btn-v2 btn-v2--primary btn-v2--lg">查看作品</a>
@@ -246,6 +249,14 @@
             <% } %>
           </ul>
         </div>
+
+        <!-- Guestbook entry ============================================== -->
+        <a href="/guestbook" class="bento-cell bento-cell--4 bento-cell--rose card-v2 card-v2--feature">
+          <span class="card-v2__eyebrow">Guestbook · 留言板</span>
+          <h3 class="card-v2__title">留下你的祝福</h3>
+          <p class="card-v2__desc">一句话、一段回忆，或者只是一个问候，都值得被记住。</p>
+          <span class="card-v2__cta">去留言</span>
+        </a>
 
       </div>
     </div>

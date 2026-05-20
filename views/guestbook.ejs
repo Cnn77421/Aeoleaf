@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<%- include('partials/public-head', {
+  title: title,
+  description: '留言板 — 给风叶留下你的祝福',
+  canonicalPath: '/guestbook',
+  twitterCard: 'summary',
+  extraCss: ['/css/guestbook.css']
+}) %>
+</head>
+<body class="guestbook-page">
+  <%- include('partials/public-header') %>
+  <main id="main" class="site-main">
+    <div class="gb-shell">
+
+      <header class="gb-intro">
+        <div class="gb-intro__eyebrow"><span class="gb-intro__dot"></span>Guestbook</div>
+        <h1 class="gb-intro__title">留言板</h1>
+        <p class="gb-intro__desc">写下你想说的话，无论是祝福、回忆还是一句简单的问候。</p>
+      </header>
+
+      <!-- Form -->
+      <section class="gb-form-section">
+        <form id="guestbook-form" class="gb-form" autocomplete="off">
+          <div class="gb-form__row">
+            <div class="gb-form__field">
+              <label for="gb-name" class="gb-form__label">昵称</label>
+              <input type="text" id="gb-name" name="name" maxlength="50" placeholder="你的名字" required class="gb-form__input">
+            </div>
+            <div class="gb-form__field">
+              <label class="gb-form__label">头像 <span class="gb-form__optional">(点击切换风格)</span></label>
+              <div class="gb-avatar-picker">
+                <div id="gb-avatar-preview" class="gb-avatar-preview">
+                  <div class="gb-avatar-preview__img"></div>
+                </div>
+                <input type="hidden" id="gb-avatar" name="avatar">
+                <span id="gb-avatar-style" class="gb-avatar-style">avataaars</span>
+              </div>
+            </div>
+          </div>
+          <div class="gb-form__field">
+            <label for="gb-message" class="gb-form__label">留言</label>
+            <textarea id="gb-message" name="message" maxlength="500" placeholder="写下你的祝福..." required rows="4" class="gb-form__textarea"></textarea>
+          </div>
+          <div class="gb-form__actions">
+            <span id="gb-char-count" class="gb-form__char-count">0 / 500</span>
+            <button type="submit" id="gb-submit" class="gb-form__submit">送出祝福</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Messages -->
+      <section class="gb-messages">
+        <div id="gb-list" class="gb-list">
+          <% if (messages.length === 0) { %>
+            <div class="gb-empty">
+              <p>还没有留言，成为第一个留下祝福的人吧。</p>
+            </div>
+          <% } else { %>
+            <% messages.forEach(function(msg) { %>
+              <article class="gb-card" data-id="<%= msg.id %>">
+                <div class="gb-card__header">
+                  <% if (msg.avatar) { %>
+                    <img src="<%= msg.avatar %>" alt="" class="gb-card__avatar">
+                  <% } else { %>
+                    <img src="https://ui-avatars.com/api/?name=<%= encodeURIComponent(msg.name) %>&background=random&color=fff&rounded=true&bold=true&size=128" alt="" class="gb-card__avatar">
+                  <% } %>
+                  <div class="gb-card__meta">
+                    <span class="gb-card__name"><%= msg.name %></span>
+                    <time class="gb-card__time"><%= msg.created_at %></time>
+                  </div>
+                </div>
+                <div class="gb-card__body"><%= msg.message %></div>
+              </article>
+            <% }); %>
+          <% } %>
+        </div>
+      </section>
+
+    </div>
+  </main>
+  <%- include('partials/public-footer') %>
+
+  <script>
+  (function () {
+    var form = document.getElementById('guestbook-form');
+    var list = document.getElementById('gb-list');
+    var nameInput = document.getElementById('gb-name');
+    var msgInput = document.getElementById('gb-message');
+    var avatarInput = document.getElementById('gb-avatar');
+    var avatarPreview = document.getElementById('gb-avatar-preview');
+    var avatarStyleEl = document.getElementById('gb-avatar-style');
+    var charCount = document.getElementById('gb-char-count');
+    var submitBtn = document.getElementById('gb-submit');
+
+    // Restore saved name
+    try {
+      var savedName = localStorage.getItem('gb_name');
+      if (savedName && !nameInput.value) nameInput.value = savedName;
+    } catch (_e) {}
+
+    function avatarUrl(seed) {
+      return 'https://ui-avatars.com/api/?name=' + encodeURIComponent(seed || 'Guest')
+        + '&background=random&color=fff&rounded=true&bold=true&size=128';
+    }
+
+    function updateAvatar() {
+      var seed = nameInput.value.trim() || 'Guest';
+      var url = avatarUrl(seed);
+      avatarInput.value = url;
+      avatarPreview.querySelector('.gb-avatar-preview__img').style.backgroundImage = 'url(' + url + ')';
+      avatarStyleEl.textContent = '点击刷新';
+    }
+
+    // Click to refresh (random bg color each time)
+    avatarPreview.addEventListener('click', updateAvatar);
+
+    nameInput.addEventListener('input', updateAvatar);
+    updateAvatar();
+
+    // Character counter
+    msgInput.addEventListener('input', function () {
+      charCount.textContent = msgInput.value.length + ' / 500';
+    });
+
+    function makeAvatarHtml(name, avatar) {
+      if (avatar) return '<img src="' + avatar + '" alt="" class="gb-card__avatar">';
+      var url = avatarUrl(name);
+      return '<img src="' + url + '" alt="" class="gb-card__avatar">';
+    }
+
+    function createCard(msg) {
+      var article = document.createElement('article');
+      article.className = 'gb-card gb-card--new';
+      article.dataset.id = msg.id;
+
+      article.innerHTML =
+        '<div class="gb-card__header">' +
+          makeAvatarHtml(msg.name, msg.avatar) +
+          '<div class="gb-card__meta">' +
+            '<span class="gb-card__name">' + msg.name + '</span>' +
+            '<time class="gb-card__time">' + msg.created_at + '</time>' +
+          '</div>' +
+        '</div>' +
+        '<div class="gb-card__body">' + msg.message + '</div>';
+
+      return article;
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      var name = nameInput.value.trim();
+      var message = msgInput.value.trim();
+      var avatar = avatarInput.value.trim();
+
+      if (!name || !message) return;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = '发送中...';
+
+      fetch('/api/guestbook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, message: message, avatar: avatar })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.error) throw new Error(data.error);
+
+          try { localStorage.setItem('gb_name', name); } catch (_e) {}
+
+          var empty = list.querySelector('.gb-empty');
+          if (empty) empty.remove();
+
+          var card = createCard(data);
+          list.insertBefore(card, list.firstChild);
+
+          msgInput.value = '';
+          charCount.textContent = '0 / 500';
+
+          if (window.confetti) {
+            confetti({ particleCount: 40, spread: 50, origin: { y: 0.7 }, disableForReducedMotion: true });
+          }
+
+          submitBtn.textContent = '已送出!';
+          setTimeout(function () {
+            submitBtn.textContent = '送出祝福';
+            submitBtn.disabled = false;
+          }, 1500);
+        })
+        .catch(function (err) {
+          alert(err.message || '发送失败，请稍后再试');
+          submitBtn.textContent = '送出祝福';
+          submitBtn.disabled = false;
+        });
+    });
+  })();
+  </script>
+</body>
+</html>

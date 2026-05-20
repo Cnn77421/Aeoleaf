@@ -251,6 +251,16 @@ async function initDB() {
   `);
   db.run('CREATE INDEX IF NOT EXISTS idx_blacklist_ip ON ip_blacklist(ip)');
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS guestbook (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      message TEXT NOT NULL,
+      avatar TEXT DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+  `);
+
   refreshBlacklistCache();
   saveDBSync();
   return db;
