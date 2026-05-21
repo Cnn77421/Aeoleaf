@@ -77,6 +77,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -115,7 +116,7 @@ a:focus-visible {
   border-bottom: 1px solid rgba(221, 210, 188, 0.4);
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
-  z-index: 100;
+  z-index: 1000;
   transition: background-color var(--transition), box-shadow var(--transition), border-color var(--transition);
 }
 
@@ -223,27 +224,40 @@ a:focus-visible {
 }
 
 .nav-overlay {
-  display: none;
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(20, 14, 8, 0.55);
   z-index: 999;
   opacity: 0;
-  transition: opacity var(--dur-2) var(--ease-out);
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--dur-3) var(--ease-out), visibility 0s var(--dur-3);
 }
 
 .nav-overlay.active {
-  display: block;
   opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity var(--dur-3) var(--ease-out), visibility 0s 0s;
 }
 
 .nav-icon {
   display: block;
   pointer-events: none;
 }
+
+.nav-icon--close { display: none; }
+.nav-toggle[aria-expanded="true"] .nav-icon--menu { display: none; }
+.nav-toggle[aria-expanded="true"] .nav-icon--close { display: block; }
+
+/* Drawer footer is mobile-only; hidden in the desktop nav row. */
+.nav-drawer-foot { display: none; }
+
+/* Chinese sub-labels only appear in the mobile drawer. */
+.nav-link__zh { display: none; }
 
 .theme-toggle {
   background: none;
@@ -1515,34 +1529,145 @@ img:not([data-src]) {
 .toast-info { background: var(--accent); color: white; }
 
 @media (max-width: 768px) {
-  .nav-links {
+  /* Mobile slide-in drawer. Uses #id selectors so these rules win the
+     cascade over editorial.css's plain `.nav-links` rules (loaded later). */
+  #site-nav-links {
     position: fixed;
     top: 0;
     right: 0;
-    width: 70%;
-    max-width: 300px;
+    width: min(78%, 300px);
     height: 100vh;
-    background: var(--bg);
-    border-left: 1px solid var(--border);
+    height: 100dvh;
+    margin: 0;
+    list-style: none;
+    background: var(--surface);
+    display: flex;
     flex-direction: column;
-    padding: var(--space-16) var(--space-6);
-    gap: var(--space-4);
+    gap: 0;
+    padding: calc(var(--nav-height) + var(--space-4)) 0 0;
     transform: translateX(100%);
     visibility: hidden;
-    transition: transform var(--dur-2) var(--ease-emphasis), visibility var(--dur-2);
+    transition: transform var(--dur-3) var(--ease-emphasis), visibility var(--dur-3);
     box-shadow: var(--shadow-xl);
     z-index: 1000;
+    overflow-y: auto;
   }
 
-  .nav-links.active {
+  #site-nav-links.active {
     transform: translateX(0);
     visibility: visible;
   }
 
+  #site-nav-links li {
+    border-bottom: 1px solid var(--border);
+  }
+
+  #site-nav-links li > a {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 100%;
+    padding: var(--space-4) var(--space-6);
+    transition: background var(--transition), padding-left var(--transition);
+  }
+
+  #site-nav-links li > a::after {
+    display: none;
+  }
+
+  #site-nav-links .nav-link__en {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text);
+    transition: color var(--transition);
+  }
+
+  #site-nav-links .nav-link__zh {
+    display: block;
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+  }
+
+  #site-nav-links li > a:hover,
+  #site-nav-links li > a:focus-visible {
+    background: rgba(139, 58, 46, 0.07);
+    padding-left: calc(var(--space-6) + 6px);
+  }
+
+  #site-nav-links li > a:hover .nav-link__en,
+  #site-nav-links li > a:focus-visible .nav-link__en {
+    color: var(--accent);
+  }
+
+  /* Drawer footer — social shortcuts pinned to the bottom */
+  #site-nav-links .nav-drawer-foot {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-top: auto;
+    padding: var(--space-6);
+    border-bottom: none;
+    border-top: 1px solid var(--border);
+  }
+
+  #site-nav-links .nav-drawer-foot__links {
+    display: flex;
+    gap: var(--space-3);
+  }
+
+  #site-nav-links .nav-drawer-foot__links a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--bg);
+    color: var(--secondary);
+    transition: color var(--transition), border-color var(--transition), transform var(--dur-1) var(--ease-emphasis);
+  }
+
+  #site-nav-links .nav-drawer-foot__links a:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+
+  #site-nav-links .nav-drawer-foot__links a::after {
+    display: none;
+  }
+
+  #site-nav-links .nav-drawer-foot__copy {
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+
   .nav-toggle {
     display: flex;
-    font-size: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius);
     z-index: 1001;
+    transition: background var(--transition), color var(--transition);
+  }
+
+  .nav-toggle:hover,
+  .nav-toggle[aria-expanded="true"] {
+    background: var(--surface);
+    color: var(--accent);
   }
 
   .nav-container { padding: var(--space-3) var(--space-4); }
@@ -2766,7 +2891,7 @@ img.error {
   left: 0;
   right: 0;
   height: 3px;
-  z-index: 1100;                     /* above site-header (typically 100) */
+  z-index: 1100;                     /* above site-header (1000) */
   background: transparent;
   pointer-events: none;
 }

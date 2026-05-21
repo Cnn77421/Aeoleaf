@@ -143,16 +143,40 @@
     // Clear any previous loop
     if (danmakuTimer) { clearTimeout(danmakuTimer); danmakuTimer = null; }
 
+    var ROWS = 10;
+    var GAP = 48;                        // min horizontal gap between items on a row (px)
+    var rowFreeAt = [];                  // timestamp each row becomes free again
+    for (var r = 0; r < ROWS; r++) rowFreeAt.push(0);
+
+    // Place one comment on a free row. Returns false when every row is busy.
     function spawn(text) {
+      var now = Date.now();
+      var free = [];
+      for (var i = 0; i < ROWS; i++) {
+        if (now >= rowFreeAt[i]) free.push(i);
+      }
+      if (!free.length) return false;
+      var row = free[Math.floor(Math.random() * free.length)];
+
       var el = document.createElement('div');
       el.className = 'birthday-danmaku__item';
       el.textContent = text;
-      var row = Math.floor(Math.random() * 10);
       el.style.top = (5 + row * 9.5) + '%';
-      var dur = 10 + Math.random() * 8;
-      el.style.animationDuration = dur + 's';
+      // Suppress the stylesheet animation so width can be measured flash-free.
+      el.style.animation = 'none';
       container.appendChild(el);
+
+      var width = el.offsetWidth;
+      // Uniform speed (px/s) keeps items from ever catching up to one another.
+      var speed = window.innerWidth / 7;
+      var dur = (window.innerWidth + width * 1.2) / speed;
+      el.style.animation = 'danmakuFloat ' + dur.toFixed(2) + 's linear forwards';
+
+      // Row reopens once this item's tail has cleared the entry edge + gap.
+      rowFreeAt[row] = now + ((width + GAP) / speed) * 1000;
+
       setTimeout(function () { el.remove(); }, dur * 1000);
+      return true;
     }
 
     var idx = 0;
@@ -160,9 +184,10 @@
       if (!danmakuPool.length) return;
       // Stop if container was removed from DOM (PJAX navigated away)
       if (!document.getElementById('birthday-danmaku')) return;
-      spawn(danmakuPool[idx % danmakuPool.length]);
-      idx++;
-      var gap = 800 + Math.random() * 1200;
+      if (spawn(danmakuPool[idx % danmakuPool.length])) {
+        idx++;
+      }
+      var gap = 700 + Math.random() * 900;
       danmakuTimer = setTimeout(loop, gap);
     }
 

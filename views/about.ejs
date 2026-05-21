@@ -17,6 +17,11 @@
 
       <!-- Hero -->
       <header class="ab-hero ab-reveal">
+        <nav class="breadcrumb" aria-label="面包屑">
+          <a href="/">首页</a>
+          <span class="breadcrumb-separator" aria-hidden="true">›</span>
+          <span class="breadcrumb-current">关于</span>
+        </nav>
         <p class="ab-hero__label">About</p>
         <h1 class="ab-hero__title">关于</h1>
         <p class="ab-hero__desc"><%= locals.aboutHeroLine != null && String(locals.aboutHeroLine) ? locals.aboutHeroLine : '个人博客与作品集' %></p>
