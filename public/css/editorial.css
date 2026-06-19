@@ -253,7 +253,7 @@ h1, h2, h3, h4 {
   gap: clamp(var(--space-8), 5vw, var(--space-12));
   align-items: start;
 }
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .hp-about__inner { grid-template-columns: minmax(0, 1fr); }
 }
 
@@ -408,7 +408,7 @@ h1, h2, h3, h4 {
   border-radius: 0;
   box-shadow: none;
 }
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .hp-contact__card { grid-template-columns: minmax(0, 1fr); }
 }
 .hp-contact__title {
@@ -495,7 +495,7 @@ h1, h2, h3, h4 {
   align-items: baseline;
   padding: 0 var(--space-6);
 }
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .blog-item__row {
     grid-template-columns: 1fr;
     gap: var(--space-3);
@@ -742,7 +742,7 @@ h1, h2, h3, h4 {
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: clamp(var(--space-6), 3vw, var(--space-12));
 }
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .footer-content { grid-template-columns: 1fr; }
 }
 .footer-section h3,
@@ -869,12 +869,12 @@ html.js-ready .reveal-section:not(.visible) .slide-from-right {
 /* Fallback for old Firefox / no-JS / disabled IO: if .visible never arrives,
    the content is still readable thanks to the defaults above. */
 
-/* ── Font metric matching: reduce Fraunces swap CLS ──────────────────── */
-/* Declare a local fallback face sized to match Fraunces so that when the
+/* ── Font metric matching: reduce serif webfont swap CLS ──────────────────── */
+/* Declare a local fallback face sized to match Instrument Serif so that when the
    webfont arrives, text geometry barely changes. Numbers chosen empirically
-   for Fraunces (regular / 14pt-ish axis). */
+   for the serif display face (regular / 14pt-ish axis). */
 @font-face {
-  font-family: 'Fraunces Fallback';
+  font-family: 'Serif Fallback';
   src: local('Georgia'), local('Songti SC'), local('serif');
   size-adjust: 103%;
   ascent-override: 92%;
@@ -891,7 +891,8 @@ html.js-ready .reveal-section:not(.visible) .slide-from-right {
 }
 :root {
   --font-sans: 'Inter', 'Inter Fallback', 'Noto Sans SC', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-display: 'Fraunces', 'Fraunces Fallback', 'Noto Serif SC', Georgia, 'Songti SC', serif;
+  /* Display/journal unified to sans (Linear look). Was Instrument Serif. */
+  --font-display: 'Inter', 'Inter Fallback', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
   --font-serif: var(--font-display);
   --font-journal: var(--font-display);
 }

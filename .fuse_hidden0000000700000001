@@ -225,7 +225,6 @@ app.use('/api/track', require('./routes/api/track'));
 app.use('/api/guestbook', require('./routes/api/guestbook'));
 app.use('/', require('./routes/api/sitemap'));
 app.use('/', require('./routes/api/rss'));
-app.use('/admin', require('./routes/admin'));
 app.use('/', require('./routes/pages'));
 
 app.use((req, res) => {

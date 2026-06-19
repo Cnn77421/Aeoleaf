@@ -22,6 +22,7 @@ let rawDb = null;
 
 // Back-compat no-ops. The sql.js engine needed explicit dumps to disk; the
 // native engine persists on every write, so these just resolve/return.
+function saveDB() { /* native engine persists immediately */ }
 function saveDBSync() { /* native engine persists immediately */ }
 async function flushDB() { /* native engine persists immediately */ }
 

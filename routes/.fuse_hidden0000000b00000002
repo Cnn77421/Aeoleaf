@@ -38,7 +38,7 @@ function estimateReadMinutes(rawContent) {
     .replace(/`[^`]*`/g, '')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[[^\]]*\]\(([^)]*)\)/g, '$1')
-    .replace(/[#*_>~-]+/g, ' ')
+    .replace(/[#*_>~\-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   const cjk = (plain.match(/[\u4e00-\u9fff\u3040-\u30ff]/g) || []).length;

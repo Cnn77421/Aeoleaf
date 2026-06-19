@@ -110,8 +110,15 @@
 @media (max-width: 900px) {
   .wd-body {
     grid-template-columns: 1fr;
+    gap: var(--space-5);
   }
-  .wd-sidebar { order: -1; }
+  /* On narrow screens the sidebar stacks UNDER the content (no order:-1) and
+     must NOT be sticky — a sticky meta block here is what made 标签/年份
+     float and scroll with the page. */
+  .wd-sidebar {
+    position: static;
+    top: auto;
+  }
 }
 
 /* ── Sidebar (Bento metadata) ───────────────────────────────────────────── */
@@ -221,7 +228,34 @@
 .wd-breadcrumb__current { color: var(--text); }
 
 @media (max-width: 639px) {
-  .wd-hero { aspect-ratio: 4 / 3; margin-top: var(--space-4); }
-  .wd-hero__overlay { padding: var(--space-5); }
-  .wd-body { margin-top: var(--space-4); }
+  .wd-breadcrumb { margin-top: var(--space-4); }
+  .wd-hero { aspect-ratio: 4 / 3; margin-top: var(--space-3); }
+  .wd-hero__overlay { padding: var(--space-4); gap: var(--space-2); }
+  .wd-body {
+    margin-top: var(--space-5);
+    margin-bottom: var(--space-10);
+    gap: var(--space-4);
+  }
+
+  /* Mobile metadata: collapse the two big bordered cards into one compact
+     row. 标签 + 年份 sit side by side, lighter surface, tighter padding —
+     no more two oversized floating boxes. */
+  .wd-sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+  .wd-meta-card {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-2);
+    background: color-mix(in srgb, var(--surface) 60%, transparent);
+    border-color: color-mix(in srgb, var(--border) 60%, transparent);
+    border-radius: var(--radius, 12px);
+  }
+  .wd-meta-card__label { font-size: 0.66rem; }
+  .wd-meta-card__value { font-size: 0.9rem; }
+  /* CTA spans the full row below the meta cards. */
+  .wd-cta { flex: 1 1 100%; }
 }

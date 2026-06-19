@@ -11,9 +11,78 @@
  * --focus-ring, --radius-card, --radius-pill, --ring-*, --motion-*.
  */
 
-/* ===== Dark (default) ===== */
-:root,
-[data-theme="dark"] {
+/* ==========================================================================
+ *  Global responsive safety net (added to fix mobile overflow / 错位).
+ *  Loaded last, so these win the cascade. Prevents:
+ *   - 横向滚动: any over-wide child pushing the page sideways on phones.
+ *   - 图片/视频/iframe 溢出: media without an explicit max-width.
+ *   - flex/grid 子项无法收缩 (min-width:auto 默认值导致的溢出)。
+ * ========================================================================== */
+html {
+  -webkit-text-size-adjust: 100%; /* iOS: dont auto-inflate text on rotate */
+}
+body {
+  /* `clip` stops sideways scroll WITHOUT creating a scroll container, so it
+     does not break `position: sticky` descendants (e.g. the post TOC). The
+     `hidden` line is a fallback for browsers without overflow:clip support. */
+  overflow-x: hidden;
+  overflow-x: clip;
+  max-width: 100%;
+}
+img,
+svg,
+video,
+canvas,
+iframe {
+  max-width: 100%;
+}
+img,
+video {
+  height: auto;                 /* keep aspect ratio when width shrinks */
+}
+/* Let fl/grid children shrink below their content size so long words,
+   code, and URLs cannot force horizontal overflow. */
+.bento > *,
+.bento-grid > *,
+main :where(.grid, .flex, [class*="__grid"], [class*="-grid"]) > * {
+  min-width: 0;
+}
+/* Break overly long unbroken strings (long URLs, hashes) inside prose. */
+.prose,
+.post-content,
+.guestbook-message {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* ===== Theme-agnostic tokens (shared by light AND dark) =====
+   These don't change between themes, so they must live OUTSIDE the
+   per-theme blocks. They were previously defined only inside the dark
+   block, which left them undefined in light mode — causing elements to
+   snap between rounded and square corners (and lose transitions) when
+   toggling themes. Defined once here, both themes inherit them. */
+:root {
+  /* Radii */
+  --radius:       8px;
+  --radius-lg:    12px;
+  --radius-card:  12px;
+  --radius-pill:  999px;
+
+  /* Motion */
+  --ease-out:       cubic-bezier(0.2, 0.6, 0.2, 1);
+  --ease-in:        cubic-bezier(0.5, 0, 1, 0.5);
+  --ease-emphasis:  cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --dur-3: 420ms;
+  --transition: var(--dur-2) var(--ease-out);
+
+  /* Card radius is theme-agnostic too (shadows below stay per-theme). */
+  --card-radius: var(--radius-card);
+}
+
+/* ===== Dark (opt-in via data-theme="dark") ===== */
+:root[data-theme="dark"] {
   color-scheme: dark;
 
   /* Surfaces — near-black → elevated panels. Matches Linear/Vercel dark base. */
@@ -38,11 +107,13 @@
   --accent-ring:      rgba(124, 92, 255, 0.45);
 
   /* Secondary accents — used to tint Bento cells */
-  --accent-secondary: #49E3D0;  /* mint   */
-  --accent-tertiary:  #FFB84D;  /* amber  */
-  --accent-alt-rose:  #FF6B9D;  /* rose   */
-  --accent-alt-sky:   #4DA8FF;  /* sky    */
-  --accent-alt-lime:  #B8F26C;  /* lime   */
+  /* Secondary accents — unified to the violet line (Linear-style restraint).
+     Names kept for back-compatibility; values are now violet tints/shades. */
+  --accent-secondary: #9479FF;  /* violet light  */
+  --accent-tertiary:  #6443FF;  /* violet deep   */
+  --accent-alt-rose:  #8B6CFF;  /* violet soft   */
+  --accent-alt-sky:   #6E8BFF;  /* violet-blue   */
+  --accent-alt-lime:  #A78BFA;  /* violet pale   */
 
   /* Feedback */
   --success: #45D483;
@@ -50,11 +121,10 @@
   --danger:  #FF5D73;
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #7C5CFF 0%, #49E3D0 100%);
+  --gradient-primary: linear-gradient(135deg, #7C5CFF 0%, #9479FF 100%);
   --gradient-surface: linear-gradient(180deg, rgba(17,17,19,0) 0%, rgba(17,17,19,1) 100%);
-  --gradient-aurora:  radial-gradient(60% 80% at 10% 0%, rgba(124,92,255,0.22) 0%, transparent 60%),
-                      radial-gradient(60% 80% at 90% 20%, rgba(73,227,208,0.14) 0%, transparent 60%),
-                      radial-gradient(60% 80% at 50% 100%, rgba(255,107,157,0.10) 0%, transparent 60%);
+  --gradient-aurora:  radial-gradient(60% 80% at 10% 0%, rgba(124,92,255,0.16) 0%, transparent 60%),
+                      radial-gradient(50% 60% at 90% 10%, rgba(124,92,255,0.08) 0%, transparent 60%);
 
   /* Shadows — darker / tighter than light mode */
   --shadow-sm: 0 1px 0 rgba(255,255,255,0.04) inset,
@@ -70,15 +140,15 @@
 
   /* Typography */
   --font-sans:    'Inter', 'Noto Sans SC', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-display: 'Instrument Serif', 'Noto Serif SC', Georgia, 'Songti SC', serif;
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
   --font-serif:   var(--font-display);
-  --font-journal: 'Instrument Serif', 'Noto Serif SC', Georgia, 'Songti SC', serif;
+  --font-journal: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
   --font-mono:    'JetBrains Mono', 'Noto Sans Mono', 'Consolas', monospace;
 
   /* Radii */
-  --radius:       10px;
-  --radius-lg:    16px;
-  --radius-card:  20px;
+  --radius:       8px;
+  --radius-lg:    12px;
+  --radius-card:  12px;
   --radius-pill:  999px;
 
   /* Motion */
@@ -90,13 +160,14 @@
   --dur-3: 420ms;
   --transition: var(--dur-2) var(--ease-out);
 
-  /* Card re-points to new tokens used in main.css */
+  /* Card — Linear-style: hairline border does the work, shadow stays faint. */
   --card-radius: var(--radius-card);
-  --card-shadow: var(--shadow-md);
-  --card-shadow-hover: var(--shadow-lg);
+  --card-shadow: 0 1px 2px rgba(0,0,0,0.30);
+  --card-shadow-hover: 0 4px 16px -6px rgba(0,0,0,0.45);
 }
 
-/* ===== Light ===== */
+/* ===== Light (default) ===== */
+:root,
 [data-theme="light"] {
   color-scheme: light;
 
@@ -118,26 +189,38 @@
   --accent-soft:      rgba(109, 75, 255, 0.10);
   --accent-ring:      rgba(109, 75, 255, 0.35);
 
-  --accent-secondary: #0BB89F;
-  --accent-tertiary:  #E6962A;
-  --accent-alt-rose:  #E64E83;
-  --accent-alt-sky:   #2E8BE6;
-  --accent-alt-lime:  #7FC92B;
+  /* Unified to the violet line (Linear-style restraint). */
+  --accent-secondary: #5A38F0;
+  --accent-tertiary:  #4A27DA;
+  --accent-alt-rose:  #6D4BFF;
+  --accent-alt-sky:   #5B6CF0;
+  --accent-alt-lime:  #7C5CFF;
 
   --success: #15A15A;
   --warning: #D08715;
   --danger:  #E03A55;
 
-  --gradient-primary: linear-gradient(135deg, #6D4BFF 0%, #0BB89F 100%);
+  --gradient-primary: linear-gradient(135deg, #6D4BFF 0%, #5A38F0 100%);
   --gradient-surface: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 100%);
-  --gradient-aurora:  radial-gradient(60% 80% at 10% 0%, rgba(109,75,255,0.10) 0%, transparent 60%),
-                      radial-gradient(60% 80% at 90% 20%, rgba(11,184,159,0.08) 0%, transparent 60%),
-                      radial-gradient(60% 80% at 50% 100%, rgba(230,78,131,0.06) 0%, transparent 60%);
+  --gradient-aurora:  radial-gradient(60% 80% at 10% 0%, rgba(109,75,255,0.06) 0%, transparent 60%),
+                      radial-gradient(50% 60% at 90% 10%, rgba(109,75,255,0.04) 0%, transparent 60%);
 
   --shadow-sm: 0 1px 2px rgba(15, 15, 20, 0.06);
   --shadow-md: 0 6px 16px rgba(15, 15, 20, 0.08);
   --shadow-lg: 0 20px 40px rgba(15, 15, 20, 0.12);
   --shadow-xl: 0 40px 80px rgba(15, 15, 20, 0.16);
+
+  /* Card — Linear-style hairline + faint shadow (light). */
+  --card-radius: var(--radius-card);
+  --card-shadow: 0 1px 2px rgba(15,15,20,0.05);
+  --card-shadow-hover: 0 6px 20px -8px rgba(15,15,20,0.12);
+
+  /* Fonts (light/default) — sans display for the Linear look. */
+  --font-sans:    'Inter', 'Noto Sans SC', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-serif:   var(--font-display);
+  --font-journal: var(--font-display);
+  --font-mono:    'JetBrains Mono', 'Noto Sans Mono', 'Consolas', monospace;
 }
 
 /* ==========================================================================

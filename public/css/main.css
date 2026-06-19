@@ -1,22 +1,18 @@
 :root {
   /* Aeoleaf "风叶" autumnal palette — warm cream ground, maple accents, pine rest. */
-  --bg: #FAF7F0;
-  --text: #141414;
-  --accent: #8B3A2E;
-  --accent-hover: #6F2C22;
-  --accent-secondary: #C4906E;
-  --accent-tertiary: #3A5F4A;
-  --secondary: #5A4A3E;
-  --surface: #F1EADB;
-  --border: #DDD2BC;
-  --text-muted: #4A4A4A;
-  --gradient-primary: linear-gradient(135deg, #8B3A2E 0%, #C4906E 100%);
-  --gradient-surface: linear-gradient(180deg, rgba(241,234,219,0.7) 0%, rgba(241,234,219,1) 100%);
+  --bg: #FAFAFA;
+  --text: #09090B;
+  --accent: #7C5CFF;
+  --accent-hover: #9479FF;
+  --accent-secondary: #9479FF;
+  --accent-tertiary: #6443FF;
+  --secondary: #A1A1AA;
+  --surface: #FFFFFF;
+  --border: #E4E4E7;
+  --text-muted: #52525B;
+  --gradient-primary: linear-gradient(135deg, #7C5CFF 0%, #9479FF 100%);
+  --gradient-surface: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 100%);
   --font-sans: 'Inter', 'Noto Sans SC', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-display: 'Fraunces', 'Noto Serif SC', Georgia, 'Songti SC', serif;
-  --font-serif: var(--font-display);
-  /* Longform / titles: Fraunces + Noto Serif SC (C2 portfolio axis). */
-  --font-journal: 'Fraunces', 'Noto Serif SC', Georgia, 'Songti SC', serif;
   --font-mono: 'JetBrains Mono', 'Noto Sans Mono', 'Consolas', monospace;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -534,7 +530,7 @@ a:focus-visible {
 
 .hero-title__accent {
   /* Only the trailing word is tinted; keep light-end deep enough for cream bg. */
-  background: linear-gradient(120deg, #4A1510 0%, #6F2C22 55%, #7A3024 100%);
+  background: linear-gradient(120deg, #7C5CFF 0%, #9479FF 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1375,14 +1371,6 @@ button.btn-primary:disabled {
   transform: scale(1.05);
 }
 
-img[data-src] {
-  opacity: 0;
-}
-
-img:not([data-src]) {
-  opacity: 1;
-}
-
 .work-title {
   margin-top: var(--space-3);
   font-size: 1.1rem;
@@ -1454,15 +1442,14 @@ img:not([data-src]) {
 .btn-primary {
   display: inline-block;
   padding: var(--space-3) var(--space-6);
-  background: var(--gradient-primary);
-  color: white;
+  background: var(--accent);
+  color: #fff;
   border-radius: var(--radius);
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 500;
-  transition: all var(--transition);
-  box-shadow: var(--shadow-md);
+  transition: background-color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out);
   position: relative;
   overflow: hidden;
 }
@@ -1477,8 +1464,7 @@ img:not([data-src]) {
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  background: var(--accent-hover);
 }
 
 .btn-primary:hover::before {
@@ -1486,8 +1472,7 @@ img:not([data-src]) {
 }
 
 .btn-primary:active {
-  transform: translateY(0) scale(0.98);
-  box-shadow: var(--shadow-sm);
+  background: var(--accent-pressed);
 }
 
 .btn-primary:focus-visible {
@@ -2308,12 +2293,7 @@ body.page-leaving {
   }
 }
 
-/* Lazy load image states */
-img[data-src] {
-  background: var(--surface);
-  min-height: 200px;
-}
-
+/* Lazy load image states (img.loading/.loaded/.error set by reinitPageFeatures) */
 img.loading {
   opacity: 0.6;
   animation: pulse 1.5s ease-in-out infinite;
@@ -2860,7 +2840,7 @@ img.error {
   transform: rotate(-18deg);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .prose h2::before { display: none; }
 }
 
@@ -2875,11 +2855,19 @@ img.error {
   padding: 0.05em 0.08em 0 0;
 }
 
-/* Drop cap looks weird on very narrow screens or when the first paragraph
-   starts with a quotation mark / emoji — opt out on small viewports. */
+/* Drop cap reads badly on phones — a floated, oversized first glyph is
+   especially awkward with CJK square characters, which don't wrap text
+   neatly around the float. Disable it entirely on small viewports so the
+   first letter renders inline at normal size, like the rest of the prose. */
 @media (max-width: 520px) {
   .prose > p:first-of-type::first-letter {
-    font-size: 2.4em;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    float: none;
+    margin: 0;
+    padding: 0;
+    color: inherit;
   }
 }
 
@@ -3105,45 +3093,12 @@ img.error {
   }
 }
 
-/* D2 — Leaf watermark on card hover.
-   Uses a data-uri SVG (leaf outline) as background in ::after,
-   positioned top-right, fades in on hover. Doesn't trigger layout
-   reflow; respects prefers-reduced-motion via universal override. */
-/* Leaf watermark: not on .hp-featured-post__card — it already uses ::after for focus ring. */
+/* D2 — Leaf watermark removed (decorative SVG residue cleaned out per the
+   Linear-ization pass). `.work-card` / `.blog-item` keep position:relative
+   because other absolutely-positioned children (tags, badges) rely on it. */
 .work-card,
 .blog-item {
   position: relative;
-}
-
-.work-card::after,
-.blog-item::after {
-  content: '';
-  position: absolute;
-  top: 12px;
-  right: 14px;
-  width: 42px;
-  height: 42px;
-  pointer-events: none;
-  opacity: 0;
-  transform: translateY(-4px) rotate(-12deg);
-  transition: opacity 0.45s ease, transform 0.45s ease;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' fill='none' stroke='%238B3A2E' stroke-width='1.4'><path d='M20 4 C12 10, 8 18, 10 26 C12 32, 16 36, 20 36 C24 36, 28 32, 30 26 C32 18, 28 10, 20 4 Z' opacity='0.7'/><path d='M20 6 C20 14, 20 28, 20 36' stroke-width='1' opacity='0.5'/></svg>");
-  background-repeat: no-repeat;
-  background-size: contain;
-  z-index: 3;
-}
-
-.work-card:hover::after,
-.blog-item:hover::after {
-  opacity: 0.55;
-  transform: translateY(0) rotate(0deg);
-}
-
-/* Dark theme swaps leaf stroke to the warmer secondary accent so it
-   doesn't disappear into the deep surface. */
-[data-theme="dark"] .work-card::after,
-[data-theme="dark"] .blog-item::after {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' fill='none' stroke='%23C4906E' stroke-width='1.4'><path d='M20 4 C12 10, 8 18, 10 26 C12 32, 16 36, 20 36 C24 36, 28 32, 30 26 C32 18, 28 10, 20 4 Z' opacity='0.7'/><path d='M20 6 C20 14, 20 28, 20 36' stroke-width='1' opacity='0.5'/></svg>");
 }
 
 /* E1 — Error shell (404 / 500). Two-column visual+body layout on desktop,
@@ -3283,15 +3238,6 @@ img.error {
 @media (prefers-reduced-motion: reduce) {
   .error-shell__leaf {
     animation: none !important;
-  }
-  .work-card::after,
-  .blog-item::after {
-    transition: opacity 0.001ms !important;
-    transform: none !important;
-  }
-  .work-card:hover::after,
-  .blog-item:hover::after {
-    transform: none !important;
   }
 }
 
