@@ -7,8 +7,8 @@
 
   // Page-specific stylesheets that should be swapped on each PJAX navigation.
   var PAGE_SPECIFIC_CSS = [
-    '/css/home.css', '/css/blog-v2.css', '/css/blog.css',
-    '/css/works-v2.css', '/css/works.css', '/css/about-v2.css'
+    '/css/home.css', '/css/blog-v2.css',
+    '/css/works-v2.css', '/css/about-v2.css'
   ];
 
   // Unified cascade anchor — tokens.css / bento.css MUST remain last in the

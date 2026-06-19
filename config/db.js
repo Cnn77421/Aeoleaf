@@ -1,6 +1,11 @@
-const initSqlJs = require('sql.js');
+// Database layer backed by Node's built-in node:sqlite (Node >= 22.5).
+// Replaces the previous sql.js (in-memory + debounced full-file dump) engine:
+// writes now persist immediately via WAL, survive crashes, and no longer hold
+// the whole database in JS memory. The public surface of this module is
+// unchanged — callers still use `db.prepare(sql).get/all/run(...params)`,
+// `db.transaction(fn)`, and the visitor-analytics helpers below.
+const { DatabaseSync } = require('node:sqlite');
 const fs = require('fs');
-const fsp = require('fs').promises;
 const path = require('path');
 
 const defaultDbPath = path.join(__dirname, '../database', 'aeoleaf.db');
@@ -11,64 +16,26 @@ const dbDir = path.dirname(dbPath);
 
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 
-const SAVE_DEBOUNCE_MS = 400;
-let saveDebounceTimer = null;
+// `rawDb` is the native DatabaseSync handle. We keep a separate `dbWrapper`
+// (exported as `db`) so the rest of the codebase keeps the old call style.
+let rawDb = null;
 
-function exportDbBuffer() {
-  return Buffer.from(db.export());
-}
+// Back-compat no-ops. The sql.js engine needed explicit dumps to disk; the
+// native engine persists on every write, so these just resolve/return.
+function saveDBSync() { /* native engine persists immediately */ }
+async function flushDB() { /* native engine persists immediately */ }
 
-function atomicWriteSync(target, buf) {
-  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, buf);
-  fs.renameSync(tmp, target);
-}
+function initDB() {
+  rawDb = new DatabaseSync(dbPath);
 
-async function atomicWrite(target, buf) {
-  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
-  await fsp.writeFile(tmp, buf);
-  await fsp.rename(tmp, target);
-}
+  // WAL gives durable, concurrent-reader-friendly writes. NORMAL sync is the
+  // standard WAL pairing: safe across app crashes, only at risk on OS/power
+  // loss (acceptable for a blog; bump to FULL if you want maximum safety).
+  rawDb.exec('PRAGMA journal_mode = WAL');
+  rawDb.exec('PRAGMA synchronous = NORMAL');
+  rawDb.exec('PRAGMA foreign_keys = ON');
 
-function saveDBSync() {
-  if (saveDebounceTimer) {
-    clearTimeout(saveDebounceTimer);
-    saveDebounceTimer = null;
-  }
-  if (!db) return;
-  atomicWriteSync(dbPath, exportDbBuffer());
-}
-
-let db;
-const queryCache = new Map();
-const CACHE_TTL = 60000; // 1 分钟缓存
-const CACHE_MAX_ENTRIES = 500;
-
-/** COUNT(...) 等聚合读不应缓存，避免多进程/写入后长时间读到旧的 0 */
-function skipResultCacheForSql(sql) {
-  return typeof sql === 'string' && /\bCOUNT\s*\(/i.test(sql);
-}
-
-function cacheSet(key, value) {
-  // Simple LRU-ish cap: when exceeded, drop the oldest entry (Map keeps insertion order).
-  if (queryCache.size >= CACHE_MAX_ENTRIES) {
-    const firstKey = queryCache.keys().next().value;
-    if (firstKey !== undefined) queryCache.delete(firstKey);
-  }
-  queryCache.set(key, value);
-}
-
-async function initDB() {
-  const SQL = await initSqlJs();
-
-  if (fs.existsSync(dbPath)) {
-    const buffer = fs.readFileSync(dbPath);
-    db = new SQL.Database(buffer);
-  } else {
-    db = new SQL.Database();
-  }
-
-  db.run(`
+  rawDb.exec(`
     CREATE TABLE IF NOT EXISTS posts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
@@ -185,39 +152,39 @@ async function initDB() {
 
   // Add views column if it doesn't exist
   try {
-    db.run('ALTER TABLE posts ADD COLUMN views INTEGER NOT NULL DEFAULT 0');
+    rawDb.exec('ALTER TABLE posts ADD COLUMN views INTEGER NOT NULL DEFAULT 0');
   } catch (e) {
     // Column already exists, ignore error
   }
 
   // Add date column to works if it doesn't exist
   try {
-    db.run('ALTER TABLE works ADD COLUMN date TEXT DEFAULT \'\'');
+    rawDb.exec('ALTER TABLE works ADD COLUMN date TEXT DEFAULT \'\'');
   } catch (e) {
     // Column already exists, ignore error
   }
 
   // Visitor table incremental columns (ALTER only, keep backward compatible)
-  try { db.run('ALTER TABLE visitors ADD COLUMN request_id TEXT DEFAULT \'\''); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN event_type TEXT DEFAULT \'\''); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN user_agent_raw TEXT DEFAULT \'\''); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN http_status INTEGER DEFAULT 200'); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN request_method TEXT DEFAULT \'POST\''); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN utm_source TEXT DEFAULT \'\''); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN utm_medium TEXT DEFAULT \'\''); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN utm_campaign TEXT DEFAULT \'\''); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN search_keyword TEXT DEFAULT \'\''); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN is_bot INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN visitor_session_id INTEGER'); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN country TEXT DEFAULT \'\''); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN province TEXT DEFAULT \'\''); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN city TEXT DEFAULT \'\''); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN isp TEXT DEFAULT \'\''); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN page_view_id TEXT DEFAULT \'\''); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN downlink REAL DEFAULT 0'); } catch (e) {}
-  try { db.run('ALTER TABLE visitors ADD COLUMN rtt REAL DEFAULT 0'); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN request_id TEXT DEFAULT \'\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN event_type TEXT DEFAULT \'\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN user_agent_raw TEXT DEFAULT \'\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN http_status INTEGER DEFAULT 200'); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN request_method TEXT DEFAULT \'POST\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN utm_source TEXT DEFAULT \'\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN utm_medium TEXT DEFAULT \'\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN utm_campaign TEXT DEFAULT \'\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN search_keyword TEXT DEFAULT \'\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN is_bot INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN visitor_session_id INTEGER'); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN country TEXT DEFAULT \'\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN province TEXT DEFAULT \'\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN city TEXT DEFAULT \'\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN isp TEXT DEFAULT \'\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN page_view_id TEXT DEFAULT \'\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN downlink REAL DEFAULT 0'); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN rtt REAL DEFAULT 0'); } catch (e) {}
 
-  db.run(`
+  rawDb.exec(`
     CREATE TABLE IF NOT EXISTS visitor_sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       fingerprint_id TEXT NOT NULL,
@@ -231,17 +198,17 @@ async function initDB() {
 
   // idx_visitors_tracked_at / idx_visitors_fingerprint / idx_visitors_ip
   // already created above; avoid duplicates. Only add the new columns' indexes.
-  db.run('CREATE INDEX IF NOT EXISTS idx_visitors_url_search ON visitors(full_url)');
-  db.run('CREATE INDEX IF NOT EXISTS idx_visitors_request_id ON visitors(request_id)');
-  db.run('CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON visitors(visitor_session_id)');
-  db.run('CREATE INDEX IF NOT EXISTS idx_visitors_page_view_id ON visitors(page_view_id)');
-  db.run('CREATE INDEX IF NOT EXISTS idx_visitor_sessions_fingerprint ON visitor_sessions(fingerprint_id)');
+  rawDb.exec('CREATE INDEX IF NOT EXISTS idx_visitors_url_search ON visitors(full_url)');
+  rawDb.exec('CREATE INDEX IF NOT EXISTS idx_visitors_request_id ON visitors(request_id)');
+  rawDb.exec('CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON visitors(visitor_session_id)');
+  rawDb.exec('CREATE INDEX IF NOT EXISTS idx_visitors_page_view_id ON visitors(page_view_id)');
+  rawDb.exec('CREATE INDEX IF NOT EXISTS idx_visitor_sessions_fingerprint ON visitor_sessions(fingerprint_id)');
   // Drop legacy duplicates introduced by earlier versions.
-  try { db.run('DROP INDEX IF EXISTS idx_visitors_time'); } catch (e) {}
-  try { db.run('DROP INDEX IF EXISTS idx_visitors_ip_search'); } catch (e) {}
-  try { db.run('DROP INDEX IF EXISTS idx_visitors_fp_search'); } catch (e) {}
+  try { rawDb.exec('DROP INDEX IF EXISTS idx_visitors_time'); } catch (e) {}
+  try { rawDb.exec('DROP INDEX IF EXISTS idx_visitors_ip_search'); } catch (e) {}
+  try { rawDb.exec('DROP INDEX IF EXISTS idx_visitors_fp_search'); } catch (e) {}
 
-  db.run(`
+  rawDb.exec(`
     CREATE TABLE IF NOT EXISTS ip_blacklist (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       ip TEXT NOT NULL UNIQUE,
@@ -249,9 +216,9 @@ async function initDB() {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
-  db.run('CREATE INDEX IF NOT EXISTS idx_blacklist_ip ON ip_blacklist(ip)');
+  rawDb.exec('CREATE INDEX IF NOT EXISTS idx_blacklist_ip ON ip_blacklist(ip)');
 
-  db.run(`
+  rawDb.exec(`
     CREATE TABLE IF NOT EXISTS guestbook (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -262,94 +229,41 @@ async function initDB() {
   `);
 
   refreshBlacklistCache();
-  saveDBSync();
-  return db;
+  return rawDb;
 }
 
-function saveDB() {
-  if (!db) return;
-  if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
-  saveDebounceTimer = setTimeout(() => {
-    saveDebounceTimer = null;
-    const buf = exportDbBuffer();
-    atomicWrite(dbPath, buf).catch((err) => {
-      console.error('Database write failed:', err);
-    });
-  }, SAVE_DEBOUNCE_MS);
-}
-
-async function flushDB() {
-  if (saveDebounceTimer) {
-    clearTimeout(saveDebounceTimer);
-    saveDebounceTimer = null;
-  }
-  if (!db) return;
-  await atomicWrite(dbPath, exportDbBuffer());
-}
-
+// Thin wrapper preserving the historical `prepare(sql).get/all/run(...params)`
+// shape used throughout routes/. node:sqlite already supports positional
+// params and returns { lastInsertRowid, changes } from run(), so this is mostly
+// a pass-through. The 60s query cache from the sql.js era is intentionally gone:
+// native prepared statements are fast enough and the cache caused stale reads.
 const dbWrapper = {
   prepare: (sql) => {
+    const stmt = rawDb.prepare(sql);
     return {
-      get: (...params) => {
-        const noCache = skipResultCacheForSql(sql);
-        const cacheKey = sql + JSON.stringify(params);
-        if (!noCache) {
-          const cached = queryCache.get(cacheKey);
-          if (cached && Date.now() - cached.time < CACHE_TTL) {
-            return cached.data;
-          }
-        }
-
-        const stmt = db.prepare(sql);
-        stmt.bind(params);
-        const result = stmt.step() ? stmt.getAsObject() : null;
-        stmt.free();
-
-        if (!noCache) {
-          cacheSet(cacheKey, { data: result, time: Date.now() });
-        }
-        return result;
-      },
-      all: (...params) => {
-        const noCache = skipResultCacheForSql(sql);
-        const cacheKey = sql + JSON.stringify(params);
-        if (!noCache) {
-          const cached = queryCache.get(cacheKey);
-          if (cached && Date.now() - cached.time < CACHE_TTL) {
-            return cached.data;
-          }
-        }
-
-        const stmt = db.prepare(sql);
-        stmt.bind(params);
-        const results = [];
-        while (stmt.step()) results.push(stmt.getAsObject());
-        stmt.free();
-
-        if (!noCache) {
-          cacheSet(cacheKey, { data: results, time: Date.now() });
-        }
-        return results;
-      },
+      get: (...params) => stmt.get(...params) ?? null,
+      all: (...params) => stmt.all(...params),
       run: (...params) => {
-        queryCache.clear();
-        const stmt = db.prepare(sql);
-        stmt.bind(params);
-        stmt.step();
-        const lastID = db.exec('SELECT last_insert_rowid() as id')[0]?.values[0]?.[0];
-        stmt.free();
-        saveDB();
-        return { lastInsertRowid: lastID };
+        const r = stmt.run(...params);
+        return { lastInsertRowid: r.lastInsertRowid, changes: r.changes };
       }
     };
   },
-  transaction: (fn) => () => {
-    queryCache.clear();
-    fn();
-    saveDB();
+  // Mirrors the better-sqlite3 / old wrapper contract: returns a function that
+  // runs `fn` inside a single transaction. node:sqlite has no transaction()
+  // helper, so we drive BEGIN/COMMIT/ROLLBACK manually.
+  transaction: (fn) => (...args) => {
+    rawDb.exec('BEGIN');
+    try {
+      const out = fn(...args);
+      rawDb.exec('COMMIT');
+      return out;
+    } catch (e) {
+      try { rawDb.exec('ROLLBACK'); } catch (_) { /* already rolled back */ }
+      throw e;
+    }
   }
 };
-
 function buildVisitorFilter({ startTime, endTime, ip, city, deviceType, fingerprint }) {
   let where = ' WHERE 1=1';
   const params = [];
@@ -474,12 +388,7 @@ function getVisitorsByFilter(filters, limit = 5000) {
 function getVisitorDetail(id) {
   const numericId = Number.parseInt(String(id), 10);
   if (!Number.isFinite(numericId) || numericId < 1) return null;
-  // Bypass queryCache: by-id lookups must never serve stale null after inserts.
-  const stmt = db.prepare('SELECT * FROM visitors WHERE id = ?');
-  stmt.bind([numericId]);
-  const result = stmt.step() ? stmt.getAsObject() : null;
-  stmt.free();
-  return result;
+  return dbWrapper.prepare('SELECT * FROM visitors WHERE id = ?').get(numericId);
 }
 
 function getVisitorSessionById(sessionId) {
@@ -546,10 +455,7 @@ let blacklistSet = new Set();
 function refreshBlacklistCache() {
   blacklistSet = new Set();
   try {
-    const stmt = db.prepare('SELECT ip FROM ip_blacklist');
-    const rows = [];
-    while (stmt.step()) rows.push(stmt.getAsObject());
-    stmt.free();
+    const rows = dbWrapper.prepare('SELECT ip FROM ip_blacklist').all();
     rows.forEach(r => blacklistSet.add(r.ip));
   } catch (e) {}
 }

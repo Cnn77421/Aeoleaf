@@ -42,12 +42,17 @@
 
 .home-hero__title {
   font-family: var(--font-display);
-  font-size: clamp(56px, 10vw, 140px);
+  /* Lower bound dropped 56px -> 38px so the mixed EN+CJK title
+     ("Aeoleaf 风叶") fits on one line on phones instead of orphaning "叶"
+     onto a second line. Desktop is unaffected: at >=560px viewport 10vw
+     already exceeds the old 56px floor, so the rendered size is unchanged. */
+  font-size: clamp(38px, 10vw, 140px);
   line-height: 0.95;
   letter-spacing: -0.03em;
   font-weight: 400;
   color: var(--text);
   margin: 0 0 clamp(16px, 2vw, 24px);
+  text-wrap: balance;
 }
 /* Override the generic .hero-title__accent spacing when nested in the new hero */
 .home-hero__title .hero-title__accent {

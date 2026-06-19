@@ -33,20 +33,12 @@
     //      Without this class, reveal-sections and hero animations stay in
     //      their final (visible) state — robust when JS is slow or disabled.
     (function () {
-      // North Star: dark is the default. Explicit user choice (localStorage)
-      // still wins. On first visit we honor `prefers-color-scheme: light` to
-      // respect the OS, otherwise fall back to dark.
+      // Light is the hard default. Only an explicit prior user choice
+      // (localStorage) switches to dark; we no longer follow the OS so the
+      // first-visit look is consistent.
       var stored = null;
       try { stored = localStorage.getItem('theme'); } catch (_e) { /* ignore */ }
-      var chosen;
-      if (stored === 'dark' || stored === 'light') {
-        chosen = stored;
-      } else {
-        try {
-          chosen = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)
-            ? 'light' : 'dark';
-        } catch (_e) { chosen = 'dark'; }
-      }
+      var chosen = (stored === 'dark') ? 'dark' : 'light';
       document.documentElement.setAttribute('data-theme', chosen);
       document.documentElement.classList.add('js-ready');
     })();
@@ -54,7 +46,8 @@
   <title><%= _title %></title>
   <meta name="description" content="<%= _desc %>">
   <meta name="author" content="aeoleaf">
-  <meta name="theme-color" content="#8B3A2E">
+  <meta name="theme-color" content="#FAFAFA" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0A0A0B" media="(prefers-color-scheme: dark)">
   <meta name="color-scheme" content="light dark">
   <% if (_noIndex) { %><meta name="robots" content="noindex"><% } %>
   <link rel="canonical" href="<%= _baseUrl %><%= _canonicalPath %>">
