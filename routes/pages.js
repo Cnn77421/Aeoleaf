@@ -82,6 +82,111 @@ function removeDuplicateLeadHeading(html, title) {
   return dom.window.document.body.innerHTML;
 }
 
+const CODE_LANGUAGE_LABELS = {
+  bash: 'Bash', shell: 'Shell', sh: 'Shell', powershell: 'PowerShell', ps1: 'PowerShell',
+  javascript: 'JavaScript', js: 'JavaScript', typescript: 'TypeScript', ts: 'TypeScript',
+  json: 'JSON', html: 'HTML', css: 'CSS', python: 'Python', py: 'Python',
+  sql: 'SQL', yaml: 'YAML', yml: 'YAML', nginx: 'Nginx', dockerfile: 'Dockerfile',
+  text: 'Text', plaintext: 'Text'
+};
+
+const CALLOUT_LABELS = {
+  note: '提示', info: '信息', tip: '建议', success: '成功', important: '重要',
+  warning: '注意', caution: '警告', danger: '危险'
+};
+
+function enhanceArticleHtml(html) {
+  if (!html) return '';
+  const dom = new JSDOM('<!doctype html><body>' + html + '</body>');
+  const doc = dom.window.document;
+
+  Array.from(doc.querySelectorAll('pre > code')).forEach((code) => {
+    const pre = code.parentElement;
+    if (!pre || pre.parentElement?.classList.contains('code-frame')) return;
+    const languageClass = Array.from(code.classList).find((name) => name.startsWith('language-')) || '';
+    const language = languageClass.replace(/^language-/, '').toLowerCase() || 'text';
+    const label = CODE_LANGUAGE_LABELS[language] || language.toUpperCase();
+
+    const rawCode = String(code.textContent || '').replace(/\n$/, '');
+    code.textContent = '';
+    rawCode.split('\n').forEach((line, index) => {
+      const row = doc.createElement('span');
+      row.className = 'code-line';
+      const number = doc.createElement('span');
+      number.className = 'code-line__number';
+      number.setAttribute('aria-hidden', 'true');
+      number.textContent = String(index + 1);
+      const content = doc.createElement('span');
+      content.className = 'code-line__content';
+      content.textContent = line || '\u200b';
+      row.append(number, content);
+      code.appendChild(row);
+    });
+
+    const frame = doc.createElement('div');
+    frame.className = 'code-frame';
+    frame.setAttribute('data-language', language);
+
+    const header = doc.createElement('div');
+    header.className = 'code-frame__header';
+    const dots = doc.createElement('span');
+    dots.className = 'code-frame__dots';
+    dots.setAttribute('aria-hidden', 'true');
+    dots.innerHTML = '<i></i><i></i><i></i>';
+    const languageLabel = doc.createElement('span');
+    languageLabel.className = 'code-frame__language';
+    languageLabel.textContent = label;
+    const copyButton = doc.createElement('button');
+    copyButton.className = 'code-frame__copy';
+    copyButton.type = 'button';
+    copyButton.setAttribute('data-copy-code', '');
+    copyButton.textContent = '复制';
+    header.append(dots, languageLabel, copyButton);
+
+    pre.replaceWith(frame);
+    pre.classList.add('code-frame__pre');
+    pre.setAttribute('tabindex', '0');
+    frame.append(header, pre);
+  });
+
+  Array.from(doc.querySelectorAll('blockquote')).forEach((quote) => {
+    const first = quote.firstElementChild;
+    const raw = String(first?.textContent || '').trim();
+    const marker = raw.match(/^\[!(note|info|tip|success|important|warning|caution|danger)\]\s*/i);
+    if (!marker || !first) {
+      quote.classList.add('article-quote');
+      return;
+    }
+
+    const tone = marker[1].toLowerCase();
+    quote.classList.add('article-callout', 'article-callout--' + tone);
+    const walker = doc.createTreeWalker(first, dom.window.NodeFilter.SHOW_TEXT);
+    const firstTextNode = walker.nextNode();
+    if (firstTextNode) firstTextNode.nodeValue = firstTextNode.nodeValue.replace(/^\[![^\]]+\]\s*/i, '');
+
+    const title = doc.createElement('p');
+    title.className = 'article-callout__title';
+    title.textContent = CALLOUT_LABELS[tone] || '提示';
+    quote.insertBefore(title, first);
+    if (!String(first.textContent || '').trim()) first.remove();
+  });
+
+  Array.from(doc.querySelectorAll('table')).forEach((table) => {
+    if (table.parentElement?.classList.contains('article-table-wrap')) return;
+    const wrap = doc.createElement('div');
+    wrap.className = 'article-table-wrap';
+    table.replaceWith(wrap);
+    wrap.appendChild(table);
+  });
+
+  Array.from(doc.querySelectorAll('img')).forEach((img) => {
+    if (!img.hasAttribute('loading')) img.setAttribute('loading', 'lazy');
+    img.setAttribute('decoding', 'async');
+  });
+
+  return doc.body.innerHTML;
+}
+
 function getSetting(key) {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
   return row ? row.value : '';
@@ -321,7 +426,8 @@ router.get('/blog/:slug', (req, res) => {
 
   const readMinutes = estimateReadMinutes(post.content);
   const bodyWithoutDuplicateTitle = removeDuplicateLeadHeading(render(post.content), post.title);
-  const { html: postHtml, toc } = extractHeadings(bodyWithoutDuplicateTitle);
+  const enhancedBody = enhanceArticleHtml(bodyWithoutDuplicateTitle);
+  const { html: postHtml, toc } = extractHeadings(enhancedBody);
   // The reference article layout reserves a right rail for navigation, so a
   // single real heading is already useful enough to expose as a compact TOC.
   // The title is also an outline entry, so short posts keep a stable rail.

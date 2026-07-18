@@ -10,15 +10,19 @@
 </head>
 <body class="home-page reference-home">
   <%- include('partials/public-header') %>
+  <div class="ref-home-backdrop" data-home-backdrop aria-hidden="true">
+    <% if (heroImage) { %>
+    <picture class="ref-home-backdrop__picture">
+      <% if (heroImageMobile) { %><source media="(max-width: 700px)" srcset="<%= heroImageMobile %>"><% } %>
+      <img class="ref-home-backdrop__image" src="<%= heroImage %>" alt="" width="1920" height="1080" fetchpriority="high" decoding="async" style="--hero-position-desktop:<%= heroPosition %>;--hero-position-mobile:<%= heroPositionMobile %>">
+    </picture>
+    <% } %>
+    <div class="ref-home-backdrop__veil"></div>
+    <div class="ref-home-backdrop__wash"></div>
+  </div>
+
   <main id="main" class="site-main site-main--no-pad">
     <section class="ref-hero" aria-labelledby="ref-hero-title">
-      <% if (heroImage) { %>
-      <picture class="ref-hero__picture">
-        <% if (heroImageMobile) { %><source media="(max-width: 700px)" srcset="<%= heroImageMobile %>"><% } %>
-        <img class="ref-hero__image" src="<%= heroImage %>" alt="" width="1920" height="1080" fetchpriority="high" decoding="async" style="--hero-position-desktop:<%= heroPosition %>;--hero-position-mobile:<%= heroPositionMobile %>">
-      </picture>
-      <% } %>
-      <div class="ref-hero__veil" aria-hidden="true"></div>
       <div class="ref-hero__content">
         <p class="ref-hero__kicker">Stories · Works · Life</p>
         <h1 id="ref-hero-title" class="ref-hero__title"><%= title %></h1>
