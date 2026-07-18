@@ -70,9 +70,45 @@ function extractHeadings(html) {
   return { html: doc.body.innerHTML, toc };
 }
 
+function removeDuplicateLeadHeading(html, title) {
+  if (!html) return '';
+  const dom = new JSDOM('<!doctype html><body>' + html + '</body>');
+  const first = dom.window.document.body.firstElementChild;
+  const normalizedTitle = String(title || '').replace(/\s+/g, '').toLowerCase();
+  if (first && /^H[12]$/.test(first.tagName)) {
+    const normalizedHeading = String(first.textContent || '').replace(/\s+/g, '').toLowerCase();
+    if (normalizedHeading === normalizedTitle) first.remove();
+  }
+  return dom.window.document.body.innerHTML;
+}
+
 function getSetting(key) {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
   return row ? row.value : '';
+}
+
+function normalizeHeroPosition(value) {
+  const allowed = new Set([
+    'left top', 'center top', 'right top',
+    'left center', 'center center', 'right center',
+    'left bottom', 'center bottom', 'right bottom'
+  ]);
+  const normalized = String(value || '').trim().toLowerCase();
+  return allowed.has(normalized) ? normalized : 'center center';
+}
+
+function getPublicProfileData() {
+  return {
+    siteTitle: getSetting('site_title') || 'Aeoleaf',
+    siteSubtitle: getSetting('site_subtitle') || '风叶',
+    aboutSummary: plainTextFromMarkdown(getSetting('about_text') || '', 180),
+    aboutImage: getSetting('about_image') || '',
+    statsData: {
+      postsCount: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='published'").get()?.cnt || 0,
+      worksCount: db.prepare('SELECT COUNT(*) as cnt FROM works').get()?.cnt || 0,
+      totalPV: db.prepare('SELECT COUNT(*) as cnt FROM visitors').get()?.cnt || 0
+    }
+  };
 }
 
 function safeSocialUrl(u) {
@@ -186,6 +222,10 @@ router.get('/', (req, res) => {
     ? { ...featuredPostRow, tags: JSON.parse(featuredPostRow.tags || '[]') }
     : null;
 
+  const configuredHeroImage = (getSetting('home_hero_image') || '').trim();
+  const heroImage = configuredHeroImage || featuredPost?.cover_image || '';
+  const heroImageMobile = (getSetting('home_hero_image_mobile') || '').trim();
+
   const statsData = {
     postsCount: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='published'").get()?.cnt || 0,
     worksCount: db.prepare("SELECT COUNT(*) as cnt FROM works").get()?.cnt || 0,
@@ -214,6 +254,10 @@ router.get('/', (req, res) => {
     carouselWorks,
     recentPosts,
     featuredPost,
+    heroImage,
+    heroImageMobile,
+    heroPosition: normalizeHeroPosition(getSetting('home_hero_position')),
+    heroPositionMobile: normalizeHeroPosition(getSetting('home_hero_position_mobile')),
     statsData,
     aboutText: getSetting('about_text') || '',
     aboutSummary: plainTextFromMarkdown(getSetting('about_text') || '', 220),
@@ -263,7 +307,8 @@ router.get('/blog', (req, res) => {
     totalPages,
     pagination: buildBlogPagination(page, totalPages),
     activeTag,
-    allTags
+    allTags,
+    ...getPublicProfileData()
   });
 });
 
@@ -275,18 +320,20 @@ router.get('/blog/:slug', (req, res) => {
   db.prepare('UPDATE posts SET views = views + 1 WHERE id = ?').run(post.id);
 
   const readMinutes = estimateReadMinutes(post.content);
-  const { html: postHtml, toc } = extractHeadings(render(post.content));
-  // Only show TOC when there are at least 3 top-level (h2) sections;
-  // anything shorter feels like visual clutter next to the article.
-  const h2Count = toc.filter(h => h.level === 2).length;
-  const tocVisible = h2Count >= 3;
+  const bodyWithoutDuplicateTitle = removeDuplicateLeadHeading(render(post.content), post.title);
+  const { html: postHtml, toc } = extractHeadings(bodyWithoutDuplicateTitle);
+  // The reference article layout reserves a right rail for navigation, so a
+  // single real heading is already useful enough to expose as a compact TOC.
+  // The title is also an outline entry, so short posts keep a stable rail.
+  const tocVisible = true;
 
   res.render('post', {
     title: post.title + ' — ' + getSetting('site_title'),
     post: { ...post, tags: JSON.parse(post.tags || '[]'), html: postHtml },
     readMinutes,
     toc,
-    tocVisible
+    tocVisible,
+    ...getPublicProfileData()
   });
 });
 

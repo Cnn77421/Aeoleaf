@@ -4,138 +4,79 @@
 <%- include('partials/public-head', {
   title: title,
   description: (typeof description !== 'undefined' && description) ? description : '浏览所有博客文章，分享技术见解和创意思考',
-  canonicalPath: '/blog',
-  twitterCard: 'summary',
-  extraCss: ['/css/blog-v2.css']
+  canonicalPath: '/blog', twitterCard: 'summary', extraCss: ['/css/blog-v2.css']
 }) %>
 </head>
-<body class="blog-v2">
+<body class="journal-page">
   <%- include('partials/public-header') %>
-  <main id="main" class="site-main">
-    <div class="bl-shell">
-
-      <!-- Intro -->
-      <header class="bl-intro">
-        <nav class="breadcrumb" aria-label="面包屑">
-          <a href="/">首页</a>
-          <span class="breadcrumb-separator" aria-hidden="true">›</span>
-          <span class="breadcrumb-current">博客</span>
+  <main id="main" class="site-main journal-main">
+    <div class="journal-shell">
+      <aside class="journal-sidebar" aria-label="博客信息">
+        <div class="journal-panel journal-profile">
+          <img src="<%= aboutImage || '/images/logo.png' %>" alt="<%= siteTitle %>" width="82" height="82">
+          <h2><%= siteTitle %></h2>
+          <p class="journal-profile__role">Author · Journal</p>
+          <p class="journal-profile__bio"><%= aboutSummary || siteSubtitle || '记录技术、设计与生活。' %></p>
+          <dl class="journal-profile__stats">
+            <div><dt>文章</dt><dd><%= statsData.postsCount %></dd></div>
+            <div><dt>作品</dt><dd><%= statsData.worksCount %></dd></div>
+            <div><dt>访问</dt><dd><%= statsData.totalPV %></dd></div>
+          </dl>
+        </div>
+        <% if (allTags && allTags.length) { %>
+        <nav class="journal-panel journal-tags" aria-label="标签筛选">
+          <p class="journal-panel__label">标签</p>
+          <a href="/blog" class="<%= !activeTag ? 'is-active' : '' %>"><span>全部文章</span><small><%= total %></small></a>
+          <% allTags.forEach(function (tag) { %>
+          <a href="/blog?tag=<%= encodeURIComponent(tag) %>" class="<%= tag === activeTag ? 'is-active' : '' %>"><span># <%= tag %></span></a>
+          <% }); %>
         </nav>
-        <div class="bl-intro__eyebrow"><span class="bl-intro__dot"></span>Journal</div>
-        <h1 class="bl-intro__title">Blog</h1>
-        <p class="bl-intro__desc">技术见解与创意思考。</p>
-      </header>
+        <% } %>
+        <nav class="journal-panel journal-links" aria-label="更多入口">
+          <p class="journal-panel__label">探索</p>
+          <a href="/works"><span>作品集</span><b>→</b></a>
+          <a href="/guestbook"><span>留言板</span><b>→</b></a>
+          <a href="/rss.xml"><span>RSS 订阅</span><b>→</b></a>
+        </nav>
+      </aside>
 
-      <%
-        const _hasTag = typeof activeTag !== 'undefined' && activeTag;
-        const _tagQ   = _hasTag ? ('&tag=' + encodeURIComponent(activeTag)) : '';
-        const _allTags = typeof allTags !== 'undefined' ? allTags : [];
-        const _activeTag = typeof activeTag !== 'undefined' ? activeTag : '';
-      %>
+      <section class="journal-feed" aria-labelledby="journal-title">
+        <header class="journal-heading">
+          <nav class="breadcrumb" aria-label="面包屑"><a href="/">首页</a><span aria-hidden="true">›</span><span>博客</span></nav>
+          <span class="journal-heading__eyebrow">Stories &amp; Notes</span>
+          <h1 id="journal-title"><%= activeTag ? '# ' + activeTag : 'Blog' %></h1>
+          <p><%= activeTag ? '正在查看该标签下的文章。' : '技术见解、创作过程，以及生活里的细小发现。' %></p>
+        </header>
 
-      <!-- Filter bar -->
-      <% if (_allTags.length > 0 || _hasTag) { %>
-      <nav class="bl-filter" aria-label="标签筛选">
-        <a href="/blog" class="bl-filter__btn<%= !_hasTag ? ' bl-filter__btn--active' : '' %>">全部</a>
-        <% _allTags.forEach(tag => { %>
-        <a href="/blog?tag=<%= encodeURIComponent(tag) %>" class="bl-filter__btn<%= tag === _activeTag ? ' bl-filter__btn--active' : '' %>">#<%= tag %></a>
-        <% }); %>
-        <% if (_hasTag) { %><a href="/blog" class="bl-filter__clear" aria-label="清除筛选">× 清除 #<%= activeTag %></a><% } %>
-      </nav>
-      <% } %>
-
-      <% if (posts.length === 0) { %>
-      <div class="bl-empty">
-        <p class="bl-empty__title"><% if (_hasTag) { %>没有找到相关文章<% } else { %>这里还没有文章<% } %></p>
-        <p class="bl-empty__desc">
-          <% if (_hasTag) { %>暂无带 <strong>#<%= activeTag %></strong> 标签的文章。<a href="/blog">查看全部</a>。<% } else { %>第一篇文章正在路上。<% } %>
-        </p>
-      </div>
-      <% } else { %>
-
-      <%
-        const _featured = posts[0];
-        const _rest     = posts.slice(1);
-        const _fDate    = new Date(_featured.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
-        const _fInitial = (_featured.title && String(_featured.title).trim()) ? String(_featured.title).trim().charAt(0) : '?';
-      %>
-
-      <!-- Featured post (Clerk magazine hero) -->
-      <a href="/blog/<%= _featured.slug %>" class="bl-featured">
-        <div class="bl-featured__media">
-          <% if (_featured.cover_image) { %>
-          <img src="<%= _featured.cover_image %>" alt="<%= _featured.title %>" class="bl-featured__img" loading="eager">
-          <% } else { %>
-          <div class="bl-featured__mono"><%= _fInitial %></div>
-          <% } %>
-        </div>
-        <div class="bl-featured__body">
-          <div class="bl-featured__eyebrow">
-            <span style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block;"></span>
-            最新文章
-            <% if (_featured.tags && _featured.tags.length > 0) { %>
-            <span class="bl-featured__tag">#<%= _featured.tags[0] %></span>
-            <% } %>
-          </div>
-          <h2 class="bl-featured__title"><%= _featured.title %></h2>
-          <% if (_featured.excerpt) { %><p class="bl-featured__excerpt"><%= _featured.excerpt %></p><% } %>
-          <div class="bl-featured__meta">
-            <time datetime="<%= _featured.created_at %>"><%= _fDate %></time>
-            <% if (_featured.readMinutes) { %><span>·</span><span>约 <%= _featured.readMinutes %> 分钟</span><% } %>
-          </div>
-        </div>
-      </a>
-
-      <!-- Post list (Vercel rhythm) -->
-      <% if (_rest.length > 0) { %>
-      <div class="bl-list">
-        <% _rest.forEach(post => { %>
-        <%
-          const _d = new Date(post.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
-          const _init = (post.title && String(post.title).trim()) ? String(post.title).trim().charAt(0) : '?';
-        %>
-        <a href="/blog/<%= post.slug %>" class="bl-item">
-          <div class="bl-item__body">
-            <div class="bl-item__meta">
-              <time datetime="<%= post.created_at %>"><%= _d %></time>
-              <% if (post.readMinutes) { %><span class="bl-item__dot">·</span><span>约 <%= post.readMinutes %> 分钟</span><% } %>
+        <% if (!posts.length) { %>
+        <div class="journal-empty"><span>🍃</span><h2>这里还没有文章</h2><p><%= activeTag ? '这个标签暂时没有匹配内容。' : '第一篇文章正在路上。' %></p><% if (activeTag) { %><a href="/blog">查看全部文章</a><% } %></div>
+        <% } else { %>
+        <div class="journal-list">
+          <% posts.forEach(function (post, index) { var date = new Date(post.created_at).toLocaleDateString('zh-CN', { year:'numeric', month:'long', day:'numeric' }); %>
+          <article class="journal-card<%= index === 0 && page === 1 ? ' journal-card--lead' : '' %>">
+            <% if (post.cover_image) { %><a href="/blog/<%= post.slug %>" class="journal-card__media" tabindex="-1" aria-hidden="true"><img src="<%= post.cover_image %>" alt="" width="1200" height="675" loading="<%= index === 0 ? 'eager' : 'lazy' %>"></a><% } %>
+            <div class="journal-card__body">
+              <div class="journal-card__meta"><time datetime="<%= post.created_at %>"><%= date %></time><span>·</span><span>约 <%= post.readMinutes %> 分钟</span></div>
+              <h2><a href="/blog/<%= post.slug %>"><%= post.title %></a></h2>
+              <% if (post.excerpt) { %><p><%= post.excerpt.length > 200 ? post.excerpt.slice(0, 200) + '…' : post.excerpt %></p><% } %>
+              <div class="journal-card__foot">
+                <div class="journal-card__tags"><% (post.tags || []).slice(0, 3).forEach(function (tag) { %><a href="/blog?tag=<%= encodeURIComponent(tag) %>">#<%= tag %></a><% }); %></div>
+                <a href="/blog/<%= post.slug %>" class="journal-card__more">阅读全文 <span>→</span></a>
+              </div>
             </div>
-            <h2 class="bl-item__title"><%= post.title %></h2>
-            <% if (post.excerpt) { %><p class="bl-item__excerpt"><%= post.excerpt %></p><% } %>
-            <% if (post.tags && post.tags.length > 0) { %>
-            <div class="bl-item__tags">
-              <% post.tags.forEach(tag => { %><span class="bl-item__tag">#<%= tag %></span><% }); %>
-            </div>
-            <% } %>
-          </div>
-          <div class="bl-item__thumb">
-            <% if (post.cover_image) { %>
-            <img src="<%= post.cover_image %>" alt="" loading="lazy">
-            <% } else { %>
-            <div class="bl-item__thumb-mono"><%= _init %></div>
-            <% } %>
-          </div>
-        </a>
-        <% }); %>
-      </div>
-      <% } %>
+          </article>
+          <% }); %>
+        </div>
+        <% } %>
 
-      <% } %>
-
-      <!-- Pagination -->
-      <% if (typeof pagination !== 'undefined' && pagination) { %>
-      <nav class="bl-pagination" aria-label="分页导航">
-        <% if (pagination.prev) { %><a class="bl-pagination__btn" href="/blog?page=<%= pagination.prev %><%= _tagQ %>" rel="prev">‹</a><% } %>
-        <% pagination.parts.forEach(function(part) { %>
-          <% if (part === 'gap') { %><span class="bl-pagination__gap">…</span>
-          <% } else if (part === page) { %><span class="bl-pagination__btn bl-pagination__btn--active" aria-current="page"><%= part %></span>
-          <% } else { %><a class="bl-pagination__btn" href="/blog?page=<%= part %><%= _tagQ %>"><%= part %></a><% } %>
-        <% }); %>
-        <% if (pagination.next) { %><a class="bl-pagination__btn" href="/blog?page=<%= pagination.next %><%= _tagQ %>" rel="next">›</a><% } %>
-        <span class="bl-pagination__summary"><%= page %> / <%= totalPages %></span>
-      </nav>
-      <% } %>
-
+        <% if (pagination) { var tagQ = activeTag ? ('&tag=' + encodeURIComponent(activeTag)) : ''; %>
+        <nav class="journal-pagination" aria-label="分页导航">
+          <% if (pagination.prev) { %><a href="/blog?page=<%= pagination.prev %><%= tagQ %>" rel="prev">←</a><% } %>
+          <% pagination.parts.forEach(function (part) { if (part === 'gap') { %><span>…</span><% } else if (part === page) { %><strong aria-current="page"><%= part %></strong><% } else { %><a href="/blog?page=<%= part %><%= tagQ %>"><%= part %></a><% } }); %>
+          <% if (pagination.next) { %><a href="/blog?page=<%= pagination.next %><%= tagQ %>" rel="next">→</a><% } %>
+        </nav>
+        <% } %>
+      </section>
     </div>
   </main>
   <%- include('partials/public-footer') %>

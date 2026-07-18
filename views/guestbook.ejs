@@ -6,7 +6,7 @@
   description: '留言板 — 给风叶留下你的祝福',
   canonicalPath: '/guestbook',
   twitterCard: 'summary',
-  extraCss: ['/css/guestbook.css']
+  extraCss: ['/css/guestbook.css', '/css/public-pages.css']
 }) %>
 </head>
 <body class="guestbook-page">
@@ -25,6 +25,7 @@
         <p class="gb-intro__desc">写下你想说的话，无论是祝福、回忆还是一句简单的问候。</p>
       </header>
 
+      <div class="gb-layout">
       <!-- Form -->
       <section class="gb-form-section">
         <form id="guestbook-form" class="gb-form" autocomplete="off">
@@ -82,6 +83,8 @@
           <% } %>
         </div>
       </section>
+
+      </div>
 
     </div>
   </main>
