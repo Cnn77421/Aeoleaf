@@ -7,7 +7,8 @@
   canonicalPath: '/blog/' + post.slug,
   ogType: 'article',
   ogImagePath: post.cover_image || '/images/logo.png',
-  twitterCard: 'summary_large_image'
+  twitterCard: 'summary_large_image',
+  extraCss: ['/css/blog-v2.css']
 }) %>
   <meta property="article:published_time" content="<%= post.created_at %>">
   <% post.tags.forEach(tag => { %>
@@ -43,59 +44,49 @@
   %>
   <script type="application/ld+json"><%- JSON.stringify(_articleJsonLd) %></script>
 </head>
-<body>
+<body class="journal-post-page">
   <div class="reading-progress" role="progressbar" aria-label="阅读进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="reading-progress__bar"></span></div>
   <%- include('partials/public-header') %>
-  <main id="main" class="site-main">
-    <div class="post-shell<%= (typeof tocVisible !== 'undefined' && tocVisible) ? ' post-shell--has-toc' : '' %>">
-      <article class="post-detail" data-post-article>
-        <nav class="breadcrumb" aria-label="面包屑">
-          <a href="/">首页</a>
-          <span class="breadcrumb-separator" aria-hidden="true">›</span>
-          <a href="/blog">博客</a>
-          <span class="breadcrumb-separator" aria-hidden="true">›</span>
-          <span class="breadcrumb-current"><%= post.title %></span>
-        </nav>
-        <a href="/blog" class="back-link">← Blog</a>
-        <% if (post.cover_image) { %>
-        <div class="post-hero">
-          <img src="<%= post.cover_image %>" alt="<%= post.title %>" class="post-cover" loading="lazy">
-        </div>
-        <% } %>
-        <h1 class="post-title"><%= post.title %></h1>
-        <div class="post-meta">
-          <time datetime="<%= post.created_at %>"><%= new Date(post.created_at).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}) %></time>
-          <span class="post-meta__sep" aria-hidden="true">·</span>
-          <span class="post-reading-time"><%= typeof readMinutes !== 'undefined' ? readMinutes : 1 %> 分钟阅读</span>
-          <span class="post-meta__sep" aria-hidden="true">·</span>
-          <span class="post-views"><%= post.views || 0 %> 次阅读</span>
-          <% if (post.tags.length > 0) { %>
-          <div class="tags">
-            <% post.tags.forEach(tag => { %><a href="/blog?tag=<%= encodeURIComponent(tag) %>" class="tag tag--chip" aria-label="查看带 <%= tag %> 标签的全部文章">#<%= tag %></a><% }); %>
+  <main id="main" class="site-main journal-main">
+    <div class="journal-post-shell">
+      <article class="post-detail journal-article" id="article-top" data-post-article>
+        <div class="journal-article__hero<%= post.cover_image ? '' : ' journal-article__hero--placeholder' %>">
+          <% if (post.cover_image) { %><img src="<%= post.cover_image %>" alt="" width="1400" height="788" fetchpriority="high"><% } %>
+          <div class="journal-article__hero-shade" aria-hidden="true"></div>
+          <div class="journal-article__hero-copy">
+            <h1><%= post.title %></h1>
           </div>
-          <% } %>
         </div>
-        <div class="prose">
-          <%- post.html %>
+        <div class="journal-article__byline">
+          <img src="<%= aboutImage || '/images/logo.png' %>" alt="<%= siteTitle %>" width="52" height="52">
+          <div class="journal-article__author"><strong><%= siteTitle %></strong><small>Author</small></div>
+          <div class="journal-article__byline-meta">
+            <time datetime="<%= post.created_at %>"><%= new Date(post.created_at).toLocaleDateString('zh-CN', {year:'numeric',month:'long',day:'numeric'}) %></time>
+            <span>·</span><span><%= readMinutes %> 分钟</span><span>·</span><span><%= post.views || 0 %> 次阅读</span>
+          </div>
+          <% if (post.tags.length) { %><div class="journal-article__tags"><% post.tags.forEach(function (tag) { %><a href="/blog?tag=<%= encodeURIComponent(tag) %>">#<%= tag %></a><% }); %></div><% } %>
+        </div>
+        <div class="journal-article__inner">
+          <% if (post.excerpt) { %><p class="journal-article__lead"><%= post.excerpt %></p><% } %>
+          <div class="prose journal-prose"><%- post.html %></div>
+          <footer class="journal-article__footer"><a href="/blog">← 返回文章列表</a><span>感谢阅读这一叶。</span></footer>
         </div>
       </article>
-      <% if (typeof tocVisible !== 'undefined' && tocVisible) { %>
-      <aside class="post-toc" aria-label="本页目录">
-        <details class="post-toc__details" open>
-          <summary class="post-toc__summary">
-            <svg class="post-toc__icon" width="16" height="16" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="14" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
-            <span>本页目录</span>
-          </summary>
-          <ol class="post-toc__list">
-            <% toc.forEach(function (h) { %>
-            <li class="post-toc__item post-toc__item--h<%= h.level %>">
-              <a class="post-toc__link" href="#<%= h.id %>" data-toc-target="<%= h.id %>"><%= h.text %></a>
-            </li>
-            <% }); %>
-          </ol>
-        </details>
+
+      <aside class="journal-post-aside" aria-label="文章辅助信息">
+        <% if (tocVisible) { %>
+        <div class="post-toc journal-panel" aria-label="本页目录">
+          <details class="post-toc__details" open>
+            <summary class="post-toc__summary"><span>目录</span></summary>
+            <h2 class="post-toc__title"><a href="#article-top"><%= post.title %></a></h2>
+            <ol class="post-toc__list">
+              <% toc.forEach(function (h) { %><li class="post-toc__item post-toc__item--h<%= h.level %>"><a class="post-toc__link" href="#<%= h.id %>" data-toc-target="<%= h.id %>"><%= h.text %></a></li><% }); %>
+            </ol>
+          </details>
+        </div>
+        <% } %>
+        <nav class="journal-panel journal-links" aria-label="更多入口"><p class="journal-panel__label">继续探索</p><a href="/works"><span>作品集</span><b>→</b></a><a href="/guestbook"><span>留言板</span><b>→</b></a></nav>
       </aside>
-      <% } %>
     </div>
   </main>
   <%- include('partials/public-footer') %>

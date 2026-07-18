@@ -8,7 +8,7 @@
   ogType: 'article',
   ogImagePath: work.cover_image || '/images/logo.png',
   twitterCard: 'summary_large_image',
-  extraCss: ['/css/work-detail-v2.css']
+  extraCss: ['/css/work-detail-v2.css', '/css/public-pages.css']
 }) %>
   <% if (work.cover_image) { %>
   <link rel="preload" as="image" href="<%= work.cover_image %>" fetchpriority="high">
@@ -30,7 +30,7 @@
   %>
   <script type="application/ld+json"><%- JSON.stringify(_ld) %></script>
 </head>
-<body>
+<body class="work-detail-page">
   <%- include('partials/public-header') %>
   <main id="main" class="site-main">
 

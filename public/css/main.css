@@ -1655,7 +1655,8 @@ button.btn-primary:disabled {
     color: var(--accent);
   }
 
-  .nav-container { padding: var(--space-3) var(--space-4); }
+  .nav-container { width: 100%; padding: var(--space-3) var(--space-4); }
+  .nav-right { gap: var(--space-1); }
 
   .hero { padding: var(--space-8) 0; }
   .hero--enhanced {

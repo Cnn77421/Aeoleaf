@@ -23,6 +23,7 @@ const {
 } = require('../config/db');
 const { requireAdmin } = require('../middleware/auth');
 const { rateLimit } = require('../middleware/rateLimit');
+const { uploadGeneral } = require('../middleware/upload');
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -30,6 +31,28 @@ const loginLimiter = rateLimit({
   message: 'Too many login attempts, try again later',
   keyPrefix: 'login:'
 });
+
+const settingsUpload = uploadGeneral.fields([
+  { name: 'home_hero_desktop_file', maxCount: 1 },
+  { name: 'home_hero_mobile_file', maxCount: 1 }
+]);
+
+function parseSettingsUpload(req, res, next) {
+  settingsUpload(req, res, (err) => {
+    if (err) return res.redirect('/admin/settings?err=upload');
+    return next();
+  });
+}
+
+function normalizeHeroPosition(value) {
+  const allowed = new Set([
+    'left top', 'center top', 'right top',
+    'left center', 'center center', 'right center',
+    'left bottom', 'center bottom', 'right bottom'
+  ]);
+  const normalized = String(value || '').trim().toLowerCase();
+  return allowed.has(normalized) ? normalized : 'center center';
+}
 
 function renderPublic404(res) {
   return res.status(404).render('404', {
@@ -158,13 +181,15 @@ router.get('/settings', requireAdmin, (req, res) => {
   const notice = req.query.ok === '1' ? '已保存' : null;
   const saveError = req.query.err === 'social_json'
     ? '社交链接 JSON 格式无效，请检查括号与引号后重试。'
+    : req.query.err === 'upload'
+      ? '背景图片上传失败，仅支持 8MB 以内的常见图片格式。'
     : req.query.err === 'body'
       ? '未收到表单数据（可能被代理截断或请求过大）。'
       : null;
   res.render('admin/settings', { title: 'Settings — aeoleaf', settings, notice, saveError });
 });
 
-router.post('/settings', requireAdmin, (req, res, next) => {
+router.post('/settings', requireAdmin, parseSettingsUpload, (req, res, next) => {
   try {
     const b = req.body;
     if (!b || typeof b !== 'object') {
@@ -178,6 +203,10 @@ router.post('/settings', requireAdmin, (req, res, next) => {
       'about_image',
       'about_tagline',
       'about_meta',
+      'home_hero_image',
+      'home_hero_image_mobile',
+      'home_hero_position',
+      'home_hero_position_mobile',
       'contact_email',
       'contact_qq',
       'social_links'
@@ -207,12 +236,26 @@ router.post('/settings', requireAdmin, (req, res, next) => {
 
     const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
     const update = db.transaction(() => {
+      const desktopUpload = req.files?.home_hero_desktop_file?.[0];
+      const mobileUpload = req.files?.home_hero_mobile_file?.[0];
       if (Object.prototype.hasOwnProperty.call(b, 'site_title')) stmt.run('site_title', b.site_title ?? '');
       if (Object.prototype.hasOwnProperty.call(b, 'site_subtitle')) stmt.run('site_subtitle', b.site_subtitle ?? '');
       if (Object.prototype.hasOwnProperty.call(b, 'about_text')) stmt.run('about_text', b.about_text ?? '');
       if (Object.prototype.hasOwnProperty.call(b, 'about_image')) stmt.run('about_image', b.about_image ?? '');
       if (Object.prototype.hasOwnProperty.call(b, 'about_tagline')) stmt.run('about_tagline', b.about_tagline ?? '');
       if (Object.prototype.hasOwnProperty.call(b, 'about_meta')) stmt.run('about_meta', b.about_meta ?? '');
+      if (Object.prototype.hasOwnProperty.call(b, 'home_hero_image') || desktopUpload) {
+        stmt.run('home_hero_image', desktopUpload ? `/uploads/general/${desktopUpload.filename}` : (b.home_hero_image ?? ''));
+      }
+      if (Object.prototype.hasOwnProperty.call(b, 'home_hero_image_mobile') || mobileUpload) {
+        stmt.run('home_hero_image_mobile', mobileUpload ? `/uploads/general/${mobileUpload.filename}` : (b.home_hero_image_mobile ?? ''));
+      }
+      if (Object.prototype.hasOwnProperty.call(b, 'home_hero_position')) {
+        stmt.run('home_hero_position', normalizeHeroPosition(b.home_hero_position));
+      }
+      if (Object.prototype.hasOwnProperty.call(b, 'home_hero_position_mobile')) {
+        stmt.run('home_hero_position_mobile', normalizeHeroPosition(b.home_hero_position_mobile));
+      }
       if (Object.prototype.hasOwnProperty.call(b, 'contact_email')) stmt.run('contact_email', b.contact_email ?? '');
       if (Object.prototype.hasOwnProperty.call(b, 'contact_qq')) stmt.run('contact_qq', b.contact_qq ?? '');
       if (Object.prototype.hasOwnProperty.call(b, 'social_links')) stmt.run('social_links', socialVal);

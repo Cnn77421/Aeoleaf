@@ -14,7 +14,8 @@
   title: _errorCode + ' — aeoleaf',
   description: _errorTitle,
   canonicalPath: '/' + _errorCode,
-  noIndex: true
+  noIndex: true,
+  extraCss: ['/css/public-pages.css']
 }) %>
 <style>
 .err-shell {
@@ -104,7 +105,7 @@
 .err-links a:hover { color: var(--accent); }
 </style>
 </head>
-<body>
+<body class="error-page">
   <%- include('partials/public-header') %>
   <main id="main" class="site-main">
     <div class="err-shell">

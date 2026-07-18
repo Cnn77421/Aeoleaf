@@ -40,7 +40,7 @@
     <% if (typeof saveError !== 'undefined' && saveError) { %>
     <div class="admin-notice admin-notice--err" role="alert"><%= saveError %></div>
     <% } %>
-    <form method="POST" action="/admin/settings" class="settings-form" accept-charset="UTF-8">
+    <form method="POST" action="/admin/settings" class="settings-form" accept-charset="UTF-8" enctype="multipart/form-data">
       <div class="form-group">
         <label>Site Title</label>
         <input type="text" name="site_title" value="<%= settings.site_title || '' %>">
@@ -48,6 +48,33 @@
       <div class="form-group">
         <label>Site Subtitle</label>
         <input type="text" name="site_subtitle" value="<%= settings.site_subtitle || '' %>">
+      </div>
+      <div class="form-group">
+        <label>首页背景图（桌面端）</label>
+        <input type="text" name="home_hero_image" value="<%= settings.home_hero_image || '' %>" placeholder="/uploads/general/... 或 https://...">
+        <input type="file" name="home_hero_desktop_file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic,image/heif,image/bmp">
+        <p class="form-hint">上传新图片会覆盖上方 URL；留空并保存可恢复自动回退背景。</p>
+      </div>
+      <div class="form-group">
+        <label>桌面端背景焦点</label>
+        <select name="home_hero_position">
+          <% [['center center','居中'],['center top','中上'],['center bottom','中下'],['left center','左侧'],['right center','右侧'],['left top','左上'],['right top','右上'],['left bottom','左下'],['right bottom','右下']].forEach(function (opt) { %>
+          <option value="<%= opt[0] %>"<%= (settings.home_hero_position || 'center center') === opt[0] ? ' selected' : '' %>><%= opt[1] %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>首页背景图（移动端，可选）</label>
+        <input type="text" name="home_hero_image_mobile" value="<%= settings.home_hero_image_mobile || '' %>" placeholder="留空则使用桌面背景">
+        <input type="file" name="home_hero_mobile_file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic,image/heif,image/bmp">
+      </div>
+      <div class="form-group">
+        <label>移动端背景焦点</label>
+        <select name="home_hero_position_mobile">
+          <% [['center center','居中'],['center top','中上'],['center bottom','中下'],['left center','左侧'],['right center','右侧'],['left top','左上'],['right top','右上'],['left bottom','左下'],['right bottom','右下']].forEach(function (opt) { %>
+          <option value="<%= opt[0] %>"<%= (settings.home_hero_position_mobile || 'center center') === opt[0] ? ' selected' : '' %>><%= opt[1] %></option>
+          <% }); %>
+        </select>
       </div>
       <div class="form-group">
         <label>About Text (Markdown)</label>

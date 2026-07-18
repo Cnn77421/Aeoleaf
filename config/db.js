@@ -145,6 +145,10 @@ function initDB() {
       ('about_image', ''),
       ('about_tagline', ''),
       ('about_meta', ''),
+      ('home_hero_image', ''),
+      ('home_hero_image_mobile', ''),
+      ('home_hero_position', 'center center'),
+      ('home_hero_position_mobile', 'center center'),
       ('contact_email', ''),
       ('contact_qq', ''),
       ('social_links', '[]');
