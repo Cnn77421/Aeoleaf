@@ -95,6 +95,47 @@
     var bar = document.querySelector('.reading-progress');
     var fill = bar && bar.querySelector('.reading-progress__bar');
     var article = document.querySelector('[data-post-article]');
+
+    function fallbackCopy(text) {
+      var input = document.createElement('textarea');
+      input.value = text;
+      input.setAttribute('readonly', '');
+      input.style.position = 'fixed';
+      input.style.opacity = '0';
+      document.body.appendChild(input);
+      input.select();
+      var copied = false;
+      try { copied = document.execCommand('copy'); } catch (_e) { copied = false; }
+      input.remove();
+      return Promise.resolve(copied);
+    }
+
+    function copyText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text).then(function () { return true; }, function () { return fallbackCopy(text); });
+      }
+      return fallbackCopy(text);
+    }
+
+    Array.prototype.slice.call(document.querySelectorAll('[data-copy-code]')).forEach(function (button) {
+      button.addEventListener('click', function () {
+        var frame = button.closest('.code-frame');
+        var code = frame && frame.querySelector('pre code');
+        if (!code) return;
+        var rows = Array.prototype.slice.call(code.querySelectorAll('.code-line__content'));
+        var source = rows.length ? rows.map(function (row) { return row.textContent === '\u200b' ? '' : row.textContent; }).join('\n') : (code.textContent || '');
+        copyText(source).then(function (copied) {
+          if (!copied) return;
+          button.textContent = '已复制';
+          button.classList.add('is-copied');
+          window.setTimeout(function () {
+            button.textContent = '复制';
+            button.classList.remove('is-copied');
+          }, 1600);
+        });
+      });
+    });
+
     if (!bar || !fill || !article) return;
     var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var tocLinks = Array.prototype.slice.call(document.querySelectorAll('.post-toc__link[data-toc-target]'));

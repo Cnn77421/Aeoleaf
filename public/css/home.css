@@ -7,6 +7,76 @@
   padding: 0;
 }
 
+.reference-home .site-main {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  background: transparent;
+}
+
+.ref-home-backdrop {
+  --home-backdrop-blur: 0px;
+  --home-backdrop-scale: 1.025;
+  --home-backdrop-saturation: 100%;
+  --home-backdrop-brightness: 100%;
+  --home-backdrop-wash: 0;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 25% 20%, rgba(115, 194, 206, 0.82), transparent 35%),
+    linear-gradient(135deg, #d9e9ec 0%, #7196a4 45%, #314d59 100%);
+  contain: paint;
+}
+
+.ref-home-backdrop__picture,
+.ref-home-backdrop__image,
+.ref-home-backdrop__veil,
+.ref-home-backdrop__wash {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ref-home-backdrop__picture {
+  display: block;
+  animation: refHeroReveal 1.2s ease-out both;
+}
+
+.ref-home-backdrop__image {
+  object-fit: cover;
+  object-position: var(--hero-position-desktop, center center);
+  transform: scale(var(--home-backdrop-scale));
+  filter: blur(var(--home-backdrop-blur)) saturate(var(--home-backdrop-saturation)) brightness(var(--home-backdrop-brightness));
+  transform-origin: center;
+  will-change: filter, transform;
+}
+
+.ref-home-backdrop__veil {
+  background:
+    linear-gradient(180deg, rgba(8, 20, 28, 0.16) 0%, rgba(8, 20, 28, 0.03) 45%, rgba(8, 20, 28, 0.48) 100%),
+    linear-gradient(90deg, rgba(8, 20, 28, 0.18), transparent 55%);
+}
+
+.ref-home-backdrop__wash {
+  background: rgba(247, 249, 250, 0.84);
+  opacity: var(--home-backdrop-wash);
+  will-change: opacity;
+}
+
+[data-theme="dark"] .ref-home-backdrop__wash {
+  background: rgba(10, 12, 15, 0.82);
+}
+
+.reference-home .site-main > .ref-hero,
+.reference-home .site-main > .ref-home-shell {
+  position: relative;
+  z-index: 1;
+}
+
 .reference-home .site-header:not(.scrolled) {
   background: linear-gradient(180deg, rgba(11, 22, 31, 0.42), transparent);
   border-bottom-color: transparent;
@@ -32,37 +102,7 @@
   overflow: hidden;
   isolation: isolate;
   color: #fff;
-  background:
-    radial-gradient(circle at 25% 20%, rgba(115, 194, 206, 0.82), transparent 35%),
-    linear-gradient(135deg, #d9e9ec 0%, #7196a4 45%, #314d59 100%);
-}
-
-.ref-hero__picture,
-.ref-hero__image,
-.ref-hero__veil {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.ref-hero__picture {
-  z-index: -3;
-  display: block;
-}
-
-.ref-hero__image {
-  object-fit: cover;
-  object-position: var(--hero-position-desktop, center center);
-  transform: scale(1.01);
-  animation: refHeroReveal 1.2s ease-out both;
-}
-
-.ref-hero__veil {
-  z-index: -2;
-  background:
-    linear-gradient(180deg, rgba(8, 20, 28, 0.16) 0%, rgba(8, 20, 28, 0.03) 45%, rgba(8, 20, 28, 0.48) 100%),
-    linear-gradient(90deg, rgba(8, 20, 28, 0.18), transparent 55%);
+  background: transparent;
 }
 
 .ref-hero__content {
@@ -397,11 +437,14 @@
 .ref-post-empty h3 { margin: 12px 0 6px; color: var(--text); }
 .ref-post-empty p { margin: 0; }
 
-.reference-home .site-footer { margin-top: 0; }
+.reference-home .site-footer {
+  z-index: 1;
+  margin-top: 0;
+}
 
 @keyframes refHeroReveal {
-  from { opacity: 0; transform: scale(1.08); }
-  to { opacity: 1; transform: scale(1.01); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 @keyframes refHeroContent {
   from { opacity: 0; transform: translateY(18px); }
@@ -430,7 +473,7 @@
   .reference-home .nav-container { width: 100%; }
   .reference-home .nav-right { gap: 4px; }
   .ref-hero__content { width: min(calc(100% - 28px), 520px); }
-  .ref-hero__image { object-position: var(--hero-position-mobile, center center); }
+  .ref-home-backdrop__image { object-position: var(--hero-position-mobile, center center); }
   .ref-hero__title { font-size: clamp(44px, 13vw, 64px); }
   .ref-hero__subtitle { max-width: 19em; }
   .ref-hero__scroll span { display: none; }
@@ -447,7 +490,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ref-hero__image,
+  .ref-home-backdrop__picture,
   .ref-hero__content,
   .ref-hero__scroll i { animation: none; }
   .ref-post-card,

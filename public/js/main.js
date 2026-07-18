@@ -184,6 +184,52 @@
     });
   }
 
+  var homeBackdropCleanup = null;
+
+  function initHomeBackdropScroll() {
+    if (homeBackdropCleanup) {
+      homeBackdropCleanup();
+      homeBackdropCleanup = null;
+    }
+
+    var backdrop = document.querySelector('[data-home-backdrop]');
+    if (!backdrop) return;
+
+    var ticking = false;
+    var reduced = prefersReducedMotion();
+
+    function renderBackdrop() {
+      ticking = false;
+      var viewportHeight = Math.max(document.documentElement.clientHeight || window.innerHeight || 1, 1);
+      var distance = Math.max(viewportHeight * 0.92, 560);
+      var progress = Math.min(Math.max(window.pageYOffset / distance, 0), 1);
+      var eased = 1 - Math.pow(1 - progress, 3);
+      var compact = window.matchMedia && window.matchMedia('(max-width: 700px)').matches;
+      var maxBlur = compact ? 12 : 20;
+
+      backdrop.style.setProperty('--home-backdrop-blur', (eased * maxBlur).toFixed(2) + 'px');
+      backdrop.style.setProperty('--home-backdrop-saturation', (100 - eased * 30).toFixed(1) + '%');
+      backdrop.style.setProperty('--home-backdrop-brightness', (100 - eased * 15).toFixed(1) + '%');
+      backdrop.style.setProperty('--home-backdrop-wash', (eased * 0.54).toFixed(3));
+      backdrop.style.setProperty('--home-backdrop-scale', reduced ? '1.055' : (1.025 + eased * 0.03).toFixed(4));
+    }
+
+    function requestBackdropRender() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(renderBackdrop);
+    }
+
+    renderBackdrop();
+    window.addEventListener('scroll', requestBackdropRender, { passive: true });
+    window.addEventListener('resize', requestBackdropRender, { passive: true });
+
+    homeBackdropCleanup = function () {
+      window.removeEventListener('scroll', requestBackdropRender);
+      window.removeEventListener('resize', requestBackdropRender);
+    };
+  }
+
   function reinitPageFeatures() {
     var lazyImages = document.querySelectorAll('img[data-src]');
     if ('IntersectionObserver' in window) {
@@ -246,6 +292,7 @@
       });
     });
 
+    initHomeBackdropScroll();
     initRevealSections();
     initStatsCounters();
   }
@@ -397,6 +444,16 @@
         }
       }
       if (wasLoading) document.body.classList.add('pjax-loading');
+
+      // The homepage backdrop intentionally lives outside <main> so no PJAX
+      // transform can turn its fixed positioning into container positioning.
+      // Keep that page-level layer in sync when navigating without a reload.
+      var currentBackdrop = document.querySelector('body > [data-home-backdrop]');
+      if (currentBackdrop) currentBackdrop.remove();
+      var incomingBackdrop = doc.querySelector('body > [data-home-backdrop]');
+      if (incomingBackdrop) {
+        document.body.insertBefore(incomingBackdrop.cloneNode(true), mainEl);
+      }
 
       mainEl.innerHTML = newMain.innerHTML;
       mainEl.className = newMain.className;
