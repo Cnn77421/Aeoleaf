@@ -1,0 +1,33 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { requireSameOrigin } = require('../middleware/sameOrigin');
+
+function invoke({ method = 'POST', origin = '', referer = '' } = {}) {
+  const req = {
+    method,
+    protocol: 'https',
+    get(name) {
+      return { origin, referer, host: 'blog.example.com' }[name.toLowerCase()] || '';
+    }
+  };
+  let statusCode = 200;
+  let body = null;
+  let nextCalled = false;
+  const res = {
+    status(code) { statusCode = code; return this; },
+    json(value) { body = value; return this; }
+  };
+  requireSameOrigin(req, res, () => { nextCalled = true; });
+  return { statusCode, body, nextCalled };
+}
+
+test('allows same-origin writes and rejects cross-site or originless writes', () => {
+  assert.equal(invoke({ origin: 'https://blog.example.com' }).nextCalled, true);
+  assert.equal(invoke({ referer: 'https://blog.example.com/admin/posts' }).nextCalled, true);
+  assert.equal(invoke({ origin: 'https://evil.example' }).statusCode, 403);
+  assert.equal(invoke().statusCode, 403);
+});
+
+test('does not require origin validation for safe methods', () => {
+  assert.equal(invoke({ method: 'GET' }).nextCalled, true);
+});

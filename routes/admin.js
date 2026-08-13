@@ -23,7 +23,7 @@ const {
 } = require('../config/db');
 const { requireAdmin } = require('../middleware/auth');
 const { rateLimit } = require('../middleware/rateLimit');
-const { uploadGeneral } = require('../middleware/upload');
+const { uploadGeneral, validateUploadedFiles } = require('../middleware/upload');
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -38,9 +38,14 @@ const settingsUpload = uploadGeneral.fields([
 ]);
 
 function parseSettingsUpload(req, res, next) {
-  settingsUpload(req, res, (err) => {
+  settingsUpload(req, res, async (err) => {
     if (err) return res.redirect('/admin/settings?err=upload');
-    return next();
+    try {
+      await validateUploadedFiles(req);
+      return next();
+    } catch {
+      return res.redirect('/admin/settings?err=upload');
+    }
   });
 }
 

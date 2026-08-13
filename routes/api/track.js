@@ -11,11 +11,16 @@ const trackLimiter = rateLimit({
 const ip2Region = new IP2Region();
 
 function setCors(req, res) {
-  const origin = req.headers.origin || '*';
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Vary', 'Origin');
+  const origin = req.headers.origin;
+  const configured = String(process.env.BASE_URL || '').trim();
+  let allowedOrigin = '';
+  try { allowedOrigin = configured ? new URL(configured).origin : ''; } catch { /* validated at startup */ }
+  if (origin && origin !== allowedOrigin) return false;
+  if (origin) res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  res.vary('Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With');
+  return true;
 }
 
 function parseUserAgent(ua) {
@@ -90,29 +95,8 @@ function resolveGeoByIp(ip) {
   }
 }
 
-function getClientIp(req) {
-  const xff = req.headers['x-forwarded-for'];
-  if (typeof xff === 'string' && xff.trim()) return xff.split(',')[0].trim();
-  const xrip = req.headers['x-real-ip'];
-  if (typeof xrip === 'string' && xrip.trim()) return xrip.trim();
-  const rip = typeof req.ip === 'string' ? req.ip : '';
-  if (rip && rip.trim()) return rip.trim();
-  return (req.socket && req.socket.remoteAddress ? req.socket.remoteAddress : '').replace('::ffff:', '');
-}
-
-function resolveVisitorIp(req, body) {
-  const bodyIp = normalizeIp(body && body.publicIp);
-  if (bodyIp && !isPrivateOrLocalIp(bodyIp)) return bodyIp;
-  const sources = [
-    req.headers['x-forwarded-for'] && normalizeIp(req.headers['x-forwarded-for'].split(',')[0]),
-    normalizeIp(req.headers['x-real-ip']),
-    normalizeIp(req.headers['cf-connecting-ip']),
-    normalizeIp(req.headers['true-client-ip'])
-  ];
-  for (const ip of sources) {
-    if (ip && !isPrivateOrLocalIp(ip)) return ip;
-  }
-  return normalizeIp(getClientIp(req));
+function resolveVisitorIp(req) {
+  return normalizeIp(req.ip || req.socket?.remoteAddress || '');
 }
 
 function readNetworkType(body) {
@@ -174,12 +158,12 @@ function backfillGeo() {
 }
 
 router.options('/', (req, res) => {
-  setCors(req, res);
+  if (!setCors(req, res)) return res.status(403).end();
   return res.status(204).end();
 });
 
 router.post('/', trackLimiter, (req, res) => {
-  setCors(req, res);
+  if (!setCors(req, res)) return res.status(403).json({ error: 'Origin not allowed' });
   backfillGeo();
   try {
     const now = Date.now();
@@ -215,7 +199,7 @@ router.post('/', trackLimiter, (req, res) => {
 
     const ua = req.headers['user-agent'] || '';
     const parsed = parseUserAgent(ua);
-    const ip = resolveVisitorIp(req, body);
+    const ip = resolveVisitorIp(req);
     const geo = !isPrivateOrLocalIp(ip) ? resolveGeoByIp(ip) : { country: '', province: '', city: '', isp: '' };
     const networkType = readNetworkType(body);
     const trackedAt = Number(body.trackedAt) || now;
@@ -309,7 +293,9 @@ router.post('/', trackLimiter, (req, res) => {
     return res.json({ ok: true, visitorId, visitorSessionId });
   } catch (err) {
     console.error('[track] error:', err);
-    return res.status(500).json({ ok: false, error: 'Track failed', detail: err.message });
+    const payload = { ok: false, error: 'Track failed' };
+    if (process.env.NODE_ENV !== 'production') payload.detail = err.message;
+    return res.status(500).json(payload);
   }
 });
 

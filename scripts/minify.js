@@ -83,8 +83,12 @@ function processDir(dir, ext, minifier) {
     const src = fs.readFileSync(path.join(dir, name), 'utf8');
     const min = minifier(src);
     const outName = name.replace(new RegExp(ext.replace('.', '\\.') + '$'), '.min' + ext);
-    if (!CHECK_ONLY) fs.writeFileSync(path.join(dir, outName), min, 'utf8');
-    rows.push({ name, before: Buffer.byteLength(src), after: Buffer.byteLength(min) });
+    const outPath = path.join(dir, outName);
+    let current = null;
+    try { current = fs.readFileSync(outPath, 'utf8'); } catch { /* missing output */ }
+    const matches = current === min;
+    if (!CHECK_ONLY) fs.writeFileSync(outPath, min, 'utf8');
+    rows.push({ name, outName, before: Buffer.byteLength(src), after: Buffer.byteLength(min), matches });
   }
   return rows;
 }
@@ -98,3 +102,12 @@ for (const r of all) {
   console.log('  ' + r.name.padEnd(26) + fmt(r.before).padStart(8) + fmt(r.after).padStart(8) + '  ' + ((1 - r.after / r.before) * 100).toFixed(0) + '%');
 }
 console.log('  ' + 'TOTAL'.padEnd(26) + fmt(tb).padStart(8) + fmt(ta).padStart(8) + '  ' + ((1 - ta / tb) * 100).toFixed(0) + '%');
+if (CHECK_ONLY) {
+  const stale = all.filter((r) => !r.matches);
+  if (stale.length) {
+    console.error(`Stale or missing minified assets: ${stale.map((r) => r.outName).join(', ')}`);
+    process.exitCode = 1;
+  } else {
+    console.log('  all minified assets are current');
+  }
+}

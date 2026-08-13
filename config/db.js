@@ -23,7 +23,15 @@ let rawDb = null;
 // Back-compat no-ops. The sql.js engine needed explicit dumps to disk; the
 // native engine persists on every write, so these just resolve/return.
 function saveDBSync() { /* native engine persists immediately */ }
-async function flushDB() { /* native engine persists immediately */ }
+async function flushDB() {
+  if (rawDb) rawDb.exec('PRAGMA wal_checkpoint(PASSIVE)');
+}
+
+function closeDB() {
+  if (!rawDb) return;
+  rawDb.close();
+  rawDb = null;
+}
 
 function initDB() {
   rawDb = new DatabaseSync(dbPath);
@@ -78,6 +86,14 @@ function initDB() {
       key TEXT PRIMARY KEY,
       value TEXT DEFAULT ''
     );
+
+    CREATE TABLE IF NOT EXISTS admin_sessions (
+      sid TEXT PRIMARY KEY,
+      data TEXT NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions(expires_at);
 
     CREATE TABLE IF NOT EXISTS visitors (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -485,6 +501,7 @@ function removeFromBlacklist(ip) {
 module.exports = {
   initDB,
   flushDB,
+  closeDB,
   saveDBSync,
   db: dbWrapper,
   getVisitorOverview,
