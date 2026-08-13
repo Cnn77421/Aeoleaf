@@ -2,9 +2,14 @@ node_modules/
 .env
 database/aeoleaf.db
 database/*.db
+database/*.db-wal
+database/*.db-shm
+database/*.db-journal
 public/uploads/
 *.log
 *.rar
+.fuse_hidden*
+FETCH_HEAD
 .vs/
 .claude/
 新建 文本文档.txt

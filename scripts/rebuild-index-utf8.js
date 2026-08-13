@@ -130,7 +130,7 @@ const body = `<!DOCTYPE html>
         <div class="hp-about__text slide-from-right">
           <h2>${C.aboutH2}</h2>
           <% if (aboutText) { %>
-            <p><%= aboutText.replace(/[#*_\[\]()]/g, '').substring(0, 200) %><% if (aboutText.length > 200) { %>\u2026<% } %></p>
+            <p><%= aboutText.replace(/[][()#*_]/g, '').substring(0, 200) %><% if (aboutText.length > 200) { %>\u2026<% } %></p>
           <% } else { %>
             <p>${C.aboutFallback}</p>
           <% } %>

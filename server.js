@@ -6,12 +6,21 @@ const helmet = require('helmet');
 const path = require('path');
 const { pathWithoutQuery } = require('./lib/pathWithoutQuery');
 const { asset } = require('./lib/assetVersion');
-const { initDB, flushDB, isBlacklisted } = require('./config/db');
+const { validateRuntimeConfig } = require('./lib/runtimeConfig');
+const { SQLiteSessionStore } = require('./lib/sqliteSessionStore');
+const { initDB, flushDB, closeDB, db, isBlacklisted } = require('./config/db');
 
 const app = express();
-app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
-const isProd = process.env.NODE_ENV === 'production';
+let runtimeConfig;
+try {
+  runtimeConfig = validateRuntimeConfig(process.env);
+} catch (err) {
+  console.error(`FATAL: ${err.message}`);
+  process.exit(1);
+}
+const isProd = runtimeConfig.isProd;
+app.set('trust proxy', runtimeConfig.trustProxy);
 
 function resolveBaseUrl(req) {
   const configured = String(process.env.BASE_URL || '').trim();
@@ -19,29 +28,49 @@ function resolveBaseUrl(req) {
   return `${req.protocol}://${req.get('host')}`;
 }
 
-if (isProd) {
-  const sec = process.env.SESSION_SECRET;
-  if (!sec || sec === 'change-this-secret' || sec.length < 24) {
-    console.error('FATAL: Set SESSION_SECRET to a random string of at least 24 characters in production.');
-    process.exit(1);
-  }
-  const adminPass = process.env.ADMIN_PASSWORD;
-  if (!adminPass || adminPass.length < 8) {
-    console.error('FATAL: Set ADMIN_PASSWORD to a non-empty string of at least 8 characters in production.');
-    process.exit(1);
-  }
-} else if (!process.env.ADMIN_PASSWORD) {
+if (!isProd && !process.env.ADMIN_PASSWORD) {
   console.warn('[warn] ADMIN_PASSWORD is empty; admin login is disabled.');
 }
 
-// Stability: log and keep going on unexpected errors rather than crashing
-// the whole process for a single bad request.
-process.on('unhandledRejection', (reason) => {
-  console.error('[unhandledRejection]', reason && reason.stack || reason);
+let httpServer = null;
+let sessionStore = null;
+let shuttingDown = false;
+
+async function shutdown(exitCode, reason) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  if (reason) console.error(reason);
+
+  const forceExit = setTimeout(() => {
+    console.error('FATAL: Graceful shutdown timed out.');
+    process.exit(1);
+  }, 10_000);
+  forceExit.unref();
+
+  try {
+    if (httpServer) {
+      await new Promise((resolve) => httpServer.close(resolve));
+    }
+    if (sessionStore) sessionStore.close();
+    await flushDB();
+    closeDB();
+  } catch (err) {
+    console.error('Error during shutdown:', err && err.stack || err);
+    exitCode = 1;
+  } finally {
+    clearTimeout(forceExit);
+    process.exit(exitCode);
+  }
+}
+
+process.once('unhandledRejection', (reason) => {
+  void shutdown(1, `[unhandledRejection] ${reason && reason.stack || reason}`);
 });
-process.on('uncaughtException', (err) => {
-  console.error('[uncaughtException]', err && err.stack || err);
+process.once('uncaughtException', (err) => {
+  void shutdown(1, `[uncaughtException] ${err && err.stack || err}`);
 });
+process.once('SIGINT', () => { void shutdown(0); });
+process.once('SIGTERM', () => { void shutdown(0); });
 
 (async () => {
   await initDB();
@@ -200,6 +229,7 @@ const sessionCookieSecure = process.env.SESSION_COOKIE_SECURE === 'true'
 // Session only applies to dynamic routes below this point; static files
 // above never allocate or decode session cookies.
 const sessionMiddleware = session({
+  store: (sessionStore = new SQLiteSessionStore(db)),
   secret: process.env.SESSION_SECRET || 'change-this-secret',
   resave: false,
   saveUninitialized: false,
@@ -215,6 +245,13 @@ app.use((req, res, next) => {
   // never depend on a session cookie.
   if (req.path === '/api/track') return next();
   return sessionMiddleware(req, res, next);
+});
+
+const { requireSameOrigin } = require('./middleware/sameOrigin');
+const protectedWritePaths = /^\/(admin(?:\/|$)|api\/(?:auth|posts|works)(?:\/|$))/;
+app.use((req, res, next) => {
+  if (!protectedWritePaths.test(req.path)) return next();
+  return requireSameOrigin(req, res, next);
 });
 
 app.use('/api/auth', require('./routes/api/auth'));
@@ -240,7 +277,7 @@ app.use((req, res) => {
 app.use((err, req, res, _next) => {
   console.error(err.stack);
   if (req.path.startsWith('/api/')) {
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: isProd ? 'Internal server error' : err.message });
   }
   res.status(500).render('404', {
     title: 'Server Error',
@@ -250,18 +287,10 @@ app.use((err, req, res, _next) => {
   });
 });
 
-  async function shutdown() {
-    try {
-      await flushDB();
-    } catch (e) {
-      console.error('flushDB on shutdown:', e);
-    }
-    process.exit(0);
-  }
-  process.once('SIGINT', shutdown);
-  process.once('SIGTERM', shutdown);
-
-  app.listen(PORT, () => {
+  httpServer = app.listen(PORT, () => {
     console.log(`aeoleaf running on http://localhost:${PORT}`);
+  });
+  httpServer.once('error', (err) => {
+    void shutdown(1, `[listen] ${err && err.stack || err}`);
   });
 })();
