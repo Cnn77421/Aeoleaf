@@ -23,6 +23,7 @@ const {
 } = require('../config/db');
 const { requireAdmin } = require('../middleware/auth');
 const { rateLimit } = require('../middleware/rateLimit');
+const { getCsrfToken } = require('../middleware/sameOrigin');
 const { uploadGeneral, validateUploadedFiles } = require('../middleware/upload');
 
 const loginLimiter = rateLimit({
@@ -74,7 +75,11 @@ router.get('/', (req, res) => res.redirect('/admin/dashboard'));
 
 router.get('/login', (req, res) => {
   if (req.session && req.session.admin) return res.redirect('/admin/dashboard');
-  res.render('admin/login', { title: 'Login — aeoleaf', error: null });
+  res.render('admin/login', {
+    title: 'Login — aeoleaf',
+    error: null,
+    csrfToken: getCsrfToken(req)
+  });
 });
 
 router.post('/login', loginLimiter, (req, res, next) => {
@@ -83,7 +88,11 @@ router.post('/login', loginLimiter, (req, res, next) => {
   const adminPass = process.env.ADMIN_PASSWORD || '';
 
   const renderFail = () =>
-    res.status(401).render('admin/login', { title: 'Login — aeoleaf', error: 'Incorrect password' });
+    res.status(401).render('admin/login', {
+      title: 'Login — aeoleaf',
+      error: 'Incorrect password',
+      csrfToken: getCsrfToken(req)
+    });
 
   if (!password || !adminPass) return renderFail();
 
