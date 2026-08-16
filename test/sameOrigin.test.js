@@ -2,12 +2,17 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { requireSameOrigin } = require('../middleware/sameOrigin');
 
-function invoke({ method = 'POST', origin = '', referer = '' } = {}) {
+function invoke({ method = 'POST', origin = '', referer = '', fetchSite = '' } = {}) {
   const req = {
     method,
     protocol: 'https',
     get(name) {
-      return { origin, referer, host: 'blog.example.com' }[name.toLowerCase()] || '';
+      return {
+        origin,
+        referer,
+        host: 'blog.example.com',
+        'sec-fetch-site': fetchSite
+      }[name.toLowerCase()] || '';
     }
   };
   let statusCode = 200;
@@ -26,6 +31,16 @@ test('allows same-origin writes and rejects cross-site or originless writes', ()
   assert.equal(invoke({ referer: 'https://blog.example.com/admin/posts' }).nextCalled, true);
   assert.equal(invoke({ origin: 'https://evil.example' }).statusCode, 403);
   assert.equal(invoke().statusCode, 403);
+});
+
+test('uses browser fetch metadata only when origin headers are absent', () => {
+  assert.equal(invoke({ fetchSite: 'same-origin' }).nextCalled, true);
+  assert.equal(invoke({ fetchSite: 'same-site' }).statusCode, 403);
+  assert.equal(invoke({ fetchSite: 'cross-site' }).statusCode, 403);
+  assert.equal(invoke({
+    origin: 'https://evil.example',
+    fetchSite: 'same-origin'
+  }).statusCode, 403);
 });
 
 test('does not require origin validation for safe methods', () => {
