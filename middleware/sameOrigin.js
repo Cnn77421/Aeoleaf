@@ -1,4 +1,25 @@
+const crypto = require('crypto');
+
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+function getCsrfToken(req) {
+  if (!req.session) return '';
+  if (!req.session.csrfToken) {
+    req.session.csrfToken = crypto.randomBytes(32).toString('base64url');
+  }
+  return req.session.csrfToken;
+}
+
+function hasValidCsrfToken(req) {
+  const submitted = typeof req.body?._csrf === 'string' ? req.body._csrf : '';
+  const expected = typeof req.session?.csrfToken === 'string' ? req.session.csrfToken : '';
+  if (!submitted || !expected) return false;
+
+  const submittedBuffer = Buffer.from(submitted, 'utf8');
+  const expectedBuffer = Buffer.from(expected, 'utf8');
+  return submittedBuffer.length === expectedBuffer.length
+    && crypto.timingSafeEqual(submittedBuffer, expectedBuffer);
+}
 
 function requestOrigin(req) {
   const origin = req.get('origin');
@@ -27,7 +48,14 @@ function requireSameOrigin(req, res, next) {
     // for a genuinely same-origin form submission.
     return next();
   }
+  if (hasValidCsrfToken(req)) return next();
   return res.status(403).json({ error: 'Cross-site request rejected' });
 }
 
-module.exports = { requireSameOrigin, requestOrigin, expectedOrigin };
+module.exports = {
+  requireSameOrigin,
+  requestOrigin,
+  expectedOrigin,
+  getCsrfToken,
+  hasValidCsrfToken
+};

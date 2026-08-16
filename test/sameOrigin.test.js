@@ -2,10 +2,19 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { requireSameOrigin } = require('../middleware/sameOrigin');
 
-function invoke({ method = 'POST', origin = '', referer = '', fetchSite = '' } = {}) {
+function invoke({
+  method = 'POST',
+  origin = '',
+  referer = '',
+  fetchSite = '',
+  csrfToken = '',
+  sessionToken = ''
+} = {}) {
   const req = {
     method,
     protocol: 'https',
+    body: { _csrf: csrfToken },
+    session: sessionToken ? { csrfToken: sessionToken } : {},
     get(name) {
       return {
         origin,
@@ -41,6 +50,13 @@ test('uses browser fetch metadata only when origin headers are absent', () => {
     origin: 'https://evil.example',
     fetchSite: 'same-origin'
   }).statusCode, 403);
+});
+
+test('allows a valid CSRF token when browser origin metadata is unavailable', () => {
+  const token = 'test-session-token';
+  assert.equal(invoke({ csrfToken: token, sessionToken: token }).nextCalled, true);
+  assert.equal(invoke({ csrfToken: 'wrong', sessionToken: token }).statusCode, 403);
+  assert.equal(invoke({ csrfToken: token }).statusCode, 403);
 });
 
 test('does not require origin validation for safe methods', () => {

@@ -92,6 +92,24 @@ test('server routes, auth, CRUD, upload rejection, feeds, and tracking work toge
   }
   assert.equal((await request(base, '/definitely-missing', { write: false })).response.status, 404);
 
+  const loginPage = await request(base, '/admin/login', { write: false });
+  const loginCookie = loginPage.response.headers.get('set-cookie').split(';')[0];
+  const csrfMatch = loginPage.text.match(/name="_csrf" value="([^"]+)"/);
+  assert.ok(csrfMatch, 'login form should contain a CSRF token');
+  const originlessFormLogin = await request(base, '/admin/login', {
+    method: 'POST',
+    write: false,
+    headers: {
+      Cookie: loginCookie,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: new URLSearchParams({
+      _csrf: csrfMatch[1],
+      password: 'incorrect-password'
+    })
+  });
+  assert.equal(originlessFormLogin.response.status, 401);
+
   const rejectedLogin = await request(base, '/api/auth/login', {
     method: 'POST', json: { password: 'integration-password' }, write: false
   });
