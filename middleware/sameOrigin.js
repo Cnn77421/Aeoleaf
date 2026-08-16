@@ -19,7 +19,14 @@ function expectedOrigin(req) {
 function requireSameOrigin(req, res, next) {
   if (SAFE_METHODS.has(req.method)) return next();
   const actual = requestOrigin(req);
-  if (actual && actual === expectedOrigin(req)) return next();
+  if (actual) {
+    if (actual === expectedOrigin(req)) return next();
+  } else if (req.get('sec-fetch-site') === 'same-origin') {
+    // Origin/Referer can be removed by privacy software. Sec-Fetch-Site is a
+    // browser-controlled forbidden request header, so it is a safe fallback
+    // for a genuinely same-origin form submission.
+    return next();
+  }
   return res.status(403).json({ error: 'Cross-site request rejected' });
 }
 
