@@ -11,10 +11,22 @@
   <%- include('partials/sidebar', { activePage: 'dashboard' }) %>
   <main class="admin-main">
     <div class="dashboard-container">
-      <div class="dashboard-welcome">
-        <h1>内容概览</h1>
-        <p class="dashboard-subtitle">管理文章、作品与站点内容</p>
+      <div class="dashboard-welcome admin-page-heading">
+        <div>
+          <p class="admin-eyebrow">Dashboard</p>
+          <h1>内容概览</h1>
+          <p class="dashboard-subtitle">查看站点状态并管理最近内容。</p>
+        </div>
+        <div class="admin-heading-actions">
+          <a href="/" target="_blank" rel="noopener" class="btn-sm"><i class="ti ti-external-link"></i> 查看站点</a>
+          <a href="/admin/posts/new" class="btn-primary"><i class="ti ti-plus"></i> 新建文章</a>
+        </div>
       </div>
+
+      <nav class="dashboard-tabs" aria-label="概览视图">
+        <a href="/admin/dashboard" class="active" aria-current="page">概览</a>
+        <a href="/admin/visitors">访客分析</a>
+      </nav>
 
       <div class="stats-grid">
         <div class="stat-card stat-published">
@@ -23,6 +35,7 @@
             <span class="stat-badge"><i class="ti ti-world"></i></span>
           </div>
           <div class="stat-value"><%= stats.postsPublished %></div>
+          <div class="stat-note">站点当前公开内容</div>
         </div>
         <div class="stat-card stat-draft">
           <div class="stat-header">
@@ -30,6 +43,7 @@
             <span class="stat-badge"><i class="ti ti-pencil"></i></span>
           </div>
           <div class="stat-value"><%= stats.postsDraft %></div>
+          <div class="stat-note">等待继续编辑</div>
         </div>
         <div class="stat-card stat-works">
           <div class="stat-header">
@@ -37,6 +51,7 @@
             <span class="stat-badge"><i class="ti ti-folders"></i></span>
           </div>
           <div class="stat-value"><%= stats.worksTotal %></div>
+          <div class="stat-note">作品集展示项目</div>
         </div>
         <div class="stat-card stat-messages">
           <div class="stat-header">

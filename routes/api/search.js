@@ -28,7 +28,7 @@ router.get('/', searchLimiter, async (req, res) => {
     const posts = db.prepare(`
       SELECT id, title, slug, excerpt, created_at
       FROM posts
-      WHERE status = 'published'
+      WHERE status = 'published' AND deleted_at = ''
       AND (title LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\')
       ORDER BY created_at DESC
       LIMIT 20
@@ -37,7 +37,7 @@ router.get('/', searchLimiter, async (req, res) => {
     const works = db.prepare(`
       SELECT id, title, slug, description, cover_image, year
       FROM works
-      WHERE title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\'
+      WHERE deleted_at = '' AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
       ORDER BY sort_order ASC
       LIMIT 20
     `).all(query, query);

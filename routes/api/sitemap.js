@@ -31,11 +31,11 @@ router.get('/sitemap.xml', (req, res) => {
   const baseUrl = escapeXml(resolveBaseUrl(req));
 
   const posts = db.prepare(
-    "SELECT slug, updated_at FROM posts WHERE status = 'published' ORDER BY updated_at DESC"
+    "SELECT slug, updated_at FROM posts WHERE status = 'published' AND deleted_at = '' ORDER BY updated_at DESC"
   ).all();
 
   const works = db.prepare(
-    'SELECT slug, updated_at FROM works ORDER BY updated_at DESC'
+    "SELECT slug, updated_at FROM works WHERE deleted_at = '' ORDER BY updated_at DESC"
   ).all();
 
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';

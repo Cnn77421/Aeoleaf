@@ -9,6 +9,8 @@ const { asset } = require('./lib/assetVersion');
 const { validateRuntimeConfig } = require('./lib/runtimeConfig');
 const { SQLiteSessionStore } = require('./lib/sqliteSessionStore');
 const { initDB, flushDB, closeDB, db, isBlacklisted } = require('./config/db');
+const { runTrashCleanup } = require('./lib/trashCleanup');
+const { createBackup, scheduleDue } = require('./lib/backupService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,6 +37,9 @@ if (!isProd && !process.env.ADMIN_PASSWORD) {
 let httpServer = null;
 let sessionStore = null;
 let shuttingDown = false;
+let trashCleanupTimer = null;
+let backupScheduleTimer = null;
+let scheduledBackupRunning = false;
 
 async function shutdown(exitCode, reason) {
   if (shuttingDown) return;
@@ -52,6 +57,8 @@ async function shutdown(exitCode, reason) {
       await new Promise((resolve) => httpServer.close(resolve));
     }
     if (sessionStore) sessionStore.close();
+    if (trashCleanupTimer) clearInterval(trashCleanupTimer);
+    if (backupScheduleTimer) clearInterval(backupScheduleTimer);
     await flushDB();
     closeDB();
   } catch (err) {
@@ -74,6 +81,19 @@ process.once('SIGTERM', () => { void shutdown(0); });
 
 (async () => {
   await initDB();
+  runTrashCleanup(db);
+  trashCleanupTimer = setInterval(() => runTrashCleanup(db), 6 * 60 * 60 * 1000);
+  trashCleanupTimer.unref();
+  const runScheduledBackup = async () => {
+    if (scheduledBackupRunning || !scheduleDue()) return;
+    scheduledBackupRunning = true;
+    try { await createBackup({ trigger: 'scheduled' }); }
+    catch (error) { console.error('[backup] scheduled backup failed:', error.message); }
+    finally { scheduledBackupRunning = false; }
+  };
+  backupScheduleTimer = setInterval(() => { void runScheduledBackup(); }, 15 * 60 * 1000);
+  backupScheduleTimer.unref();
+  void runScheduledBackup();
 
 // Only compress text-like payloads; skip images, fonts, video where the
 // bytes are already compressed (compression wastes CPU for no gain).

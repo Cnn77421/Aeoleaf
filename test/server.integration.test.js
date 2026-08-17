@@ -32,7 +32,10 @@ function startServer(port, databasePath) {
       ADMIN_PASSWORD: 'integration-password',
       SESSION_COOKIE_SECURE: 'false',
       TRUST_PROXY: 'false',
-      DATABASE_PATH: databasePath
+      DATABASE_PATH: databasePath,
+      BACKUP_DIR: path.join(path.dirname(databasePath), 'backups'),
+      PUBLIC_DIR: path.join(path.dirname(databasePath), 'public'),
+      MEDIA_TRASH_DIR: path.join(path.dirname(databasePath), 'media-trash')
     },
     stdio: ['ignore', 'pipe', 'pipe']
   });
@@ -133,6 +136,21 @@ test('server routes, auth, CRUD, upload rejection, feeds, and tracking work toge
     method: 'PUT', headers: authHeaders, json: { title: 'Updated Integration Post' }
   });
   assert.equal(updatedPost.json.title, 'Updated Integration Post');
+  const autosavedPost = await request(base, `/api/posts/${post.json.id}/autosave`, {
+    method: 'POST', headers: authHeaders, json: { title: 'Unsaved Integration Post', content: '# Unsaved' }
+  });
+  assert.equal(autosavedPost.response.status, 200);
+  assert.equal(autosavedPost.json.saved, true);
+  const postRevisions = await request(base, `/api/posts/${post.json.id}/revisions`, { headers: authHeaders, write: false });
+  assert.equal(postRevisions.response.status, 200);
+  assert.ok(postRevisions.json.revisions.length >= 3);
+  const createdRevision = postRevisions.json.revisions.find((revision) => revision.source === 'created');
+  assert.ok(createdRevision);
+  const restoredPost = await request(base, `/api/posts/${post.json.id}/revisions/${createdRevision.id}/restore`, {
+    method: 'POST', headers: authHeaders
+  });
+  assert.equal(restoredPost.response.status, 200);
+  assert.equal((await request(base, '/api/posts/integration-post', { write: false })).json.title, 'Integration Post');
 
   const work = await request(base, '/api/works', {
     method: 'POST', headers: authHeaders,
@@ -184,7 +202,7 @@ test('server routes, auth, CRUD, upload rejection, feeds, and tracking work toge
   const adminPaths = [
     '/admin/dashboard', '/admin/posts', '/admin/posts/new', `/admin/posts/${post.json.id}/edit`,
     '/admin/works', '/admin/works/new', `/admin/works/${work.json.id}/edit`,
-    '/admin/guestbook', '/admin/media', '/admin/settings', '/admin/visitors', '/admin/visitors/blacklist'
+    '/admin/guestbook', '/admin/media', '/admin/trash', '/admin/backups', '/admin/settings', '/admin/visitors', '/admin/visitors/blacklist', '/admin/audit'
   ];
   for (const pathname of adminPaths) {
     const page = await request(base, pathname, { headers: authHeaders, write: false });
@@ -200,6 +218,35 @@ test('server routes, auth, CRUD, upload rejection, feeds, and tracking work toge
   assert.match(adminGuestbookPage.text, /包含 2 个链接/);
   assert.match(adminGuestbookPage.text, /admin-nav-count/);
   assert.match(adminGuestbookPage.text, /name="return_to" value="\/admin\/guestbook"/);
+  const unifiedAuditPage = await request(base, '/admin/audit?action=post.', { headers: authHeaders, write: false });
+  assert.equal(unifiedAuditPage.response.status, 200);
+  assert.match(unifiedAuditPage.text, /post\.create/);
+  assert.match(unifiedAuditPage.text, /post\.restore/);
+
+  const backupSettings = await request(base, '/admin/backups/settings', {
+    method: 'POST', headers: { ...authHeaders, Accept: 'application/json' },
+    json: { schedule_enabled: '1', interval_hours: '12', retention_count: '4' }
+  });
+  assert.equal(backupSettings.response.status, 200);
+  const createdBackup = await request(base, '/admin/backups/create', {
+    method: 'POST', headers: { ...authHeaders, Accept: 'application/json' }, json: {}
+  });
+  assert.equal(createdBackup.response.status, 201);
+  assert.match(createdBackup.json.backup.sha256, /^[a-f0-9]{64}$/);
+  const backupId = createdBackup.json.backup.id;
+  const backupPage = await request(base, '/admin/backups', { headers: authHeaders, write: false });
+  assert.match(backupPage.text, new RegExp(backupId));
+  const backupDownload = await request(base, `/admin/backups/${backupId}/download`, { headers: authHeaders, write: false });
+  assert.equal(backupDownload.response.status, 200);
+  assert.match(backupDownload.response.headers.get('content-disposition'), /\.aebak/);
+  const rejectedRestore = await request(base, `/admin/backups/${backupId}/restore`, {
+    method: 'POST', headers: { ...authHeaders, Accept: 'application/json' }, json: { password: 'wrong-password' }
+  });
+  assert.equal(rejectedRestore.response.status, 403);
+  const deletedBackup = await request(base, `/admin/backups/${backupId}/delete`, {
+    method: 'POST', headers: { ...authHeaders, Accept: 'application/json' }, json: {}
+  });
+  assert.equal(deletedBackup.response.status, 200);
 
   const runBulk = (action, id, asJson = false) => request(base, '/admin/guestbook/bulk', {
     method: 'POST',
@@ -285,6 +332,58 @@ test('server routes, auth, CRUD, upload rejection, feeds, and tracking work toge
   assert.equal((await request(base, `/api/works/${work.json.id}`, {
     method: 'DELETE', headers: authHeaders
   })).response.status, 200);
+
+  assert.equal((await request(base, '/api/posts/integration-post', { write: false })).response.status, 404);
+  assert.equal((await request(base, '/api/works/integration-work', { write: false })).response.status, 404);
+  assert.equal((await request(base, '/blog/integration-post', { write: false })).response.status, 404);
+  assert.equal((await request(base, '/works/integration-work', { write: false })).response.status, 404);
+  assert.doesNotMatch((await request(base, '/rss.xml', { write: false })).text, /integration-post/);
+  assert.doesNotMatch((await request(base, '/sitemap.xml', { write: false })).text, /integration-(post|work)/);
+  const hiddenSearch = await request(base, '/api/search?q=Integration', { write: false });
+  assert.equal(hiddenSearch.json.posts.some((item) => item.id === post.json.id), false);
+  assert.equal(hiddenSearch.json.works.some((item) => item.id === work.json.id), false);
+
+  const trashPage = await request(base, '/admin/trash?type=post&keyword=Integration', { headers: authHeaders, write: false });
+  assert.equal(trashPage.response.status, 200);
+  assert.match(trashPage.text, /Integration Post/);
+
+  const slugConflict = await request(base, '/api/posts', {
+    method: 'POST', headers: authHeaders,
+    json: { title: 'Slug Conflict', slug: 'integration-post', content: 'replacement', status: 'draft' }
+  });
+  assert.equal(slugConflict.response.status, 201);
+  const conflictedRestore = await request(base, '/admin/trash/bulk', {
+    method: 'POST', headers: { ...authHeaders, Accept: 'application/json' },
+    json: { action: 'restore', item_keys: `post:${post.json.id}` }
+  });
+  assert.equal(conflictedRestore.response.status, 409);
+  assert.match(conflictedRestore.json.errors[0].error, /URL/);
+
+  await request(base, `/api/posts/${slugConflict.json.id}`, { method: 'DELETE', headers: authHeaders });
+  const destroyedConflict = await request(base, '/admin/trash/bulk', {
+    method: 'POST', headers: { ...authHeaders, Accept: 'application/json' },
+    json: { action: 'destroy', item_keys: `post:${slugConflict.json.id}` }
+  });
+  assert.equal(destroyedConflict.response.status, 200);
+
+  const restored = await request(base, '/admin/trash/bulk', {
+    method: 'POST', headers: { ...authHeaders, Accept: 'application/json' },
+    json: { action: 'restore', item_keys: [`post:${post.json.id}`, `work:${work.json.id}`, `guestbook:${deleteCandidate.json.id}`] }
+  });
+  assert.equal(restored.response.status, 200);
+  assert.equal(restored.json.completed.length, 3);
+  assert.equal((await request(base, '/api/posts/integration-post', { write: false })).response.status, 200);
+  assert.equal((await request(base, '/api/works/integration-work', { write: false })).response.status, 200);
+
+  await request(base, `/api/posts/${post.json.id}`, { method: 'DELETE', headers: authHeaders });
+  await request(base, `/api/works/${work.json.id}`, { method: 'DELETE', headers: authHeaders });
+  const destroyed = await request(base, '/admin/trash/bulk', {
+    method: 'POST', headers: { ...authHeaders, Accept: 'application/json' },
+    json: { action: 'destroy', item_keys: [`post:${post.json.id}`, `work:${work.json.id}`] }
+  });
+  assert.equal(destroyed.response.status, 200);
+  assert.equal(destroyed.json.completed.length, 2);
+
   assert.equal((await request(base, '/api/auth/logout', {
     method: 'POST', headers: authHeaders
   })).response.status, 200);

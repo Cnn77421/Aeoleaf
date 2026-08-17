@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <%- include('partials/styles') %>
+</head>
+<body class="admin-body">
+  <%- include('partials/sidebar', { activePage: 'backups' }) %>
+  <main class="admin-main">
+    <div class="admin-header">
+      <div><h1>备份与恢复</h1><p class="dashboard-subtitle">创建包含数据库、上传文件和配置清单的完整可校验备份</p></div>
+      <form method="post" action="/admin/backups/create" data-admin-async-form>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" class="btn-primary"><i class="ti ti-database-export"></i> 创建完整备份</button>
+      </form>
+    </div>
+    <% if (notice) { %><div class="admin-notice" role="status"><%= notice %></div><% } %>
+    <% if (backupError) { %><div class="admin-notice admin-notice--error" role="alert"><%= backupError %></div><% } %>
+
+    <section class="backup-settings admin-card">
+      <header><h2>定时备份</h2><p>默认关闭；开启后按指定间隔创建完整备份，并自动保留最新数量。</p></header>
+      <form method="post" action="/admin/backups/settings" data-admin-async-form>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label class="backup-toggle"><input type="checkbox" name="schedule_enabled" value="1"<%= settings.backup_schedule_enabled === '1' ? ' checked' : '' %>> 启用定时备份</label>
+        <label><span>间隔小时</span><input type="number" name="interval_hours" min="1" max="720" value="<%= settings.backup_interval_hours || '24' %>"></label>
+        <label><span>保留数量</span><input type="number" name="retention_count" min="1" max="100" value="<%= settings.backup_retention_count || '10' %>"></label>
+        <button type="submit" class="btn-secondary">保存策略</button>
+      </form>
+    </section>
+
+    <section class="admin-card backup-list-card">
+      <header class="backup-section-header"><div><h2>可用备份</h2><p><%= backups.length %> 个归档</p></div></header>
+      <div class="table-responsive">
+        <table class="table admin-table">
+          <thead><tr><th>创建时间</th><th>触发方式</th><th>大小</th><th>文件</th><th>校验值</th><th>操作</th></tr></thead>
+          <tbody>
+          <% backups.forEach(function(backup) { %>
+            <tr>
+              <td><strong><%= backup.createdAt %></strong><small class="d-block text-secondary"><%= backup.id %></small></td>
+              <td><span class="badge bg-secondary-lt"><%= ({manual:'手动',scheduled:'定时',pre_restore:'恢复前安全备份'})[backup.trigger] || backup.trigger %></span></td>
+              <td><%= backup.size < 1024 * 1024 ? Math.max(1, Math.round(backup.size / 1024)) + ' KB' : (backup.size / 1024 / 1024).toFixed(1) + ' MB' %></td>
+              <td><%= backup.fileCount %></td>
+              <td><code title="<%= backup.sha256 %>"><%= backup.sha256.slice(0, 12) %>…</code></td>
+              <td class="backup-actions">
+                <a class="btn-sm btn-secondary" href="/admin/backups/<%= backup.id %>/download"><i class="ti ti-download"></i> 下载</a>
+                <form method="post" action="/admin/backups/<%= backup.id %>/delete" onsubmit="return confirm('确定删除这个备份归档吗？')">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button type="submit" class="btn-sm btn-danger">删除</button>
+                </form>
+                <form class="backup-restore-form" method="post" action="/admin/backups/<%= backup.id %>/restore" onsubmit="return confirm('恢复会替换当前数据库和上传文件，并自动创建安全备份。确定继续吗？')">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <label class="visually-hidden" for="password-<%= backup.id %>">管理员密码</label>
+                  <input id="password-<%= backup.id %>" type="password" name="password" autocomplete="current-password" placeholder="管理员密码" required>
+                  <button type="submit" class="btn-sm btn-danger"><i class="ti ti-restore"></i> 恢复</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+          <% if (!backups.length) { %><tr><td colspan="6" class="text-center text-secondary">暂无备份</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="admin-card backup-events-card">
+      <header class="backup-section-header"><div><h2>备份记录</h2><p>最近成功与失败事件</p></div></header>
+      <div class="table-responsive">
+        <table class="table admin-table">
+          <thead><tr><th>时间</th><th>动作</th><th>结果</th><th>备份</th><th>说明</th></tr></thead>
+          <tbody>
+          <% events.forEach(function(event) { %>
+            <tr><td><%= event.created_at %></td><td><%= event.trigger_type %></td><td><span class="badge <%= event.outcome === 'success' ? 'bg-success-lt' : 'bg-danger-lt' %>"><%= event.outcome === 'success' ? '成功' : '失败' %></span></td><td><code><%= event.backup_id || '—' %></code></td><td><%= event.message || '—' %></td></tr>
+          <% }); %>
+          <% if (!events.length) { %><tr><td colspan="5" class="text-center text-secondary">暂无记录</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script src="<%= asset('/js/toast.js') %>"></script>
+  <script src="<%= asset('/js/admin.js') %>"></script>
+</body>
+</html>

@@ -27,7 +27,12 @@ const { requireAdmin } = require('../middleware/auth');
 const { rateLimit } = require('../middleware/rateLimit');
 const { getCsrfToken } = require('../middleware/sameOrigin');
 const { uploadGeneral, validateUploadedFiles } = require('../middleware/upload');
-const { unlinkPublicUpload } = require('../lib/safeFs');
+const { restoreQuarantinedUpload, destroyQuarantinedUpload } = require('../lib/safeFs');
+const { logAudit } = require('../lib/auditLog');
+const { trashMedia } = require('../lib/trash');
+const {
+  createBackup, listBackups, getBackup, deleteBackup, restoreBackup, recentEvents
+} = require('../lib/backupService');
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -44,6 +49,18 @@ const mediaUpload = uploadGeneral.single('image');
 
 function wantsJson(req) {
   return String(req.get('accept') || '').includes('application/json');
+}
+
+function passwordMatches(value) {
+  const crypto = require('crypto');
+  const supplied = Buffer.from(String(value || ''), 'utf8');
+  const expected = Buffer.from(String(process.env.ADMIN_PASSWORD || ''), 'utf8');
+  if (!expected.length || supplied.length !== expected.length) {
+    const filler = Buffer.alloc(expected.length);
+    if (expected.length) crypto.timingSafeEqual(filler, expected);
+    return false;
+  }
+  return crypto.timingSafeEqual(supplied, expected);
 }
 
 function parseSettingsUpload(req, res, next) {
@@ -104,45 +121,35 @@ router.get('/login', (req, res) => {
 });
 
 router.post('/login', loginLimiter, (req, res, next) => {
-  const crypto = require('crypto');
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   const adminPass = process.env.ADMIN_PASSWORD || '';
 
-  const renderFail = () =>
-    res.status(401).render('admin/login', {
+  const renderFail = (reason) => {
+    logAudit(db, req, { action: 'auth.login', entityType: 'admin', outcome: 'failure', summary: { reason } });
+    return res.status(401).render('admin/login', {
       title: '后台登录 — aeoleaf',
       error: 'Incorrect password',
       csrfToken: getCsrfToken(req)
     });
+  };
 
-  if (!password || !adminPass) return renderFail();
+  if (!password || !adminPass) return renderFail(!adminPass ? 'disabled' : 'missing_password');
 
-  let match = false;
-  try {
-    const a = Buffer.from(password, 'utf8');
-    const b = Buffer.from(adminPass, 'utf8');
-    if (a.length !== b.length) {
-      const filler = Buffer.alloc(b.length);
-      crypto.timingSafeEqual(filler, b);
-      match = false;
-    } else {
-      match = crypto.timingSafeEqual(a, b);
-    }
-  } catch { match = false; }
-
-  if (!match) return renderFail();
+  if (!passwordMatches(password)) return renderFail('incorrect_password');
 
   req.session.regenerate((err) => {
     if (err) return next(err);
     req.session.admin = true;
     req.session.save((err2) => {
       if (err2) return next(err2);
+      logAudit(db, req, { action: 'auth.login', entityType: 'admin', outcome: 'success' });
       res.redirect('/admin/dashboard');
     });
   });
 });
 
 router.post('/logout', requireAdmin, (req, res) => {
+  logAudit(db, req, { action: 'auth.logout', entityType: 'admin' });
   req.session.destroy(() => res.redirect('/admin/login'));
 });
 
@@ -151,7 +158,13 @@ router.post('/logout', requireAdmin, (req, res) => {
 // the reliable fallback used by requireSameOrigin.
 router.use(requireAdmin, (req, res, next) => {
   res.locals.csrfToken = getCsrfToken(req);
-  res.locals.guestbookPending = db.prepare("SELECT COUNT(*) AS cnt FROM guestbook WHERE status = 'pending'").get().cnt;
+  res.locals.guestbookPending = db.prepare("SELECT COUNT(*) AS cnt FROM guestbook WHERE status = 'pending' AND deleted_at = ''").get().cnt;
+  res.locals.trashCount = db.prepare(`
+    SELECT (SELECT COUNT(*) FROM posts WHERE deleted_at != '')
+      + (SELECT COUNT(*) FROM works WHERE deleted_at != '')
+      + (SELECT COUNT(*) FROM guestbook WHERE deleted_at != '')
+      + (SELECT COUNT(*) FROM media_trash) AS cnt
+  `).get().cnt;
   next();
 });
 
@@ -159,16 +172,31 @@ router.use(requireAdmin, (req, res, next) => {
 
 router.get('/dashboard', requireAdmin, (req, res) => {
   const stats = {
-    postsPublished: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='published'").get().cnt,
-    postsDraft: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='draft'").get().cnt,
-    worksTotal: db.prepare('SELECT COUNT(*) as cnt FROM works').get().cnt,
-    guestbookTotal: db.prepare('SELECT COUNT(*) as cnt FROM guestbook').get().cnt,
-    guestbookPending: db.prepare("SELECT COUNT(*) as cnt FROM guestbook WHERE status = 'pending'").get().cnt
+    postsPublished: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='published' AND deleted_at = ''").get().cnt,
+    postsDraft: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='draft' AND deleted_at = ''").get().cnt,
+    worksTotal: db.prepare("SELECT COUNT(*) as cnt FROM works WHERE deleted_at = ''").get().cnt,
+    guestbookTotal: db.prepare("SELECT COUNT(*) as cnt FROM guestbook WHERE deleted_at = ''").get().cnt,
+    guestbookPending: db.prepare("SELECT COUNT(*) as cnt FROM guestbook WHERE status = 'pending' AND deleted_at = ''").get().cnt
   };
-  const recentPosts = db.prepare('SELECT * FROM posts ORDER BY created_at DESC LIMIT 5').all();
-  const recentWorks = db.prepare('SELECT * FROM works ORDER BY created_at DESC LIMIT 5').all();
+  const recentPosts = db.prepare("SELECT * FROM posts WHERE deleted_at = '' ORDER BY created_at DESC LIMIT 5").all();
+  const recentWorks = db.prepare("SELECT * FROM works WHERE deleted_at = '' ORDER BY created_at DESC LIMIT 5").all();
 
   res.render('admin/dashboard', { title: '后台概览 — aeoleaf', stats, recentPosts, recentWorks });
+});
+
+router.get('/audit', requireAdmin, (req, res) => {
+  const action = String(req.query.action || '').trim();
+  const outcome = String(req.query.outcome || '').trim();
+  let where = ' WHERE 1=1';
+  const params = [];
+  if (action) { where += ' AND action LIKE ?'; params.push(`%${action}%`); }
+  if (outcome === 'success' || outcome === 'failure') { where += ' AND outcome = ?'; params.push(outcome); }
+  const entries = db.prepare(`SELECT * FROM audit_log${where} ORDER BY id DESC LIMIT 200`).all(...params)
+    .map((entry) => {
+      try { return { ...entry, summary: JSON.parse(entry.summary_json || '{}') }; }
+      catch { return { ...entry, summary: {} }; }
+    });
+  res.render('admin/audit', { title: '操作审计 — aeoleaf', entries, filters: { action, outcome } });
 });
 
 // ─── Posts (edit pages; JSON CRUD lives in routes/api/posts.js) ────────────────
@@ -182,6 +210,7 @@ router.get('/posts', requireAdmin, (req, res) => {
       COALESCE(ROUND(AVG(CASE WHEN v.max_scroll_depth > 0 THEN v.max_scroll_depth END), 0), 0) AS analytics_avg_scroll
     FROM posts p
     LEFT JOIN visitors v ON v.path = '/blog/' || p.slug AND COALESCE(v.is_bot, 0) = 0
+    WHERE p.deleted_at = ''
     GROUP BY p.id
     ORDER BY p.created_at DESC
   `).all()
@@ -194,7 +223,7 @@ router.get('/posts/new', requireAdmin, (req, res) => {
 });
 
 router.get('/posts/:id/edit', requireAdmin, (req, res) => {
-  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
+  const post = db.prepare("SELECT * FROM posts WHERE id = ? AND deleted_at = ''").get(req.params.id);
   if (!post) return renderPublic404(res);
   const performance = db.prepare(`
     SELECT COUNT(*) AS pv,
@@ -214,7 +243,7 @@ router.get('/posts/:id/edit', requireAdmin, (req, res) => {
 // ─── Works (edit pages; JSON CRUD lives in routes/api/works.js) ────────────────
 
 router.get('/works', requireAdmin, (req, res) => {
-  const works = db.prepare('SELECT * FROM works ORDER BY sort_order ASC, created_at DESC').all()
+  const works = db.prepare("SELECT * FROM works WHERE deleted_at = '' ORDER BY sort_order ASC, created_at DESC").all()
     .map(w => ({ ...w, tags: JSON.parse(w.tags || '[]') }));
   res.render('admin/works-list', { title: '作品管理 — aeoleaf', works });
 });
@@ -224,7 +253,7 @@ router.get('/works/new', requireAdmin, (req, res) => {
 });
 
 router.get('/works/:id/edit', requireAdmin, (req, res) => {
-  const work = db.prepare('SELECT * FROM works WHERE id = ?').get(req.params.id);
+  const work = db.prepare("SELECT * FROM works WHERE id = ? AND deleted_at = ''").get(req.params.id);
   if (!work) return renderPublic404(res);
   res.render('admin/work-edit', {
     title: '编辑作品 — aeoleaf',
@@ -240,7 +269,7 @@ function getGuestbookCounts() {
       SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
       SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS approved,
       SUM(CASE WHEN status = 'hidden' THEN 1 ELSE 0 END) AS hidden
-    FROM guestbook
+    FROM guestbook WHERE deleted_at = ''
   `).get();
   return {
     total: counts.total || 0,
@@ -295,8 +324,8 @@ router.get('/guestbook', requireAdmin, (req, res) => {
   const requestedStatus = String(req.query.status || 'pending');
   const status = ['all', 'pending', 'approved', 'hidden'].includes(requestedStatus) ? requestedStatus : 'pending';
   const messageRows = status === 'all'
-    ? db.prepare("SELECT * FROM guestbook ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, created_at DESC").all()
-    : db.prepare('SELECT * FROM guestbook WHERE status = ? ORDER BY created_at DESC').all(status);
+    ? db.prepare("SELECT * FROM guestbook WHERE deleted_at = '' ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, created_at DESC").all()
+    : db.prepare("SELECT * FROM guestbook WHERE status = ? AND deleted_at = '' ORDER BY created_at DESC").all(status);
   res.render('admin/guestbook', {
     title: '留言管理 — aeoleaf',
     messages: messageRows.map(parseGuestbookRow),
@@ -326,10 +355,11 @@ router.get('/guestbook/audit', requireAdmin, (req, res) => {
 router.post('/guestbook/:id/status', requireAdmin, (req, res) => {
   const status = String(req.body.status || '');
   if (!['pending', 'approved', 'hidden'].includes(status)) return res.status(400).send('Invalid status');
-  const message = db.prepare('SELECT * FROM guestbook WHERE id = ?').get(req.params.id);
+  const message = db.prepare("SELECT * FROM guestbook WHERE id = ? AND deleted_at = ''").get(req.params.id);
   if (!message) return res.status(404).send('Message not found');
   db.prepare('UPDATE guestbook SET status = ? WHERE id = ?').run(status, req.params.id);
   recordGuestbookAudit(message, status === 'approved' ? 'approve' : status === 'hidden' ? 'reject' : 'reset', status);
+  logAudit(db, req, { action: `guestbook.${status === 'approved' ? 'approve' : status === 'hidden' ? 'reject' : 'reset'}`, entityType: 'guestbook', entityId: message.id, summary: { previousStatus: message.status, status } });
   saveDBSync();
   return respondGuestbookAction(req, res, {
     notice: status === 'approved' ? '留言已通过并公开' : status === 'hidden' ? '留言已拒绝' : '留言已退回待审',
@@ -346,17 +376,19 @@ router.post('/guestbook/bulk', requireAdmin, (req, res) => {
   if (!['approve', 'reject', 'delete'].includes(action)) return res.status(400).send('Invalid bulk action');
 
   const placeholders = ids.map(() => '?').join(',');
-  const messages = db.prepare(`SELECT * FROM guestbook WHERE id IN (${placeholders})`).all(...ids);
+  const messages = db.prepare(`SELECT * FROM guestbook WHERE deleted_at = '' AND id IN (${placeholders})`).all(...ids);
   const applyBulk = db.transaction(() => {
     messages.forEach((message) => {
       if (action === 'delete') {
         recordGuestbookAudit(message, 'delete', '', '批量删除');
-        db.prepare('DELETE FROM guestbook WHERE id = ?').run(message.id);
+        db.prepare("UPDATE guestbook SET deleted_at = datetime('now', 'localtime') WHERE id = ?").run(message.id);
+        logAudit(db, req, { action: 'guestbook.delete', entityType: 'guestbook', entityId: message.id, summary: { name: message.name, bulk: true } });
         return;
       }
       const nextStatus = action === 'approve' ? 'approved' : 'hidden';
       recordGuestbookAudit(message, action, nextStatus, '批量操作');
       db.prepare('UPDATE guestbook SET status = ? WHERE id = ?').run(nextStatus, message.id);
+      logAudit(db, req, { action: `guestbook.${action}`, entityType: 'guestbook', entityId: message.id, summary: { previousStatus: message.status, status: nextStatus, bulk: true } });
     });
   });
   applyBulk();
@@ -370,11 +402,12 @@ router.post('/guestbook/bulk', requireAdmin, (req, res) => {
 
 router.post('/guestbook/:id/reply', requireAdmin, (req, res) => {
   const reply = String(req.body.admin_reply || '').trim().slice(0, 1000);
-  const message = db.prepare('SELECT * FROM guestbook WHERE id = ?').get(req.params.id);
+  const message = db.prepare("SELECT * FROM guestbook WHERE id = ? AND deleted_at = ''").get(req.params.id);
   if (!message) return res.status(404).send('Message not found');
   db.prepare("UPDATE guestbook SET admin_reply = ?, replied_at = CASE WHEN ? = '' THEN '' ELSE datetime('now') END WHERE id = ?")
     .run(reply, reply, req.params.id);
   recordGuestbookAudit(message, reply ? 'reply' : 'clear_reply', message.status, reply ? '保存站长回复' : '清除站长回复');
+  logAudit(db, req, { action: `guestbook.${reply ? 'reply' : 'clear_reply'}`, entityType: 'guestbook', entityId: message.id, summary: { replyLength: reply.length } });
   saveDBSync();
   return respondGuestbookAction(req, res, {
     notice: reply ? '回复已保存' : '回复已清除',
@@ -384,16 +417,217 @@ router.post('/guestbook/:id/reply', requireAdmin, (req, res) => {
 });
 
 router.post('/guestbook/:id/delete', requireAdmin, (req, res) => {
-  const message = db.prepare('SELECT * FROM guestbook WHERE id = ?').get(req.params.id);
+  const message = db.prepare("SELECT * FROM guestbook WHERE id = ? AND deleted_at = ''").get(req.params.id);
   if (!message) return res.status(404).send('Message not found');
   recordGuestbookAudit(message, 'delete');
-  db.prepare('DELETE FROM guestbook WHERE id = ?').run(req.params.id);
+  db.prepare("UPDATE guestbook SET deleted_at = datetime('now', 'localtime') WHERE id = ?").run(req.params.id);
+  logAudit(db, req, { action: 'guestbook.delete', entityType: 'guestbook', entityId: message.id, summary: { name: message.name } });
   saveDBSync();
   return respondGuestbookAction(req, res, {
     notice: '留言已删除',
     affectedIds: [message.id],
     status: 'deleted'
   });
+});
+
+// ─── Unified trash ───────────────────────────────────────────────────────────
+
+const TRASH_TYPES = new Set(['post', 'work', 'guestbook', 'media']);
+
+function trashItems(filters = {}) {
+  const type = TRASH_TYPES.has(filters.type) ? filters.type : '';
+  const keyword = String(filters.keyword || '').trim();
+  const dateFrom = /^\d{4}-\d{2}-\d{2}$/.test(filters.dateFrom || '') ? filters.dateFrom : '';
+  const dateTo = /^\d{4}-\d{2}-\d{2}$/.test(filters.dateTo || '') ? filters.dateTo : '';
+  let where = ' WHERE 1=1';
+  const params = [];
+  if (type) { where += ' AND type = ?'; params.push(type); }
+  if (keyword) { where += ' AND (title LIKE ? OR detail LIKE ?)'; params.push(`%${keyword}%`, `%${keyword}%`); }
+  if (dateFrom) { where += ' AND deleted_at >= ?'; params.push(`${dateFrom} 00:00:00`); }
+  if (dateTo) { where += ' AND deleted_at <= ?'; params.push(`${dateTo} 23:59:59`); }
+  return db.prepare(`
+    SELECT * FROM (
+      SELECT 'post' AS type, id, title, deleted_slug AS detail, deleted_at FROM posts WHERE deleted_at != ''
+      UNION ALL
+      SELECT 'work' AS type, id, title, deleted_slug AS detail, deleted_at FROM works WHERE deleted_at != ''
+      UNION ALL
+      SELECT 'guestbook' AS type, id, name AS title, substr(message, 1, 160) AS detail, deleted_at FROM guestbook WHERE deleted_at != ''
+      UNION ALL
+      SELECT 'media' AS type, id, original_url AS title, printf('%d bytes', original_size) AS detail, deleted_at FROM media_trash
+    )${where}
+    ORDER BY deleted_at DESC, type, id DESC
+    LIMIT 500
+  `).all(...params).map((item) => ({ ...item, key: `${item.type}:${item.id}` }));
+}
+
+function parseTrashKey(value) {
+  const match = String(value || '').match(/^(post|work|guestbook|media):(\d+)$/);
+  if (!match) return null;
+  const id = Number(match[2]);
+  return Number.isSafeInteger(id) && id > 0 ? { type: match[1], id } : null;
+}
+
+function restoreTrashItem(req, key) {
+  if (key.type === 'post' || key.type === 'work') {
+    const table = key.type === 'post' ? 'posts' : 'works';
+    const row = db.prepare(`SELECT * FROM ${table} WHERE id = ? AND deleted_at != ''`).get(key.id);
+    if (!row) throw Object.assign(new Error('项目不存在或已恢复'), { status: 404 });
+    if (!row.deleted_slug) throw Object.assign(new Error('缺少原始 URL 别名，无法安全恢复'), { status: 409 });
+    const conflict = db.prepare(`SELECT id FROM ${table} WHERE slug = ? AND id != ?`).get(row.deleted_slug, row.id);
+    if (conflict) throw Object.assign(new Error(`URL 别名 ${row.deleted_slug} 已被占用`), { status: 409 });
+    db.prepare(`UPDATE ${table} SET slug = deleted_slug, deleted_slug = '', deleted_at = '', updated_at = datetime('now') WHERE id = ?`).run(row.id);
+    logAudit(db, req, { action: `${key.type}.trash_restore`, entityType: key.type, entityId: row.id, summary: { title: row.title, slug: row.deleted_slug } });
+    return { key: `${key.type}:${row.id}`, restoredUrl: key.type === 'post' ? `/blog/${row.deleted_slug}` : `/works/${row.deleted_slug}` };
+  }
+  if (key.type === 'guestbook') {
+    const row = db.prepare("SELECT * FROM guestbook WHERE id = ? AND deleted_at != ''").get(key.id);
+    if (!row) throw Object.assign(new Error('留言不存在或已恢复'), { status: 404 });
+    db.prepare("UPDATE guestbook SET deleted_at = '' WHERE id = ?").run(row.id);
+    recordGuestbookAudit(row, 'restore', row.status, '从回收站恢复');
+    logAudit(db, req, { action: 'guestbook.restore', entityType: 'guestbook', entityId: row.id, summary: { name: row.name } });
+    return { key: `guestbook:${row.id}` };
+  }
+  const row = db.prepare('SELECT * FROM media_trash WHERE id = ?').get(key.id);
+  if (!row) throw Object.assign(new Error('媒体不存在或已恢复'), { status: 404 });
+  const restored = restoreQuarantinedUpload(row.quarantine_name, row.original_url);
+  if (!restored) throw Object.assign(new Error('隔离文件缺失，无法恢复'), { status: 409 });
+  db.prepare('DELETE FROM media_trash WHERE id = ?').run(row.id);
+  logAudit(db, req, { action: 'media.restore', entityType: 'media', entityId: row.id, summary: { originalUrl: row.original_url, restoredUrl: restored.url, renamed: restored.renamed } });
+  return { key: `media:${row.id}`, restoredUrl: restored.url, renamed: restored.renamed };
+}
+
+function destroyTrashItem(req, key) {
+  if (key.type === 'post' || key.type === 'work') {
+    const table = key.type === 'post' ? 'posts' : 'works';
+    const row = db.prepare(`SELECT * FROM ${table} WHERE id = ? AND deleted_at != ''`).get(key.id);
+    if (!row) throw Object.assign(new Error('项目不存在'), { status: 404 });
+    const destroy = db.transaction(() => {
+      db.prepare('DELETE FROM content_versions WHERE entity_type = ? AND entity_id = ?').run(key.type, row.id);
+      db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(row.id);
+    });
+    destroy();
+    logAudit(db, req, { action: `${key.type}.destroy`, entityType: key.type, entityId: row.id, summary: { title: row.title, slug: row.deleted_slug } });
+    return { key: `${key.type}:${row.id}` };
+  }
+  if (key.type === 'guestbook') {
+    const row = db.prepare("SELECT * FROM guestbook WHERE id = ? AND deleted_at != ''").get(key.id);
+    if (!row) throw Object.assign(new Error('留言不存在'), { status: 404 });
+    db.prepare('DELETE FROM guestbook WHERE id = ?').run(row.id);
+    recordGuestbookAudit(row, 'destroy', '', '从回收站彻底删除');
+    logAudit(db, req, { action: 'guestbook.destroy', entityType: 'guestbook', entityId: row.id, summary: { name: row.name } });
+    return { key: `guestbook:${row.id}` };
+  }
+  const row = db.prepare('SELECT * FROM media_trash WHERE id = ?').get(key.id);
+  if (!row) throw Object.assign(new Error('媒体不存在'), { status: 404 });
+  if (!destroyQuarantinedUpload(row.quarantine_name)) throw Object.assign(new Error('隔离文件删除失败'), { status: 500 });
+  db.prepare('DELETE FROM media_trash WHERE id = ?').run(row.id);
+  logAudit(db, req, { action: 'media.destroy', entityType: 'media', entityId: row.id, summary: { url: row.original_url } });
+  return { key: `media:${row.id}` };
+}
+
+router.get('/trash', requireAdmin, (req, res) => {
+  const filters = {
+    type: String(req.query.type || ''), keyword: String(req.query.keyword || ''),
+    dateFrom: String(req.query.date_from || ''), dateTo: String(req.query.date_to || '')
+  };
+  res.render('admin/trash', {
+    title: '回收站 — aeoleaf', items: trashItems(filters), filters,
+    notice: req.query.ok ? `已处理 ${Number(req.query.ok) || 0} 项` : null,
+    trashError: req.query.err === 'conflict' ? '部分项目存在 URL 或文件冲突，未能恢复。' : null
+  });
+});
+
+router.post('/trash/bulk', requireAdmin, (req, res) => {
+  const action = String(req.body.action || '');
+  if (!['restore', 'destroy'].includes(action)) return res.status(400).send('Invalid action');
+  const rawKeys = Array.isArray(req.body.item_keys) ? req.body.item_keys : [req.body.item_keys];
+  const keys = rawKeys.map(parseTrashKey).filter(Boolean).slice(0, 200);
+  if (!keys.length) return wantsJson(req) ? res.status(400).json({ error: '请选择项目' }) : res.redirect('/admin/trash');
+  const completed = [];
+  const errors = [];
+  keys.forEach((key) => {
+    try { completed.push(action === 'restore' ? restoreTrashItem(req, key) : destroyTrashItem(req, key)); }
+    catch (error) { errors.push({ key: `${key.type}:${key.id}`, error: error.message, status: error.status || 500 }); }
+  });
+  if (wantsJson(req)) return res.status(errors.length ? 409 : 200).json({ ok: !errors.length, completed, errors });
+  return res.redirect(`/admin/trash?ok=${completed.length}${errors.length ? '&err=conflict' : ''}`);
+});
+
+// ─── Backups ─────────────────────────────────────────────────────────────────
+
+function backupSettings() {
+  const rows = db.prepare("SELECT key, value FROM settings WHERE key IN ('backup_schedule_enabled', 'backup_interval_hours', 'backup_retention_count')").all();
+  return Object.fromEntries(rows.map((row) => [row.key, row.value]));
+}
+
+router.get('/backups', requireAdmin, (req, res) => {
+  res.render('admin/backups', {
+    title: '备份与恢复 — aeoleaf', backups: listBackups(), events: recentEvents(), settings: backupSettings(),
+    notice: req.query.ok === 'created' ? '完整备份已创建' : req.query.ok === 'deleted' ? '备份已删除' : req.query.ok === 'settings' ? '定时备份设置已保存' : null,
+    backupError: req.query.err ? '备份操作失败，请查看失败记录。' : null
+  });
+});
+
+router.post('/backups/create', requireAdmin, async (req, res) => {
+  try {
+    const backup = await createBackup({ trigger: 'manual' });
+    logAudit(db, req, { action: 'backup.create', entityType: 'backup', entityId: backup.id, summary: { size: backup.size, sha256: backup.sha256, fileCount: backup.fileCount } });
+    if (wantsJson(req)) return res.status(201).json({ ok: true, backup });
+    return res.redirect('/admin/backups?ok=created');
+  } catch (error) {
+    logAudit(db, req, { action: 'backup.create', entityType: 'backup', outcome: 'failure', summary: { reason: error.message } });
+    if (wantsJson(req)) return res.status(500).json({ error: error.message });
+    return res.redirect('/admin/backups?err=create');
+  }
+});
+
+router.get('/backups/:id/download', requireAdmin, (req, res) => {
+  const backup = getBackup(req.params.id);
+  if (!backup) return res.status(404).send('Backup not found');
+  logAudit(db, req, { action: 'backup.download', entityType: 'backup', entityId: backup.metadata.id, summary: { sha256: backup.metadata.sha256 } });
+  return res.download(backup.archive, `${backup.metadata.id}.aebak`);
+});
+
+router.post('/backups/:id/delete', requireAdmin, (req, res) => {
+  const backup = getBackup(req.params.id);
+  if (!backup) return res.status(404).send('Backup not found');
+  const summary = { size: backup.metadata.size, sha256: backup.metadata.sha256 };
+  if (!deleteBackup(req.params.id)) return res.status(500).send('Backup deletion failed');
+  logAudit(db, req, { action: 'backup.delete', entityType: 'backup', entityId: req.params.id, summary });
+  if (wantsJson(req)) return res.json({ ok: true });
+  return res.redirect('/admin/backups?ok=deleted');
+});
+
+router.post('/backups/:id/restore', requireAdmin, async (req, res) => {
+  if (!passwordMatches(req.body.password)) {
+    logAudit(db, req, { action: 'backup.restore', entityType: 'backup', entityId: req.params.id, outcome: 'failure', summary: { reason: 'password_mismatch' } });
+    return wantsJson(req) ? res.status(403).json({ error: '管理员密码错误' }) : res.redirect('/admin/backups?err=password');
+  }
+  try {
+    const result = await restoreBackup(req.params.id);
+    logAudit(db, req, { action: 'backup.restore', entityType: 'backup', entityId: req.params.id, summary: { safetyBackupId: result.safety.id } });
+    if (wantsJson(req)) return res.json({ ok: true, safetyBackupId: result.safety.id });
+    return res.redirect('/admin/login?restored=1');
+  } catch (error) {
+    logAudit(db, req, { action: 'backup.restore', entityType: 'backup', entityId: req.params.id, outcome: 'failure', summary: { reason: error.message } });
+    if (wantsJson(req)) return res.status(500).json({ error: error.message });
+    return res.redirect('/admin/backups?err=restore');
+  }
+});
+
+router.post('/backups/settings', requireAdmin, (req, res) => {
+  const intervalHours = Math.min(720, Math.max(1, Number.parseInt(req.body.interval_hours, 10) || 24));
+  const retentionCount = Math.min(100, Math.max(1, Number.parseInt(req.body.retention_count, 10) || 10));
+  const save = db.transaction(() => {
+    const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+    stmt.run('backup_schedule_enabled', req.body.schedule_enabled === '1' ? '1' : '0');
+    stmt.run('backup_interval_hours', String(intervalHours));
+    stmt.run('backup_retention_count', String(retentionCount));
+  });
+  save();
+  logAudit(db, req, { action: 'backup.settings_update', entityType: 'backup', summary: { enabled: req.body.schedule_enabled === '1', intervalHours, retentionCount } });
+  if (wantsJson(req)) return res.json({ ok: true });
+  return res.redirect('/admin/backups?ok=settings');
 });
 
 // ─── Media library ───────────────────────────────────────────────────────────
@@ -450,6 +684,8 @@ router.get('/media', requireAdmin, (req, res) => {
 });
 
 router.post('/media/upload', requireAdmin, parseMediaUpload, (req, res) => {
+  const url = `/uploads/general/${req.file.filename}`;
+  logAudit(db, req, { action: 'media.create', entityType: 'media', entityId: url, summary: { url, size: req.file.size } });
   if (wantsJson(req)) return res.json({ ok: true, notice: '图片已上传' });
   res.redirect('/admin/media?ok=uploaded');
 });
@@ -459,8 +695,8 @@ router.post('/media/delete', requireAdmin, (req, res) => {
   const item = loadMediaFiles().find((file) => file.url === url);
   if (!item) return wantsJson(req) ? res.status(400).json({ error: '图片路径无效' }) : res.redirect('/admin/media?err=invalid');
   if (item.usedBy.length) return wantsJson(req) ? res.status(409).json({ error: '图片仍被内容引用，无法删除' }) : res.redirect('/admin/media?err=used');
-  if (!unlinkPublicUpload(url)) return wantsJson(req) ? res.status(400).json({ error: '图片删除失败' }) : res.redirect('/admin/media?err=invalid');
-  if (wantsJson(req)) return res.json({ ok: true, notice: '图片已删除' });
+  if (!trashMedia(db, req, url, { reason: 'media_library' })) return wantsJson(req) ? res.status(400).json({ error: '图片删除失败' }) : res.redirect('/admin/media?err=invalid');
+  if (wantsJson(req)) return res.json({ ok: true, notice: '图片已移入回收站' });
   res.redirect('/admin/media?ok=deleted');
 });
 
@@ -507,6 +743,7 @@ router.post('/settings', requireAdmin, parseSettingsUpload, (req, res, next) => 
       'contact_email',
       'contact_qq',
       'guestbook_sensitive_words',
+      'trash_retention_days',
       'social_links'
     ];
     const hasAnyField = keys.some((k) => Object.prototype.hasOwnProperty.call(b, k));
@@ -559,9 +796,15 @@ router.post('/settings', requireAdmin, parseSettingsUpload, (req, res, next) => 
       if (Object.prototype.hasOwnProperty.call(b, 'guestbook_sensitive_words')) {
         stmt.run('guestbook_sensitive_words', String(b.guestbook_sensitive_words ?? '').slice(0, 5000));
       }
+      if (Object.prototype.hasOwnProperty.call(b, 'trash_retention_days')) {
+        const retentionDays = Math.min(3650, Math.max(1, Number.parseInt(b.trash_retention_days, 10) || 30));
+        stmt.run('trash_retention_days', String(retentionDays));
+        stmt.run('trash_retention_enabled', b.trash_retention_enabled === '1' ? '1' : '0');
+      }
       if (Object.prototype.hasOwnProperty.call(b, 'social_links')) stmt.run('social_links', socialVal);
     });
     update();
+    logAudit(db, req, { action: 'settings.update', entityType: 'settings', summary: { keys: keys.filter((key) => Object.prototype.hasOwnProperty.call(b, key)) } });
     saveDBSync();
     if (wantsJson(req)) return res.json({ ok: true, notice: '设置已保存' });
     return res.redirect('/admin/settings?ok=1');

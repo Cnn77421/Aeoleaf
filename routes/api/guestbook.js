@@ -4,6 +4,7 @@ const { rateLimit } = require('../../middleware/rateLimit');
 const { JSDOM } = require('jsdom');
 const createDOMPurify = require('dompurify');
 const { parseSensitiveWords, detectGuestbookRisk } = require('../../lib/guestbookModeration');
+const { logAudit } = require('../../lib/auditLog');
 
 const window = new JSDOM('').window;
 const DOMPurify = createDOMPurify(window);
@@ -17,7 +18,7 @@ const postLimiter = rateLimit({
 
 // GET /api/guestbook — list public messages
 router.get('/', (req, res) => {
-  const rows = db.prepare("SELECT * FROM guestbook WHERE status = 'approved' ORDER BY created_at DESC").all();
+  const rows = db.prepare("SELECT * FROM guestbook WHERE status = 'approved' AND deleted_at = '' ORDER BY created_at DESC").all();
   res.json(rows);
 });
 
@@ -40,7 +41,7 @@ router.post('/', postLimiter, (req, res) => {
   const sensitiveSetting = db.prepare("SELECT value FROM settings WHERE key = 'guestbook_sensitive_words'").get();
   const duplicate = db.prepare(`
     SELECT COUNT(*) AS cnt FROM guestbook
-    WHERE name = ? AND message = ? AND created_at >= datetime('now', '-24 hours', 'localtime')
+    WHERE name = ? AND message = ? AND deleted_at = '' AND created_at >= datetime('now', '-24 hours', 'localtime')
   `).get(cleanName, cleanMessage).cnt > 0;
   const riskFlags = detectGuestbookRisk({
     name: cleanName,
@@ -55,6 +56,7 @@ router.post('/', postLimiter, (req, res) => {
   ).run(cleanName, cleanMessage, cleanAvatar, JSON.stringify(riskFlags), requestIp);
 
   const row = db.prepare('SELECT * FROM guestbook WHERE id = ?').get(result.lastInsertRowid);
+  logAudit(db, req, { action: 'guestbook.create', entityType: 'guestbook', entityId: row.id, summary: { name: row.name, status: row.status, riskFlags } });
   res.status(201).json(row);
 });
 

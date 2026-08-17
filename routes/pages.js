@@ -209,8 +209,8 @@ function getPublicProfileData() {
     aboutSummary: plainTextFromMarkdown(getSetting('about_text') || '', 180),
     aboutImage: getSetting('about_image') || '',
     statsData: {
-      postsCount: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='published'").get()?.cnt || 0,
-      worksCount: db.prepare('SELECT COUNT(*) as cnt FROM works').get()?.cnt || 0,
+      postsCount: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='published' AND deleted_at = ''").get()?.cnt || 0,
+      worksCount: db.prepare("SELECT COUNT(*) as cnt FROM works WHERE deleted_at = ''").get()?.cnt || 0,
       totalPV: db.prepare('SELECT COUNT(*) as cnt FROM visitors').get()?.cnt || 0
     }
   };
@@ -313,15 +313,15 @@ function plainTextFromMarkdown(md, maxLen) {
 
 router.get('/', (req, res) => {
   const featuredWorks = db.prepare(
-    'SELECT * FROM works WHERE featured = 1 ORDER BY sort_order ASC, created_at DESC LIMIT 3'
+    "SELECT * FROM works WHERE featured = 1 AND deleted_at = '' ORDER BY sort_order ASC, created_at DESC LIMIT 3"
   ).all().map(w => ({ ...w, tags: JSON.parse(w.tags || '[]') }));
 
   const recentPosts = db.prepare(
-    "SELECT * FROM posts WHERE status = 'published' ORDER BY created_at DESC LIMIT 5"
+    "SELECT * FROM posts WHERE status = 'published' AND deleted_at = '' ORDER BY created_at DESC LIMIT 5"
   ).all().map(p => ({ ...p, tags: JSON.parse(p.tags || '[]') }));
 
   const featuredPostRow = db.prepare(
-    "SELECT * FROM posts WHERE status='published' AND cover_image != '' ORDER BY created_at DESC LIMIT 1"
+    "SELECT * FROM posts WHERE status='published' AND deleted_at = '' AND cover_image != '' ORDER BY created_at DESC LIMIT 1"
   ).get();
   const featuredPost = featuredPostRow
     ? { ...featuredPostRow, tags: JSON.parse(featuredPostRow.tags || '[]') }
@@ -332,15 +332,15 @@ router.get('/', (req, res) => {
   const heroImageMobile = (getSetting('home_hero_image_mobile') || '').trim();
 
   const statsData = {
-    postsCount: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='published'").get()?.cnt || 0,
-    worksCount: db.prepare("SELECT COUNT(*) as cnt FROM works").get()?.cnt || 0,
+    postsCount: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='published' AND deleted_at = ''").get()?.cnt || 0,
+    worksCount: db.prepare("SELECT COUNT(*) as cnt FROM works WHERE deleted_at = ''").get()?.cnt || 0,
     totalPV: db.prepare("SELECT COUNT(*) as cnt FROM visitors").get()?.cnt || 0
   };
 
   const { heroTitleMain, heroTitleAccent } = parseHeroTitle(getSetting('site_title'));
 
   const carouselWorks = db.prepare(
-    "SELECT * FROM works WHERE cover_image IS NOT NULL AND cover_image != '' ORDER BY sort_order ASC, created_at DESC LIMIT 3"
+    "SELECT * FROM works WHERE deleted_at = '' AND cover_image IS NOT NULL AND cover_image != '' ORDER BY sort_order ASC, created_at DESC LIMIT 3"
   ).all().map((w) => ({ ...w, tags: JSON.parse(w.tags || '[]') }));
 
   // Contact details for the home-page Bento card. Mirrors /about so that
@@ -381,7 +381,7 @@ router.get('/blog', (req, res) => {
   // Published posts are small enough that loading + filtering in-memory
   // stays cheap; tags are JSON-encoded so a SQL LIKE would be fragile.
   const allPosts = db.prepare(
-    "SELECT * FROM posts WHERE status = 'published' ORDER BY created_at DESC"
+    "SELECT * FROM posts WHERE status = 'published' AND deleted_at = '' ORDER BY created_at DESC"
   ).all().map(p => ({
     ...p,
     tags: JSON.parse(p.tags || '[]'),
@@ -418,7 +418,7 @@ router.get('/blog', (req, res) => {
 });
 
 router.get('/blog/:slug', (req, res) => {
-  const post = db.prepare('SELECT * FROM posts WHERE slug = ? AND status = ?')
+  const post = db.prepare("SELECT * FROM posts WHERE slug = ? AND status = ? AND deleted_at = ''")
     .get(req.params.slug, 'published');
   if (!post) return renderPublic404(res);
 
@@ -444,7 +444,7 @@ router.get('/blog/:slug', (req, res) => {
 });
 
 router.get('/works', (req, res) => {
-  const works = db.prepare('SELECT * FROM works ORDER BY sort_order ASC, created_at DESC').all()
+  const works = db.prepare("SELECT * FROM works WHERE deleted_at = '' ORDER BY sort_order ASC, created_at DESC").all()
     .map(w => ({ ...w, tags: JSON.parse(w.tags || '[]') }));
 
   const firstFeaturedIdx = works.findIndex((w) => Number(w.featured) === 1);
@@ -469,7 +469,7 @@ router.get('/works', (req, res) => {
 });
 
 router.get('/works/:slug', (req, res) => {
-  const work = db.prepare('SELECT * FROM works WHERE slug = ?').get(req.params.slug);
+  const work = db.prepare("SELECT * FROM works WHERE slug = ? AND deleted_at = ''").get(req.params.slug);
   if (!work) return renderPublic404(res);
 
   res.render('work-detail', {
@@ -490,16 +490,16 @@ router.get('/about', (req, res) => {
     || '关于我 — 个人博客与作品集';
 
   const featuredWorks = db.prepare(
-    'SELECT * FROM works WHERE featured = 1 ORDER BY sort_order ASC, created_at DESC LIMIT 3'
+    "SELECT * FROM works WHERE featured = 1 AND deleted_at = '' ORDER BY sort_order ASC, created_at DESC LIMIT 3"
   ).all().map((w) => ({ ...w, tags: JSON.parse(w.tags || '[]') }));
 
   const recentPosts = db.prepare(
-    "SELECT * FROM posts WHERE status = 'published' ORDER BY created_at DESC LIMIT 5"
+    "SELECT * FROM posts WHERE status = 'published' AND deleted_at = '' ORDER BY created_at DESC LIMIT 5"
   ).all().map((p) => ({ ...p, tags: JSON.parse(p.tags || '[]') }));
 
   const statsData = {
-    postsCount: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='published'").get()?.cnt || 0,
-    worksCount: db.prepare('SELECT COUNT(*) as cnt FROM works').get()?.cnt || 0,
+    postsCount: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='published' AND deleted_at = ''").get()?.cnt || 0,
+    worksCount: db.prepare("SELECT COUNT(*) as cnt FROM works WHERE deleted_at = ''").get()?.cnt || 0,
     totalPV: db.prepare('SELECT COUNT(*) as cnt FROM visitors').get()?.cnt || 0
   };
 
@@ -543,7 +543,7 @@ router.get('/search', (req, res) => {
 });
 
 router.get('/guestbook', (req, res) => {
-  const messages = db.prepare("SELECT * FROM guestbook WHERE status = 'approved' ORDER BY created_at DESC").all();
+  const messages = db.prepare("SELECT * FROM guestbook WHERE status = 'approved' AND deleted_at = '' ORDER BY created_at DESC").all();
   res.render('guestbook', {
     title: '留言板 — aeoleaf',
     messages,

@@ -27,6 +27,17 @@ async function flushDB() {
   if (rawDb) rawDb.exec('PRAGMA wal_checkpoint(PASSIVE)');
 }
 
+function snapshotDatabase(targetPath) {
+  if (!rawDb) throw new Error('Database is not initialized');
+  const target = path.resolve(targetPath);
+  if (fs.existsSync(target)) throw new Error('Database snapshot target already exists');
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const checkpoint = rawDb.prepare('PRAGMA wal_checkpoint(FULL)').get();
+  if (Number(checkpoint?.busy || 0) !== 0) throw new Error('SQLite WAL checkpoint is busy');
+  rawDb.exec(`VACUUM INTO '${target.replace(/'/g, "''")}'`);
+  return { checkpoint };
+}
+
 function closeDB() {
   if (!rawDb) return;
   rawDb.close();
@@ -54,6 +65,8 @@ function initDB() {
       tags TEXT DEFAULT '[]',
       status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'published')),
       views INTEGER NOT NULL DEFAULT 0,
+      deleted_at TEXT NOT NULL DEFAULT '',
+      deleted_slug TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -75,6 +88,8 @@ function initDB() {
       date TEXT DEFAULT '',
       featured INTEGER NOT NULL DEFAULT 0 CHECK(featured IN (0, 1)),
       sort_order INTEGER NOT NULL DEFAULT 0,
+      deleted_at TEXT NOT NULL DEFAULT '',
+      deleted_slug TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -94,6 +109,48 @@ function initDB() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions(expires_at);
+
+    CREATE TABLE IF NOT EXISTS content_versions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity_type TEXT NOT NULL CHECK(entity_type IN ('post', 'work')),
+      entity_id INTEGER NOT NULL,
+      source TEXT NOT NULL DEFAULT 'save',
+      snapshot_json TEXT NOT NULL,
+      content_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_content_versions_entity
+      ON content_versions(entity_type, entity_id, id DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_content_versions_dedupe
+      ON content_versions(entity_type, entity_id, source, content_hash);
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      action TEXT NOT NULL,
+      entity_type TEXT NOT NULL DEFAULT '',
+      entity_id TEXT NOT NULL DEFAULT '',
+      outcome TEXT NOT NULL DEFAULT 'success',
+      summary_json TEXT NOT NULL DEFAULT '{}',
+      ip TEXT NOT NULL DEFAULT '',
+      user_agent TEXT NOT NULL DEFAULT '',
+      request_id TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(id DESC);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_type, entity_id);
+
+    CREATE TABLE IF NOT EXISTS backup_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      backup_id TEXT NOT NULL DEFAULT '',
+      trigger_type TEXT NOT NULL DEFAULT 'manual',
+      outcome TEXT NOT NULL CHECK(outcome IN ('success', 'failure')),
+      message TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_backup_events_created ON backup_events(id DESC);
 
     CREATE TABLE IF NOT EXISTS visitors (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,6 +225,11 @@ function initDB() {
       ('contact_email', ''),
       ('contact_qq', ''),
       ('guestbook_sensitive_words', ''),
+      ('trash_retention_enabled', '0'),
+      ('trash_retention_days', '30'),
+      ('backup_schedule_enabled', '0'),
+      ('backup_interval_hours', '24'),
+      ('backup_retention_count', '10'),
       ('social_links', '[]');
   `);
 
@@ -184,6 +246,14 @@ function initDB() {
   } catch (e) {
     // Column already exists, ignore error
   }
+
+  // Soft-delete columns are added incrementally for existing installations.
+  try { rawDb.exec("ALTER TABLE posts ADD COLUMN deleted_at TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE posts ADD COLUMN deleted_slug TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE works ADD COLUMN deleted_at TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE works ADD COLUMN deleted_slug TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  rawDb.exec('CREATE INDEX IF NOT EXISTS idx_posts_deleted_at ON posts(deleted_at)');
+  rawDb.exec('CREATE INDEX IF NOT EXISTS idx_works_deleted_at ON works(deleted_at)');
 
   // Visitor table incremental columns (ALTER only, keep backward compatible)
   try { rawDb.exec('ALTER TABLE visitors ADD COLUMN request_id TEXT DEFAULT \'\''); } catch (e) {}
@@ -250,6 +320,7 @@ function initDB() {
       ip TEXT DEFAULT '',
       admin_reply TEXT DEFAULT '',
       replied_at TEXT DEFAULT '',
+      deleted_at TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
   `);
@@ -259,7 +330,20 @@ function initDB() {
   try { rawDb.exec("ALTER TABLE guestbook ADD COLUMN ip TEXT DEFAULT ''"); } catch (e) {}
   try { rawDb.exec("ALTER TABLE guestbook ADD COLUMN admin_reply TEXT DEFAULT ''"); } catch (e) {}
   try { rawDb.exec("ALTER TABLE guestbook ADD COLUMN replied_at TEXT DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE guestbook ADD COLUMN deleted_at TEXT NOT NULL DEFAULT ''"); } catch (e) {}
   rawDb.exec('CREATE INDEX IF NOT EXISTS idx_guestbook_status ON guestbook(status)');
+  rawDb.exec('CREATE INDEX IF NOT EXISTS idx_guestbook_deleted_at ON guestbook(deleted_at)');
+
+  rawDb.exec(`
+    CREATE TABLE IF NOT EXISTS media_trash (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      original_url TEXT NOT NULL,
+      quarantine_name TEXT NOT NULL UNIQUE,
+      original_size INTEGER NOT NULL DEFAULT 0,
+      deleted_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_media_trash_deleted_at ON media_trash(deleted_at);
+  `);
 
   rawDb.exec(`
     CREATE TABLE IF NOT EXISTS guestbook_audit_log (
@@ -531,6 +615,8 @@ module.exports = {
   initDB,
   flushDB,
   closeDB,
+  snapshotDatabase,
+  dbPath,
   saveDBSync,
   db: dbWrapper,
   getVisitorOverview,

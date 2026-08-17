@@ -14,7 +14,10 @@
       <div><h1>作品</h1><p class="dashboard-subtitle">管理作品集项目与展示内容</p></div>
       <a href="/admin/works/new" class="btn-primary"><i class="ti ti-plus"></i> 新建作品</a>
     </div>
-    <p class="work-order-help"><i class="ti ti-grip-vertical"></i> 拖动卡片，或使用上下按钮调整前台展示顺序。<span id="work-order-status" role="status"></span></p>
+    <div class="admin-collection-toolbar">
+      <p class="work-order-help"><i class="ti ti-grip-vertical"></i> 拖动卡片，或使用上下按钮调整前台展示顺序。<span id="work-order-status" role="status"></span></p>
+      <span><%= works.length %> 个作品</span>
+    </div>
     <div class="works-admin-grid" id="works-sortable">
       <% if (works.length === 0) { %>
         <p class="empty-state">暂无作品</p>

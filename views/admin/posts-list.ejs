@@ -14,7 +14,18 @@
       <div><h1>文章</h1><p class="dashboard-subtitle">管理博客文章与草稿</p></div>
       <a href="/admin/posts/new" class="btn-primary"><i class="ti ti-plus"></i> 新建文章</a>
     </div>
-    <table class="data-table">
+    <div class="admin-data-view">
+      <div class="admin-data-toolbar" role="toolbar" aria-label="文章筛选">
+        <label class="admin-toolbar-search"><i class="ti ti-search" aria-hidden="true"></i><input type="search" placeholder="按标题筛选…" data-admin-list-search></label>
+        <select class="admin-toolbar-select" data-admin-list-status aria-label="按状态筛选">
+          <option value="">全部状态</option>
+          <option value="published">已发布</option>
+          <option value="draft">草稿</option>
+        </select>
+        <span class="admin-toolbar-count"><%= posts.length %> 篇文章</span>
+      </div>
+      <div class="admin-table-shell">
+      <table class="data-table" data-admin-filter-table>
       <thead>
         <tr>
           <th>标题</th>
@@ -31,7 +42,7 @@
         <tr><td colspan="7" class="empty-state">暂无文章</td></tr>
         <% } else { %>
           <% posts.forEach(post => { %>
-          <tr>
+          <tr data-admin-filter-row data-search="<%= post.title.toLowerCase() %>" data-status="<%= post.status %>">
             <td data-label="标题"><a href="/blog/<%= post.slug %>" target="_blank" rel="noopener"><%= post.title %></a></td>
             <td data-label="状态"><span class="badge badge-<%= post.status %>"><%= post.status === 'published' ? '已发布' : '草稿' %></span></td>
             <td data-label="浏览 / 访客"><strong><%= post.analytics_pv %></strong> / <%= post.analytics_uv %></td>
@@ -46,7 +57,10 @@
           <% }); %>
         <% } %>
       </tbody>
-    </table>
+      </table>
+      </div>
+      <p class="empty-state admin-filter-empty" data-admin-filter-empty hidden>没有符合筛选条件的文章</p>
+    </div>
   </main>
   <script src="<%= asset('/js/toast.js') %>"></script>
   <script src="<%= asset('/js/admin.js') %>"></script>

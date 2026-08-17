@@ -19,8 +19,20 @@
     <% if (typeof saveError !== 'undefined' && saveError) { %>
     <div class="admin-notice admin-notice--err" role="alert"><%= saveError %></div>
     <% } %>
+    <div class="settings-shell">
+      <aside class="settings-nav" aria-label="设置分类">
+        <a href="#settings-brand" class="active"><i class="ti ti-id"></i> 品牌信息</a>
+        <a href="#settings-home"><i class="ti ti-photo"></i> 首页展示</a>
+        <a href="#settings-about"><i class="ti ti-user"></i> 关于页面</a>
+        <a href="#settings-contact"><i class="ti ti-mail"></i> 联系方式</a>
+        <a href="#settings-moderation"><i class="ti ti-shield"></i> 内容审核</a>
+        <a href="#settings-trash"><i class="ti ti-trash"></i> 回收站</a>
+        <a href="#settings-social"><i class="ti ti-link"></i> 社交链接</a>
+      </aside>
     <form method="POST" action="/admin/settings" class="settings-form" accept-charset="UTF-8" enctype="multipart/form-data" data-admin-async-form>
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <section class="settings-section" id="settings-brand">
+        <header><h2>品牌信息</h2><p>设置网站的公开名称与简介。</p></header>
       <div class="form-group">
         <label for="site-title">站点标题</label>
         <input id="site-title" type="text" name="site_title" value="<%= settings.site_title || '' %>">
@@ -29,6 +41,9 @@
         <label for="site-subtitle">站点副标题</label>
         <input id="site-subtitle" type="text" name="site_subtitle" value="<%= settings.site_subtitle || '' %>">
       </div>
+      </section>
+      <section class="settings-section" id="settings-home">
+        <header><h2>首页展示</h2><p>配置桌面端与移动端背景图片和视觉焦点。</p></header>
       <div class="form-group">
         <label for="home-hero-image">首页背景图（桌面端）</label>
         <input id="home-hero-image" type="text" name="home_hero_image" value="<%= settings.home_hero_image || '' %>" placeholder="/uploads/general/... 或 https://...">
@@ -58,6 +73,9 @@
           <% }); %>
         </select>
       </div>
+      </section>
+      <section class="settings-section" id="settings-about">
+        <header><h2>关于页面</h2><p>维护关于页内容、图片与分享摘要。</p></header>
       <div class="form-group">
         <label for="about-text">关于页正文（Markdown）</label>
         <textarea id="about-text" name="about_text" rows="10"><%= settings.about_text || '' %></textarea>
@@ -74,6 +92,9 @@
         <label for="about-meta">关于页 SEO / 分享摘要（留空则从正文截取）</label>
         <textarea id="about-meta" name="about_meta" rows="2" placeholder="用于 meta description 与 Open Graph"><%= settings.about_meta || '' %></textarea>
       </div>
+      </section>
+      <section class="settings-section" id="settings-contact">
+        <header><h2>联系方式</h2><p>设置访客可以看到的联系渠道。</p></header>
       <div class="form-group">
         <label for="contact-email">联系邮箱</label>
         <input id="contact-email" type="email" name="contact_email" value="<%= settings.contact_email || '' %>" placeholder="you@example.com">
@@ -82,18 +103,37 @@
         <label for="contact-qq">QQ</label>
         <input id="contact-qq" type="text" name="contact_qq" value="<%= settings.contact_qq || '' %>" placeholder="选填">
       </div>
+      </section>
+      <section class="settings-section" id="settings-moderation">
+        <header><h2>内容审核</h2><p>配置留言风险标记规则。</p></header>
       <div class="form-group">
         <label for="guestbook-sensitive-words">留言敏感词</label>
         <textarea id="guestbook-sensitive-words" name="guestbook_sensitive_words" rows="5" maxlength="5000" placeholder="每行一个词，也可以用逗号分隔"><%= settings.guestbook_sensitive_words || '' %></textarea>
         <p class="form-hint">命中后会在待审核队列中标记风险，不会自动删除或公开。</p>
       </div>
+      </section>
+      <section class="settings-section" id="settings-trash">
+        <header><h2>回收站保留期限</h2><p>默认关闭自动清理；开启后，服务会每 6 小时清理一次到期项目。</p></header>
+        <div class="form-group">
+          <label><input type="checkbox" name="trash_retention_enabled" value="1"<%= settings.trash_retention_enabled === '1' ? ' checked' : '' %>> 自动清理到期项目</label>
+        </div>
+        <div class="form-group">
+          <label for="trash-retention-days">保留天数</label>
+          <input id="trash-retention-days" type="number" name="trash_retention_days" min="1" max="3650" value="<%= settings.trash_retention_days || '30' %>">
+          <p class="form-hint">彻底删除不可恢复；关闭自动清理时，此数值不会触发任何删除。</p>
+        </div>
+      </section>
+      <section class="settings-section" id="settings-social">
+        <header><h2>社交链接</h2><p>维护网站展示的外部账号与站内链接。</p></header>
       <div class="form-group">
         <label for="social-links">社交链接（JSON 数组）</label>
         <textarea id="social-links" name="social_links" rows="5" placeholder='[{"label":"GitHub","url":"https://github.com/..."}]'><%= settings.social_links || '[]' %></textarea>
         <p class="form-hint">每项包含 label 与 url；url 仅支持 http(s)、mailto: 或以 / 开头的站内路径。</p>
       </div>
+      </section>
       <button type="submit" class="btn-primary">保存设置</button>
     </form>
+    </div>
   </main>
   <script src="<%= asset('/js/toast.js') %>"></script>
   <script src="<%= asset('/js/admin.js') %>"></script>

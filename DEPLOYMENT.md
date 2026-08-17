@@ -203,6 +203,21 @@ git stash show -p 'stash@{0}'
 
 ## 四、更新失败后的恢复
 
+### 后台完整备份
+
+管理员可在 `/admin/backups` 创建和管理 `.aebak` 完整备份。归档默认保存在 `database/backups/`，不经过静态文件服务，只能由已登录管理员下载。
+
+每次备份会先执行 SQLite WAL checkpoint，再通过一致性快照收集：
+
+- SQLite 数据库；
+- `public/uploads/` 上传文件；
+- `database/media-trash/` 媒体隔离文件；
+- 脱敏运行配置清单和 `package.json`。
+
+恢复会校验归档 SHA-256、逐文件 SHA-256 和 SQLite `PRAGMA integrity_check`，并在替换当前数据前自动创建 `pre_restore` 安全备份。恢复操作必须再次输入管理员密码。定时备份默认关闭，可在后台设置间隔与保留数量。
+
+可通过环境变量 `BACKUP_DIR` 将备份归档移到独立磁盘；生产环境应将该目录纳入主机级异地备份。后台备份不能替代异地副本。
+
 ### 应用无法启动
 
 ```bash

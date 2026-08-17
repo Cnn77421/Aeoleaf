@@ -1,6 +1,8 @@
 const router = require('express').Router();
 const crypto = require('crypto');
 const { rateLimit } = require('../../middleware/rateLimit');
+const { db } = require('../../config/db');
+const { logAudit } = require('../../lib/auditLog');
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -14,9 +16,11 @@ router.post('/login', loginLimiter, (req, res, next) => {
   const adminPass = process.env.ADMIN_PASSWORD || '';
 
   if (!password) {
+    logAudit(db, req, { action: 'auth.login', entityType: 'admin', outcome: 'failure', summary: { reason: 'missing_password' } });
     return res.status(400).json({ error: 'Password required' });
   }
   if (!adminPass) {
+    logAudit(db, req, { action: 'auth.login', entityType: 'admin', outcome: 'failure', summary: { reason: 'disabled' } });
     return res.status(401).json({ error: 'Admin login disabled' });
   }
 
@@ -35,19 +39,24 @@ router.post('/login', loginLimiter, (req, res, next) => {
     match = false;
   }
 
-  if (!match) return res.status(401).json({ error: 'Incorrect password' });
+  if (!match) {
+    logAudit(db, req, { action: 'auth.login', entityType: 'admin', outcome: 'failure', summary: { reason: 'incorrect_password' } });
+    return res.status(401).json({ error: 'Incorrect password' });
+  }
 
   req.session.regenerate((err) => {
     if (err) return next(err);
     req.session.admin = true;
     req.session.save((err2) => {
       if (err2) return next(err2);
+      logAudit(db, req, { action: 'auth.login', entityType: 'admin', outcome: 'success' });
       res.json({ ok: true });
     });
   });
 });
 
 router.post('/logout', (req, res) => {
+  logAudit(db, req, { action: 'auth.logout', entityType: 'admin' });
   req.session.destroy(() => res.json({ ok: true }));
 });
 

@@ -1,21 +1,24 @@
-<aside class="navbar navbar-vertical navbar-expand-lg admin-sidebar" data-bs-theme="dark" aria-label="后台导航">
+<aside class="navbar navbar-vertical navbar-expand-lg admin-sidebar" aria-label="后台导航">
   <div class="container-fluid">
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#admin-menu" aria-controls="admin-menu" aria-expanded="false" aria-label="展开导航">
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="navbar-brand admin-logo">
       <a href="/admin/dashboard" aria-label="Aeoleaf 后台首页">
-        <span class="admin-logo-mark">A</span>
-        <span class="admin-logo-copy">aeoleaf <small>风叶后台</small></span>
+        <span class="admin-logo-mark"><i class="ti ti-leaf" aria-hidden="true"></i></span>
+        <span class="admin-logo-copy">Aeoleaf <small>内容管理后台</small></span>
+        <i class="ti ti-selector admin-logo-selector" aria-hidden="true"></i>
       </a>
     </div>
     <div class="collapse navbar-collapse" id="admin-menu">
       <ul class="navbar-nav admin-nav">
+        <li class="admin-nav-label">工作台</li>
         <li class="nav-item">
           <a href="/admin/dashboard" class="nav-link <%= activePage === 'dashboard' ? 'active' : '' %>"<% if (activePage === 'dashboard') { %> aria-current="page"<% } %>>
             <i class="ti ti-layout-dashboard" aria-hidden="true"></i><span class="nav-link-title">概览</span>
           </a>
         </li>
+        <li class="admin-nav-label">内容管理</li>
         <li class="nav-item">
           <a href="/admin/posts" class="nav-link <%= activePage === 'posts' ? 'active' : '' %>"<% if (activePage === 'posts') { %> aria-current="page"<% } %>>
             <i class="ti ti-file-text" aria-hidden="true"></i><span class="nav-link-title">文章</span>
@@ -38,6 +41,13 @@
           </a>
         </li>
         <li class="nav-item">
+          <a href="/admin/trash" class="nav-link <%= activePage === 'trash' ? 'active' : '' %>"<% if (activePage === 'trash') { %> aria-current="page"<% } %>>
+            <i class="ti ti-trash" aria-hidden="true"></i><span class="nav-link-title">回收站</span>
+            <% if (trashCount > 0) { %><span class="admin-nav-count" data-count="<%= trashCount %>" aria-label="<%= trashCount %> 个已删除项目"><%= trashCount > 99 ? '99+' : trashCount %></span><% } %>
+          </a>
+        </li>
+        <li class="admin-nav-label">数据与系统</li>
+        <li class="nav-item">
           <a href="/admin/visitors" class="nav-link <%= activePage === 'visitors' ? 'active' : '' %>"<% if (activePage === 'visitors') { %> aria-current="page"<% } %>>
             <i class="ti ti-chart-histogram" aria-hidden="true"></i><span class="nav-link-title">访客分析</span>
           </a>
@@ -47,18 +57,74 @@
             <i class="ti ti-settings" aria-hidden="true"></i><span class="nav-link-title">站点设置</span>
           </a>
         </li>
+        <li class="nav-item">
+          <a href="/admin/backups" class="nav-link <%= activePage === 'backups' ? 'active' : '' %>"<% if (activePage === 'backups') { %> aria-current="page"<% } %>>
+            <i class="ti ti-database-export" aria-hidden="true"></i><span class="nav-link-title">备份与恢复</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="/admin/audit" class="nav-link <%= activePage === 'audit' ? 'active' : '' %>"<% if (activePage === 'audit') { %> aria-current="page"<% } %>>
+            <i class="ti ti-history" aria-hidden="true"></i><span class="nav-link-title">操作审计</span>
+          </a>
+        </li>
       </ul>
       <div class="admin-footer">
-        <a href="/" target="_blank" rel="noopener" class="nav-link">
-          <i class="ti ti-external-link" aria-hidden="true"></i><span class="nav-link-title">查看站点</span>
-        </a>
-        <form method="POST" action="/admin/logout">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <button type="submit" class="nav-link admin-logout">
-            <i class="ti ti-logout-2" aria-hidden="true"></i><span class="nav-link-title">退出登录</span>
-          </button>
-        </form>
+        <div class="admin-user-card">
+          <span class="admin-user-avatar">A</span>
+          <span class="admin-user-copy"><strong>Administrator</strong><small>Aeoleaf 管理员</small></span>
+          <div class="admin-user-actions">
+            <a href="/" target="_blank" rel="noopener" aria-label="查看站点" title="查看站点"><i class="ti ti-external-link" aria-hidden="true"></i></a>
+            <form method="POST" action="/admin/logout">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button type="submit" class="admin-logout" aria-label="退出登录" title="退出登录"><i class="ti ti-logout-2" aria-hidden="true"></i></button>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </aside>
+<button type="button" class="admin-drawer-backdrop" data-admin-drawer-close aria-label="关闭侧边栏"></button>
+<header class="admin-topbar">
+  <div class="admin-topbar-inner">
+    <button type="button" class="admin-icon-button admin-sidebar-trigger" data-admin-sidebar-toggle aria-label="切换侧边栏" title="切换侧边栏（Ctrl/⌘ + B）">
+      <i class="ti ti-layout-sidebar-left-collapse" aria-hidden="true"></i>
+    </button>
+    <span class="admin-topbar-separator" aria-hidden="true"></span>
+    <nav class="admin-topnav" aria-label="快捷导航">
+      <a href="/admin/dashboard">概览</a>
+      <a href="/admin/posts">文章</a>
+      <a href="/admin/settings">设置</a>
+    </nav>
+    <div class="admin-topbar-actions">
+      <button type="button" class="admin-search-trigger" data-admin-command-open aria-label="搜索后台功能">
+        <i class="ti ti-search" aria-hidden="true"></i><span>搜索</span><kbd>⌘K</kbd>
+      </button>
+      <button type="button" class="admin-icon-button admin-theme-toggle" data-admin-theme-toggle aria-label="切换明暗主题" title="切换明暗主题">
+        <i class="ti ti-sun admin-theme-light" aria-hidden="true"></i>
+        <i class="ti ti-moon admin-theme-dark" aria-hidden="true"></i>
+      </button>
+      <a href="/" target="_blank" rel="noopener" class="admin-icon-button" aria-label="查看站点" title="查看站点"><i class="ti ti-external-link" aria-hidden="true"></i></a>
+      <span class="admin-topbar-avatar" aria-hidden="true">A</span>
+    </div>
+  </div>
+</header>
+<div class="admin-command" data-admin-command hidden>
+  <button type="button" class="admin-command-backdrop" data-admin-command-close aria-label="关闭搜索"></button>
+  <section class="admin-command-dialog" role="dialog" aria-modal="true" aria-label="搜索后台功能">
+    <label class="admin-command-input"><i class="ti ti-search" aria-hidden="true"></i><input type="search" placeholder="搜索页面…" data-admin-command-input autocomplete="off"></label>
+    <div class="admin-command-list" data-admin-command-list>
+      <small>页面</small>
+      <a href="/admin/dashboard" data-admin-command-item>概览</a>
+      <a href="/admin/posts" data-admin-command-item>文章</a>
+      <a href="/admin/works" data-admin-command-item>作品</a>
+      <a href="/admin/guestbook" data-admin-command-item>留言</a>
+      <a href="/admin/media" data-admin-command-item>媒体库</a>
+      <a href="/admin/trash" data-admin-command-item>回收站</a>
+      <a href="/admin/visitors" data-admin-command-item>访客分析</a>
+      <a href="/admin/settings" data-admin-command-item>站点设置</a>
+      <a href="/admin/backups" data-admin-command-item>备份与恢复</a>
+      <a href="/admin/audit" data-admin-command-item>操作审计</a>
+    </div>
+  </section>
+</div>

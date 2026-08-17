@@ -13,7 +13,7 @@
   <%- include('partials/sidebar', { activePage: 'works' }) %>
   <main class="admin-main" data-work-id="<%= work ? work.id : '' %>">
     <div class="admin-header">
-      <div><h1><%= isNew ? '新建作品' : '编辑作品' %></h1><p class="dashboard-subtitle">编辑作品介绍与展示信息</p></div>
+      <div><h1><%= isNew ? '新建作品' : '编辑作品' %></h1><p class="dashboard-subtitle">编辑作品介绍与展示信息 · <span data-draft-status>尚无未保存更改</span></p></div>
       <button type="submit" form="work-form" class="btn-primary admin-mobile-save"><i class="ti ti-device-floppy" aria-hidden="true"></i> 保存作品</button>
     </div>
     <form id="work-form" class="edit-form">
@@ -30,6 +30,7 @@
         </div>
       </div>
       <div class="form-sidebar">
+        <div class="form-panel-heading"><strong>作品设置</strong><small>展示、年份与发布信息</small></div>
         <div class="form-group">
           <label><input type="checkbox" name="featured" <%= work && work.featured ? 'checked' : '' %>> 设为精选</label>
         </div>
@@ -58,6 +59,8 @@
         </div>
         <button type="submit" class="btn-primary btn-block"><i class="ti ti-device-floppy"></i> 保存作品</button>
         <% if (work) { %>
+          <button type="button" class="btn-secondary btn-block" data-revisions-toggle><i class="ti ti-history"></i> 历史版本</button>
+          <div class="revision-list" data-revisions-list hidden></div>
           <a href="/works/<%= work.slug %>" target="_blank" rel="noopener" class="btn-link">查看作品</a>
           <button type="button" class="btn-danger btn-sm" onclick="deleteWork(<%= work.id %>)">删除</button>
         <% } %>
