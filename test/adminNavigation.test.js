@@ -28,4 +28,20 @@ test('admin navigation keeps a persistent shell and uses page lifecycle hooks', 
   }
   const visitors = fs.readFileSync(path.join(projectRoot, 'views', 'admin', 'visitors.ejs'), 'utf8');
   assert.match(visitors, /id="visitor-chart-data" type="application\/json"/);
+  assert.match(visitors, /analytics-traffic-card/);
+  assert.match(visitors, /visitors-metrics-grid/);
+  assert.match(visitors, /visitors-page-tabs/);
+});
+
+test('long admin pages grow with content and keep settings navigation in sync', () => {
+  const projectRoot = path.join(__dirname, '..');
+  const adminStyles = fs.readFileSync(path.join(projectRoot, 'public', 'css', 'admin-v2.css'), 'utf8');
+  const adminScript = fs.readFileSync(path.join(projectRoot, 'public', 'js', 'admin.js'), 'utf8');
+
+  assert.match(adminStyles, /\.admin-body\s*\{[^}]*height:\s*auto;/s);
+  assert.match(adminStyles, /\.admin-main,[\s\S]*?height:\s*max-content;/);
+  assert.match(adminStyles, /input\[type="file"\]::file-selector-button/);
+  assert.match(adminScript, /function initSettingsSectionNavigation\(\)/);
+  assert.match(adminScript, /new IntersectionObserver/);
+  assert.match(adminScript, /aria-current/);
 });

@@ -7,18 +7,32 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
   <%- include('partials/styles') %>
 </head>
-<body>
+<body class="admin-login-body">
   <div class="login-container">
     <div class="login-card">
-      <h1><span class="admin-logo-mark">A</span> aeoleaf <span>风叶后台</span></h1>
+      <div class="login-mobile-brand"><span class="admin-logo-mark"><i class="ti ti-leaf"></i></span> Aeoleaf</div>
+      <div class="login-heading">
+        <h1>登录后台</h1>
+        <p>输入管理员密码以继续</p>
+      </div>
       <% if (error) { %>
       <p class="error-message"><%= error %></p>
       <% } %>
       <form method="POST" action="/admin/login">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="password" name="password" placeholder="管理员密码" aria-label="管理员密码" autocomplete="current-password" required autofocus>
-        <button type="submit" class="btn-primary"><i class="ti ti-login-2"></i> 登录后台</button>
+        <label for="admin-password">管理员密码</label>
+        <input id="admin-password" type="password" name="password" placeholder="请输入密码" aria-label="管理员密码" autocomplete="current-password" required autofocus>
+        <button type="submit" class="btn-primary">登录</button>
       </form>
+      <p class="login-footnote">受安全会话和 CSRF 防护保护</p>
+    </div>
+    <div class="login-brand-panel" aria-hidden="true">
+      <div class="login-brand-mark"><i class="ti ti-leaf"></i></div>
+      <div>
+        <strong>Aeoleaf</strong>
+        <p>在一处管理内容、作品与访客数据。</p>
+      </div>
+      <blockquote>“写作是在时间里种下一片叶子。”</blockquote>
     </div>
   </div>
 </body>

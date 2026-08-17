@@ -39,10 +39,10 @@
             <% if (item.usedBy.length) { %>
               <p class="media-used"><i class="ti ti-link"></i> <%= item.usedBy.slice(0, 2).join('、') %><%= item.usedBy.length > 2 ? ' 等' : '' %></p>
             <% } else { %>
-              <form method="POST" action="/admin/media/delete" data-admin-async-form onsubmit="return confirm('确定删除这张未引用的图片吗？')">
+              <form method="POST" action="/admin/media/delete" data-admin-async-form onsubmit="return confirm('确定将这张未引用的图片移入回收站吗？')">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="url" value="<%= item.url %>">
-                <button type="submit" class="btn-sm btn-danger"><i class="ti ti-trash"></i> 删除</button>
+                <button type="submit" class="btn-sm btn-danger"><i class="ti ti-trash"></i> 移入回收站</button>
               </form>
             <% } %>
           </div>

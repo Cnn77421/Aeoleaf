@@ -13,7 +13,7 @@
   <%- include('partials/sidebar', { activePage: 'posts' }) %>
   <main class="admin-main" data-post-id="<%= post ? post.id : '' %>">
     <div class="admin-header">
-      <div><h1><%= isNew ? '新建文章' : '编辑文章' %></h1><p class="dashboard-subtitle">专注写作，发布设置位于右侧</p></div>
+      <div><h1><%= isNew ? '新建文章' : '编辑文章' %></h1><p class="dashboard-subtitle">专注写作，发布设置位于右侧 · <span data-draft-status>尚无未保存更改</span></p></div>
       <button type="submit" form="post-form" class="btn-primary admin-mobile-save"><i class="ti ti-device-floppy" aria-hidden="true"></i> 保存文章</button>
     </div>
     <form id="post-form" class="edit-form">
@@ -26,6 +26,7 @@
         </div>
       </div>
       <div class="form-sidebar">
+        <div class="form-panel-heading"><strong>发布设置</strong><small>状态、摘要、标签与封面</small></div>
         <% if (performance) { %>
         <section class="post-performance" aria-labelledby="post-performance-title">
           <div class="post-performance-heading"><strong id="post-performance-title">文章表现</strong><a href="/admin/visitors">详情</a></div>
@@ -61,6 +62,8 @@
         </div>
         <button type="submit" class="btn-primary btn-block"><i class="ti ti-device-floppy"></i> 保存文章</button>
         <% if (post) { %>
+          <button type="button" class="btn-secondary btn-block" data-revisions-toggle><i class="ti ti-history"></i> 历史版本</button>
+          <div class="revision-list" data-revisions-list hidden></div>
           <a href="/blog/<%= post.slug %>" target="_blank" class="btn-link"><i class="ti ti-external-link"></i> 查看文章</a>
           <button type="button" class="btn-danger btn-sm" onclick="deletePost(<%= post.id %>)"><i class="ti ti-trash"></i> 删除</button>
         <% } %>

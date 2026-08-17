@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <%- include('partials/styles') %>
+</head>
+<body class="admin-body">
+  <%- include('partials/sidebar', { activePage: 'trash' }) %>
+  <main class="admin-main">
+    <div class="admin-header">
+      <div><h1>回收站</h1><p class="dashboard-subtitle">统一恢复或彻底删除文章、作品、留言和媒体</p></div>
+    </div>
+    <% if (notice) { %><div class="admin-notice" role="status"><%= notice %></div><% } %>
+    <% if (trashError) { %><div class="admin-notice admin-notice--error" role="alert"><%= trashError %></div><% } %>
+
+    <form class="admin-filter-bar" method="get" action="/admin/trash">
+      <label><span>类型</span><select name="type">
+        <option value="">全部</option>
+        <% [['post','文章'],['work','作品'],['guestbook','留言'],['media','媒体']].forEach(function(option) { %>
+          <option value="<%= option[0] %>"<%= filters.type === option[0] ? ' selected' : '' %>><%= option[1] %></option>
+        <% }); %>
+      </select></label>
+      <label><span>关键词</span><input type="search" name="keyword" value="<%= filters.keyword %>" placeholder="标题、留言或路径"></label>
+      <label><span>删除起始</span><input type="date" name="date_from" value="<%= filters.dateFrom %>"></label>
+      <label><span>删除截止</span><input type="date" name="date_to" value="<%= filters.dateTo %>"></label>
+      <button type="submit" class="btn-secondary">筛选</button>
+    </form>
+
+    <form id="trash-bulk-form" class="guestbook-bulk-bar" method="post" action="/admin/trash/bulk">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label><input type="checkbox" data-trash-select-all> 全选当前结果</label>
+      <span>已选项目可批量恢复或彻底删除</span>
+      <div>
+        <button class="btn-sm btn-secondary" type="submit" name="action" value="restore"><i class="ti ti-restore"></i> 批量恢复</button>
+        <button class="btn-sm btn-danger" type="submit" name="action" value="destroy" onclick="return confirm('彻底删除后无法恢复。确定永久删除选中项目吗？')"><i class="ti ti-trash-x"></i> 彻底删除</button>
+      </div>
+    </form>
+
+    <section class="admin-card">
+      <div class="table-responsive">
+        <table class="table admin-table">
+          <thead><tr><th aria-label="选择"></th><th>删除时间</th><th>类型</th><th>名称</th><th>原始信息</th><th>操作</th></tr></thead>
+          <tbody>
+          <% const labels = { post: '文章', work: '作品', guestbook: '留言', media: '媒体' }; %>
+          <% items.forEach(function(item) { %>
+            <tr>
+              <td><input type="checkbox" name="item_keys" value="<%= item.key %>" form="trash-bulk-form" data-trash-item></td>
+              <td><%= item.deleted_at %></td>
+              <td><span class="badge bg-secondary-lt"><%= labels[item.type] %></span></td>
+              <td><strong><%= item.title %></strong></td>
+              <td><code><%= item.detail || '—' %></code></td>
+              <td class="trash-actions">
+                <form method="post" action="/admin/trash/bulk">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="item_keys" value="<%= item.key %>">
+                  <button class="btn-sm btn-secondary" type="submit" name="action" value="restore">恢复</button>
+                  <button class="btn-sm btn-danger" type="submit" name="action" value="destroy" onclick="return confirm('彻底删除后无法恢复。确定继续吗？')">彻底删除</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+          <% if (!items.length) { %><tr><td colspan="6" class="text-center text-secondary">回收站为空</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script src="<%= asset('/js/toast.js') %>"></script>
+  <script src="<%= asset('/js/admin.js') %>"></script>
+</body>
+</html>

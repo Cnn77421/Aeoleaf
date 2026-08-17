@@ -3,8 +3,10 @@ const { db } = require('../../config/db');
 const slugify = require('slugify');
 const { requireAdmin } = require('../../middleware/auth');
 const { uploadWork, wrapUpload } = require('../../middleware/upload');
-const { unlinkPublicUpload } = require('../../lib/safeFs');
+const { trashMedia } = require('../../lib/trash');
 const path = require('path');
+const { logAudit } = require('../../lib/auditLog');
+const { snapshotFor, saveVersion, listVersions, getVersion } = require('../../lib/contentVersions');
 
 function makeSlug(title) {
   return slugify(title, { lower: true, strict: true, locale: 'en' }) ||
@@ -41,10 +43,26 @@ function parseYearField(y) {
   return Number.isFinite(n) ? n : null;
 }
 
+function workDraft(work, body) {
+  return {
+    ...snapshotFor('work', work),
+    title: body.title ?? work.title,
+    slug: body.slug ?? work.slug,
+    description: body.description ?? work.description,
+    content: body.content ?? work.content,
+    tags: body.tags === undefined ? work.tags : parseTags(body.tags),
+    url: body.url ?? work.url,
+    year: body.year === undefined ? work.year : parseYearField(body.year),
+    date: body.date ?? work.date,
+    featured: body.featured === undefined ? work.featured : parseFeatured(body.featured),
+    sort_order: body.sort_order ?? work.sort_order
+  };
+}
+
 // GET /api/works
 router.get('/', (req, res) => {
   const { featured, tag } = req.query;
-  let query = 'SELECT * FROM works WHERE 1=1';
+  let query = "SELECT * FROM works WHERE deleted_at = ''";
   const params = [];
 
   if (featured !== undefined) { query += ' AND featured = ?'; params.push(parseInt(featured)); }
@@ -59,9 +77,37 @@ router.get('/', (req, res) => {
   res.json({ works });
 });
 
+router.get('/:id/revisions', requireAdmin, (req, res) => {
+  const work = db.prepare("SELECT id FROM works WHERE id = ? AND deleted_at = ''").get(req.params.id);
+  if (!work) return res.status(404).json({ error: 'Not found' });
+  res.json({ revisions: listVersions(db, 'work', work.id) });
+});
+
+router.post('/:id/autosave', requireAdmin, (req, res) => {
+  const work = db.prepare("SELECT * FROM works WHERE id = ? AND deleted_at = ''").get(req.params.id);
+  if (!work) return res.status(404).json({ error: 'Not found' });
+  const result = saveVersion(db, 'work', work.id, workDraft(work, req.body || {}), 'autosave');
+  res.json({ ok: true, saved: result.created });
+});
+
+router.post('/:id/revisions/:versionId/restore', requireAdmin, (req, res) => {
+  const work = db.prepare("SELECT * FROM works WHERE id = ? AND deleted_at = ''").get(req.params.id);
+  if (!work) return res.status(404).json({ error: 'Not found' });
+  const version = getVersion(db, 'work', work.id, req.params.versionId);
+  if (!version) return res.status(404).json({ error: 'Version not found' });
+  const snap = version.snapshot;
+  const conflict = db.prepare('SELECT id FROM works WHERE slug = ? AND id != ?').get(snap.slug, work.id);
+  if (conflict) return res.status(409).json({ error: '该历史版本的 URL 别名已被占用' });
+  saveVersion(db, 'work', work.id, snapshotFor('work', work), 'before_restore');
+  db.prepare(`UPDATE works SET title=?, slug=?, description=?, content=?, cover_image=?, images=?, tags=?, url=?, year=?, date=?, featured=?, sort_order=?, updated_at=datetime('now') WHERE id=?`)
+    .run(snap.title, snap.slug, snap.description || '', snap.content || '', snap.cover_image || '', snap.images || '[]', snap.tags || '[]', snap.url || '', snap.year, snap.date || '', snap.featured ? 1 : 0, Number(snap.sort_order) || 0, work.id);
+  logAudit(db, req, { action: 'work.restore', entityType: 'work', entityId: work.id, summary: { versionId: version.id } });
+  res.json({ ok: true });
+});
+
 // GET /api/works/:slug
 router.get('/:slug', (req, res) => {
-  const work = db.prepare('SELECT * FROM works WHERE slug = ?').get(req.params.slug);
+  const work = db.prepare("SELECT * FROM works WHERE slug = ? AND deleted_at = ''").get(req.params.slug);
   if (!work) return res.status(404).json({ error: 'Not found' });
   res.json({ ...work, tags: JSON.parse(work.tags || '[]'), images: JSON.parse(work.images || '[]') });
 });
@@ -96,6 +142,8 @@ router.post('/', requireAdmin, optionalWorkCover, (req, res) => {
   }
 
   const work = db.prepare('SELECT * FROM works WHERE id = ?').get(newId);
+  saveVersion(db, 'work', newId, snapshotFor('work', work), 'created');
+  logAudit(db, req, { action: 'work.create', entityType: 'work', entityId: newId, summary: { title: work.title, slug: work.slug } });
   res.status(201).json({ ...work, tags: JSON.parse(work.tags || '[]'), images: JSON.parse(work.images || '[]') });
 });
 
@@ -104,7 +152,7 @@ router.put('/reorder', requireAdmin, (req, res) => {
   const { order } = req.body;
   if (!Array.isArray(order)) return res.status(400).json({ error: 'order array required' });
 
-  const stmt = db.prepare("UPDATE works SET sort_order = ?, updated_at = datetime('now') WHERE id = ?");
+  const stmt = db.prepare("UPDATE works SET sort_order = ?, updated_at = datetime('now') WHERE id = ? AND deleted_at = ''");
   const update = db.transaction(() => order.forEach(({ id, sort_order }) => stmt.run(sort_order, id)));
   update();
   res.json({ ok: true });
@@ -113,7 +161,7 @@ router.put('/reorder', requireAdmin, (req, res) => {
 // PUT /api/works/:id — JSON or multipart (optional `cover`)
 router.put('/:id', requireAdmin, optionalWorkCover, (req, res) => {
   const { title, slug, description, content, tags, url, year, date, featured, sort_order } = req.body;
-  const work = db.prepare('SELECT * FROM works WHERE id = ?').get(req.params.id);
+  const work = db.prepare("SELECT * FROM works WHERE id = ? AND deleted_at = ''").get(req.params.id);
   if (!work) return res.status(404).json({ error: 'Not found' });
 
   const newSlug = slug || work.slug;
@@ -121,6 +169,8 @@ router.put('/:id', requireAdmin, optionalWorkCover, (req, res) => {
     const existing = db.prepare('SELECT id FROM works WHERE slug = ? AND id != ?').get(newSlug, work.id);
     if (existing) return res.status(409).json({ error: 'Slug already exists' });
   }
+
+  saveVersion(db, 'work', work.id, snapshotFor('work', work), 'before_save');
 
   let yearVal = work.year;
   if (year !== undefined) {
@@ -148,42 +198,46 @@ router.put('/:id', requireAdmin, optionalWorkCover, (req, res) => {
   );
 
   if (req.file) {
-    unlinkPublicUpload(work.cover_image);
+    if (work.cover_image) trashMedia(db, req, work.cover_image, { reason: 'cover_replaced', workId: work.id });
     const coverUrl = '/uploads/works/' + req.file.filename;
     db.prepare("UPDATE works SET cover_image = ?, updated_at = datetime('now') WHERE id = ?").run(coverUrl, work.id);
   }
 
   const updated = db.prepare('SELECT * FROM works WHERE id = ?').get(work.id);
+  logAudit(db, req, { action: 'work.update', entityType: 'work', entityId: work.id, summary: { title: updated.title, slug: updated.slug } });
   res.json({ ...updated, tags: JSON.parse(updated.tags || '[]'), images: JSON.parse(updated.images || '[]') });
 });
 
 // DELETE /api/works/:id
 router.delete('/:id', requireAdmin, (req, res) => {
-  const work = db.prepare('SELECT * FROM works WHERE id = ?').get(req.params.id);
+  const work = db.prepare("SELECT * FROM works WHERE id = ? AND deleted_at = ''").get(req.params.id);
   if (!work) return res.status(404).json({ error: 'Not found' });
 
-  const images = JSON.parse(work.images || '[]');
-  [work.cover_image, ...images].filter(Boolean).forEach(unlinkPublicUpload);
-
-  db.prepare('DELETE FROM works WHERE id = ?').run(work.id);
+  saveVersion(db, 'work', work.id, snapshotFor('work', work), 'before_delete');
+  const tombstoneSlug = `__trash_work_${work.id}_${Date.now()}`;
+  db.prepare("UPDATE works SET deleted_at = datetime('now', 'localtime'), deleted_slug = slug, slug = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(tombstoneSlug, work.id);
+  logAudit(db, req, { action: 'work.delete', entityType: 'work', entityId: work.id, summary: { title: work.title, slug: work.slug } });
   res.json({ ok: true });
 });
 
 // POST /api/works/:id/cover
 router.post('/:id/cover', requireAdmin, wrapUpload(uploadWork.single('cover')), (req, res) => {
-  const work = db.prepare('SELECT * FROM works WHERE id = ?').get(req.params.id);
+  const work = db.prepare("SELECT * FROM works WHERE id = ? AND deleted_at = ''").get(req.params.id);
   if (!work) return res.status(404).json({ error: 'Not found' });
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-  unlinkPublicUpload(work.cover_image);
+  saveVersion(db, 'work', work.id, snapshotFor('work', work), 'before_cover');
+  if (work.cover_image) trashMedia(db, req, work.cover_image, { reason: 'cover_replaced', workId: work.id });
   const url = '/uploads/works/' + req.file.filename;
   db.prepare("UPDATE works SET cover_image = ?, updated_at = datetime('now') WHERE id = ?").run(url, work.id);
+  logAudit(db, req, { action: 'work.cover_update', entityType: 'work', entityId: work.id, summary: { url } });
   res.json({ url });
 });
 
 // POST /api/works/:id/images — add additional images
 router.post('/:id/images', requireAdmin, wrapUpload(uploadWork.array('images', 10)), (req, res) => {
-  const work = db.prepare('SELECT * FROM works WHERE id = ?').get(req.params.id);
+  const work = db.prepare("SELECT * FROM works WHERE id = ? AND deleted_at = ''").get(req.params.id);
   if (!work) return res.status(404).json({ error: 'Not found' });
   if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files' });
 
@@ -192,12 +246,13 @@ router.post('/:id/images', requireAdmin, wrapUpload(uploadWork.array('images', 1
   db.prepare("UPDATE works SET images = ?, updated_at = datetime('now') WHERE id = ?").run(
     JSON.stringify([...existing, ...newUrls]), work.id
   );
+  logAudit(db, req, { action: 'media.create', entityType: 'media', entityId: work.id, summary: { urls: newUrls, source: 'work_images' } });
   res.json({ urls: newUrls });
 });
 
 // DELETE /api/works/:id/images/:filename
 router.delete('/:id/images/:filename', requireAdmin, (req, res) => {
-  const work = db.prepare('SELECT * FROM works WHERE id = ?').get(req.params.id);
+  const work = db.prepare("SELECT * FROM works WHERE id = ? AND deleted_at = ''").get(req.params.id);
   if (!work) return res.status(404).json({ error: 'Not found' });
 
   // The filename must be a basename only — reject any attempt to escape the
@@ -215,7 +270,7 @@ router.delete('/:id/images/:filename', requireAdmin, (req, res) => {
 
   const remaining = images.filter((i) => i !== imgUrl);
   db.prepare("UPDATE works SET images = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(remaining), work.id);
-  unlinkPublicUpload(imgUrl);
+  trashMedia(db, req, imgUrl, { reason: 'work_image_removed', workId: work.id });
   res.json({ ok: true });
 });
 

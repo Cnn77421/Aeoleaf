@@ -13,35 +13,78 @@
 
   <main class="admin-main admin-main--wide">
     <div class="dashboard-container">
-      <div class="dashboard-welcome">
-        <h1>访客分析</h1>
-        <p class="dashboard-subtitle">实时访问统计、轨迹和设备画像</p>
-        <p><a class="btn-link" download href="/admin/visitors/export.csv?startTime=<%= filters.startTime || '' %>&endTime=<%= filters.endTime || '' %>&ip=<%= encodeURIComponent(filters.ip || '') %>&city=<%= encodeURIComponent(filters.city || '') %>&deviceType=<%= encodeURIComponent(filters.deviceType || '') %>&fingerprint=<%= encodeURIComponent(filters.fingerprint || '') %>">导出当前筛选 CSV</a></p>
-      </div>
-
-      <div class="stats-grid">
-        <div class="stat-card"><div class="stat-label">今日 PV</div><div class="stat-value"><%= overview.todayPV %></div></div>
-        <div class="stat-card"><div class="stat-label">今日 UV</div><div class="stat-value"><%= overview.todayUV %></div></div>
-        <div class="stat-card"><div class="stat-label">总 PV</div><div class="stat-value"><%= overview.totalPV %></div></div>
-        <div class="stat-card"><div class="stat-label">总 UV</div><div class="stat-value"><%= overview.totalUV %></div></div>
-      </div>
-
-      <div class="recent-grid">
-        <div class="recent-section">
-          <h2>最近 7 天 PV / UV 趋势</h2>
-          <canvas id="trendChart" height="120"></canvas>
+      <div class="dashboard-welcome visitors-heading">
+        <div>
+          <h1>访客分析</h1>
+          <p class="dashboard-subtitle">实时访问统计、轨迹和设备画像</p>
         </div>
-        <div class="recent-section">
-          <h2>地域分布</h2>
-          <canvas id="regionChart" height="120"></canvas>
+        <div class="admin-heading-actions">
+          <a class="btn-sm visitors-export" download href="/admin/visitors/export.csv?startTime=<%= filters.startTime || '' %>&endTime=<%= filters.endTime || '' %>&ip=<%= encodeURIComponent(filters.ip || '') %>&city=<%= encodeURIComponent(filters.city || '') %>&deviceType=<%= encodeURIComponent(filters.deviceType || '') %>&fingerprint=<%= encodeURIComponent(filters.fingerprint || '') %>"><i class="ti ti-download"></i> 导出数据</a>
         </div>
       </div>
 
-      <div class="recent-grid">
-        <div class="recent-section">
-          <h2>热门页面 TOP 10</h2>
-          <canvas id="pagesChart" height="120"></canvas>
+      <nav class="visitors-page-tabs" aria-label="访客分析页面分区">
+        <a href="#analytics-overview" class="active" aria-current="page">数据概览</a>
+        <a href="#visitors-table">访客记录</a>
+      </nav>
+
+      <section id="analytics-overview" class="analytics-card analytics-traffic-card">
+        <header class="analytics-card-header">
+          <div>
+            <h2>流量趋势</h2>
+            <p>最近 7 天页面访问量与独立访客</p>
+          </div>
+          <div class="analytics-legend" aria-label="图例">
+            <span><i class="analytics-legend-primary"></i>PV</span>
+            <span><i class="analytics-legend-secondary"></i>UV</span>
+          </div>
+        </header>
+        <div class="analytics-card-content analytics-chart-frame analytics-chart-frame--large">
+          <% if (trendRows && trendRows.length) { %><canvas id="trendChart"></canvas><% } else { %><div class="analytics-chart-empty"><i class="ti ti-chart-area-line"></i><span>最近 7 天暂无流量数据</span></div><% } %>
         </div>
+      </section>
+
+      <%
+        var pvDelta = overview.yesterdayPV > 0
+          ? Math.round(((overview.todayPV - overview.yesterdayPV) / overview.yesterdayPV) * 1000) / 10
+          : null;
+      %>
+      <div class="visitors-metrics-grid">
+        <article class="analytics-metric-card">
+          <header><span>今日 PV</span><i class="ti ti-chart-line"></i></header>
+          <strong><%= Number(overview.todayPV || 0).toLocaleString('zh-CN') %></strong>
+          <p<% if (pvDelta !== null && pvDelta >= 0) { %> class="is-positive"<% } %>><% if (pvDelta === null) { %>昨日无访问记录<% } else { %><%= pvDelta >= 0 ? '+' : '' %><%= pvDelta %>% 较昨日<% } %></p>
+        </article>
+        <article class="analytics-metric-card">
+          <header><span>今日 UV</span><i class="ti ti-users"></i></header>
+          <strong><%= Number(overview.todayUV || 0).toLocaleString('zh-CN') %></strong>
+          <p>今日独立访客</p>
+        </article>
+        <article class="analytics-metric-card">
+          <header><span>累计 PV</span><i class="ti ti-activity"></i></header>
+          <strong><%= Number(overview.totalPV || 0).toLocaleString('zh-CN') %></strong>
+          <p>全部页面访问次数</p>
+        </article>
+        <article class="analytics-metric-card">
+          <header><span>累计 UV</span><i class="ti ti-user-scan"></i></header>
+          <strong><%= Number(overview.totalUV || 0).toLocaleString('zh-CN') %></strong>
+          <p>全部独立访客</p>
+        </article>
+      </div>
+
+      <div class="analytics-insights-grid">
+        <section class="analytics-card analytics-card--wide">
+          <header class="analytics-card-header">
+            <div><h2>热门页面</h2><p>访问量最高的页面 TOP 10</p></div>
+          </header>
+          <div class="analytics-card-content analytics-chart-frame"><% if (topPages && topPages.length) { %><canvas id="pagesChart"></canvas><% } else { %><div class="analytics-chart-empty"><i class="ti ti-chart-bar"></i><span>暂无热门页面数据</span></div><% } %></div>
+        </section>
+        <section class="analytics-card analytics-card--narrow">
+          <header class="analytics-card-header">
+            <div><h2>地域分布</h2><p>主要访客来源地区</p></div>
+          </header>
+          <div class="analytics-card-content analytics-chart-frame"><% if (regionRows && regionRows.length) { %><canvas id="regionChart"></canvas><% } else { %><div class="analytics-chart-empty"><i class="ti ti-map-pin"></i><span>暂无地域分布数据</span></div><% } %></div>
+        </section>
       </div>
 
       <%
@@ -99,8 +142,15 @@
         }
       %>
 
-      <div class="recent-section visitors-filter-section">
-        <h2>筛选</h2>
+      <%
+        var activeFilterCount = ['startTime', 'endTime', 'ip', 'fingerprint', 'city', 'deviceType']
+          .filter(function(key) { return Boolean(filters[key]); }).length;
+      %>
+      <section class="analytics-card visitors-filter-section">
+        <header class="analytics-card-header visitors-filter-header">
+          <div><h2>筛选条件</h2><p>按时间、身份或设备缩小访客记录范围</p></div>
+          <% if (activeFilterCount > 0) { %><span class="visitors-filter-count"><%= activeFilterCount %> 项已启用</span><% } %>
+        </header>
         <form method="GET" action="/admin/visitors" class="visitors-filter-grid" data-admin-pjax-form>
           <input type="hidden" name="view" value="<%= view || 'detail' %>">
           <input type="hidden" name="sortBy" value="<%= sortBy || 'tracked_at' %>">
@@ -118,23 +168,25 @@
               <option value="平板" <%= filters.deviceType === '平板' ? 'selected' : '' %>>平板</option>
             </select>
           </label>
-          <button type="submit" class="btn visitors-filter-btn">应用筛选</button>
+          <div class="visitors-filter-actions">
+            <a href="/admin/visitors?view=<%= view || 'detail' %>#visitors-table" class="btn-link">重置</a>
+            <button type="submit" class="btn visitors-filter-btn"><i class="ti ti-filter"></i> 应用筛选</button>
+          </div>
         </form>
-      </div>
+      </section>
 
-      <div id="table" class="recent-section visitors-table-section">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem">
-          <h2 style="margin-bottom:0">
-            <% if (view === 'sessions') { %>会话合并<% } else { %>访客明细<% } %>
-          </h2>
+      <section id="table" class="analytics-card visitors-table-section">
+        <header class="analytics-card-header visitors-table-header">
+          <div>
+            <h2><% if (view === 'sessions') { %>会话记录<% } else { %>访客明细<% } %></h2>
+            <p><% if (view === 'sessions') { %>按访问会话合并页面路径与停留时间<% } else { %>查看每一次访问的设备、位置和行为信息<% } %></p>
+          </div>
           <div class="view-toggle">
             <a class="btn-link<%= view !== 'sessions' ? ' view-toggle-active' : '' %>" href="<%= buildPageUrl(1).replace('view=sessions', 'view=detail') %>">明细</a>
-            <span style="color:var(--border);margin:0 0.3rem">|</span>
             <a class="btn-link<%= view === 'sessions' ? ' view-toggle-active' : '' %>" href="<%= buildPageUrl(1).replace('view=detail', 'view=sessions') %>">会话</a>
-            <span style="color:var(--border);margin:0 0.3rem">|</span>
-            <a class="btn-link" href="/admin/visitors/blacklist">黑名单</a>
+            <a class="btn-link view-toggle-danger" href="/admin/visitors/blacklist">黑名单</a>
           </div>
-        </div>
+        </header>
 
         <div id="visitors-table"></div>
         <% if (view === 'sessions') { %>
@@ -250,7 +302,7 @@
             </div>
           <% } %>
         <% } %>
-      </div>
+      </section>
     </div>
     <script id="visitor-chart-data" type="application/json"><%- JSON.stringify({ trendRows: trendRows || [], regionRows: regionRows || [], topPages: topPages || [] }).replace(/</g, '\\u003c') %></script>
   </main>
