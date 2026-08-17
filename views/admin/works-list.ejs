@@ -3,44 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="view-transition" content="same-origin">
   <title><%= title %></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="<%= asset('/css/main.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/admin.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/admin-v2.css') %>">
+  <%- include('partials/styles') %>
 </head>
 <body class="admin-body">
-  <aside class="admin-sidebar">
-    <div class="admin-logo">
-      <a href="/">aeoleaf <span>风叶</span></a>
-    </div>
-    <nav class="admin-nav">
-      <a href="/admin/dashboard">Dashboard</a>
-      <a href="/admin/posts">Posts</a>
-      <a href="/admin/works" class="active">Works</a>
-      <a href="/admin/visitors">Visitors</a>
-      <a href="/admin/settings">Settings</a>
-    </nav>
-    <div class="admin-footer">
-      <a href="/" target="_blank">View Site</a>
-      <form method="POST" action="/admin/logout" style="margin-top:0.5rem">
-        <button type="submit" class="btn-link">Log Out</button>
-      </form>
-    </div>
-  </aside>
+  <%- include('partials/sidebar', { activePage: 'works' }) %>
   <main class="admin-main">
     <div class="admin-header">
-      <h1>Works</h1>
-      <a href="/admin/works/new" class="btn-primary">New Work</a>
+      <div><h1>作品</h1><p class="dashboard-subtitle">管理作品集项目与展示内容</p></div>
+      <a href="/admin/works/new" class="btn-primary"><i class="ti ti-plus"></i> 新建作品</a>
     </div>
-    <div class="works-admin-grid">
+    <p class="work-order-help"><i class="ti ti-grip-vertical"></i> 拖动卡片，或使用上下按钮调整前台展示顺序。<span id="work-order-status" role="status"></span></p>
+    <div class="works-admin-grid" id="works-sortable">
       <% if (works.length === 0) { %>
-        <p class="empty-state">No works yet</p>
+        <p class="empty-state">暂无作品</p>
       <% } else { %>
         <% works.forEach(work => { %>
-        <div class="work-admin-card">
+        <div class="work-admin-card" draggable="true" data-work-id="<%= work.id %>">
+          <button type="button" class="work-drag-handle" aria-label="拖动排序" title="拖动排序"><i class="ti ti-grip-vertical"></i></button>
           <% if (work.cover_image) { %>
           <img src="<%= work.cover_image %>" alt="<%= work.title %>">
           <% } %>
@@ -48,8 +29,10 @@
             <h3><%= work.title %></h3>
             <p><%= work.year || '-' %></p>
             <div class="work-admin-actions">
-              <a href="/admin/works/<%= work.id %>/edit" class="btn-sm">Edit</a>
-              <button class="btn-sm btn-danger" onclick="deleteWork(<%= work.id %>)">Delete</button>
+              <button type="button" class="btn-sm work-order-btn" data-direction="up" aria-label="上移 <%= work.title %>"><i class="ti ti-arrow-up"></i></button>
+              <button type="button" class="btn-sm work-order-btn" data-direction="down" aria-label="下移 <%= work.title %>"><i class="ti ti-arrow-down"></i></button>
+              <a href="/admin/works/<%= work.id %>/edit" class="btn-sm"><i class="ti ti-edit"></i> 编辑</a>
+              <button class="btn-sm btn-danger" onclick="deleteWork(<%= work.id %>)"><i class="ti ti-trash"></i> 删除</button>
             </div>
           </div>
         </div>

@@ -2,13 +2,13 @@
 (function () {
   var MAIN_SEL = 'main.admin-main';
   var NAV_SEL = '.admin-nav';
-  var DURATION = 180;
   var _busy = false;
   var _loadedScripts = {};
+  var _loadedStyles = {};
 
   function shouldIntercept(a) {
     if (!a || !a.href) return false;
-    if (a.target === '_blank' || a.download) return false;
+    if (a.target === '_blank' || a.hasAttribute('download')) return false;
     if (a.origin !== location.origin) return false;
     if (a.pathname === location.pathname && a.search === location.search && a.hash) return false;
     var href = a.getAttribute('href') || '';
@@ -20,6 +20,12 @@
   function collectCurrentScripts() {
     document.querySelectorAll('script[src]').forEach(function (s) {
       _loadedScripts[s.src] = 'loaded';
+    });
+  }
+
+  function collectCurrentStyles() {
+    document.querySelectorAll('link[rel="stylesheet"][href]').forEach(function (link) {
+      _loadedStyles[link.href] = true;
     });
   }
 
@@ -37,18 +43,37 @@
     return p;
   }
 
+  function loadStyle(href) {
+    if (_loadedStyles[href]) return Promise.resolve();
+    return new Promise(function (resolve, reject) {
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = href;
+      link.onload = function () { _loadedStyles[href] = true; resolve(); };
+      link.onerror = reject;
+      document.head.appendChild(link);
+    });
+  }
+
+  async function loadPageAssets(doc) {
+    var links = doc.querySelectorAll('link[rel="stylesheet"][href]');
+    for (var i = 0; i < links.length; i++) {
+      var href = new URL(links[i].getAttribute('href'), location.origin).href;
+      if (new URL(href).origin !== location.origin) continue;
+      await loadStyle(href);
+    }
+    var scripts = doc.querySelectorAll('script[src]');
+    for (var j = 0; j < scripts.length; j++) {
+      var src = new URL(scripts[j].getAttribute('src'), location.origin).href;
+      await loadScript(src);
+    }
+  }
+
   function execInlineScripts(container) {
-    container.querySelectorAll('script').forEach(function (old) {
+    container.querySelectorAll('script:not([src])').forEach(function (old) {
+      if (old.type && old.type !== 'text/javascript' && old.type !== 'application/javascript') return;
       var s = document.createElement('script');
-      if (old.src) {
-        if (_loadedScripts[old.src] === 'loaded') return;
-        s.src = old.src;
-        s.onload = function () { _loadedScripts[old.src] = 'loaded'; };
-        s.onerror = function () { delete _loadedScripts[old.src]; };
-        _loadedScripts[old.src] = 'loaded';
-      } else {
-        s.textContent = old.textContent;
-      }
+      s.textContent = old.textContent;
       old.replaceWith(s);
     });
   }
@@ -61,45 +86,45 @@
       var aPath = a.getAttribute('href') || '';
       if (path === aPath || (aPath !== '/admin/dashboard' && path.indexOf(aPath) === 0)) {
         a.classList.add('active');
+        a.setAttribute('aria-current', 'page');
       } else {
         a.classList.remove('active');
+        a.removeAttribute('aria-current');
       }
     });
   }
 
-  async function pjaxNavigate(url, pushState) {
+  async function pjaxNavigate(url, pushState, options) {
     if (_busy) return;
     _busy = true;
+    var opts = options || {};
+    var savedScrollY = window.scrollY;
     var mainEl = document.querySelector(MAIN_SEL);
     if (!mainEl) { location.href = url; return; }
-
-    mainEl.classList.add('pjax-out');
+    mainEl.setAttribute('aria-busy', 'true');
 
     try {
-      var resp = await fetch(url);
+      var resp = await fetch(url, { headers: { 'X-PJAX': '1' } });
       if (!resp.ok) throw new Error(resp.status);
       var html = await resp.text();
       var doc = new DOMParser().parseFromString(html, 'text/html');
       var newMain = doc.querySelector(MAIN_SEL);
       if (!newMain) throw new Error('no main');
+      var incomingPending = doc.querySelector('.admin-nav a[href="/admin/guestbook"] .admin-nav-count');
 
-      var headScripts = doc.querySelectorAll('head script[src]');
-      for (var i = 0; i < headScripts.length; i++) {
-        await loadScript(headScripts[i].src);
-      }
-
-      await new Promise(function (r) { setTimeout(r, DURATION); });
+      await loadPageAssets(doc);
+      document.dispatchEvent(new CustomEvent('admin:before-swap'));
 
       mainEl.innerHTML = newMain.innerHTML;
+      Array.from(mainEl.attributes).forEach(function (attr) {
+        mainEl.removeAttribute(attr.name);
+      });
       Array.from(newMain.attributes).forEach(function (attr) {
         mainEl.setAttribute(attr.name, attr.value);
       });
 
       execInlineScripts(mainEl);
-
-      if (!mainEl.querySelector('#work-form') && !mainEl.querySelector('#post-form')) {
-        window.__AEOL_ADMIN_CTX = { postId: null, workId: null };
-      }
+      initAdminPage();
 
       var newTitle = doc.querySelector('title');
       if (newTitle) document.title = newTitle.textContent;
@@ -109,30 +134,32 @@
       }
 
       updateNav(url);
-      mainEl.classList.remove('pjax-out');
-      mainEl.classList.add('pjax-in');
-      mainEl.addEventListener('animationend', function handler() {
-        mainEl.classList.remove('pjax-in');
-        mainEl.removeEventListener('animationend', handler);
-      });
+      updateGuestbookPendingBadge(incomingPending ? Number(incomingPending.dataset.count) || 0 : 0);
+      mainEl.removeAttribute('aria-busy');
 
-      var _hash = url.split('#')[1];
-      if (_hash) {
-        var _el = document.getElementById(_hash);
-        if (_el) { _el.scrollIntoView({ behavior: 'instant' }); }
-        else { window.scrollTo({ top: 0, behavior: 'instant' }); }
+      if (opts.preserveScroll) {
+        window.scrollTo({ top: savedScrollY, behavior: 'instant' });
       } else {
-        window.scrollTo({ top: 0, behavior: 'instant' });
+        var _hash = url.split('#')[1];
+        if (_hash) {
+          var _el = document.getElementById(_hash);
+          if (_el) { _el.scrollIntoView({ behavior: 'instant' }); }
+          else { window.scrollTo({ top: 0, behavior: 'instant' }); }
+        } else {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        }
       }
     } catch (e) {
       location.href = url;
       return;
     } finally {
+      mainEl.removeAttribute('aria-busy');
       _busy = false;
     }
   }
 
   collectCurrentScripts();
+  collectCurrentStyles();
 
   document.addEventListener('click', function (e) {
     if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
@@ -150,19 +177,202 @@
 })();
 
 function adminCtx() {
-  return window.__AEOL_ADMIN_CTX || {};
+  const main = document.querySelector('main.admin-main');
+  return {
+    postId: main && main.dataset.postId ? Number(main.dataset.postId) : null,
+    workId: main && main.dataset.workId ? Number(main.dataset.workId) : null
+  };
 }
+
+function destroyAdminPage() {
+  if (window.easyMDE) {
+    try { window.easyMDE.toTextArea(); } catch (_error) { /* page is already leaving */ }
+    window.easyMDE = null;
+  }
+  (window.__adminCharts || []).forEach(function (chart) {
+    try { chart.destroy(); } catch (_error) { /* canvas is already leaving */ }
+  });
+  window.__adminCharts = [];
+}
+
+function initAdminEditor() {
+  const contentEditor = document.getElementById('content-editor');
+  if (!contentEditor || typeof window.EasyMDE === 'undefined' || window.easyMDE) return;
+  window.easyMDE = new window.EasyMDE({
+    element: contentEditor,
+    spellChecker: false,
+    status: ['lines', 'words'],
+    minHeight: '400px',
+    toolbar: [
+      'bold', 'italic', 'heading', '|',
+      'quote', 'code', 'unordered-list', 'ordered-list', '|',
+      'link', 'image', '|',
+      'preview', 'side-by-side', 'fullscreen', '|',
+      'guide'
+    ],
+    uploadImage: true,
+    imageUploadFunction: async function (file, onSuccess, onError) {
+      const formData = new FormData();
+      formData.append('image', file);
+      try {
+        const response = await fetch('/api/posts/upload-image', {
+          method: 'POST', body: formData, credentials: 'same-origin'
+        });
+        const result = await response.json();
+        if (response.ok) onSuccess(result.url);
+        else onError(result.error || 'Upload failed');
+      } catch (error) {
+        onError(error.message);
+      }
+    }
+  });
+}
+
+function initVisitorCharts() {
+  const dataElement = document.getElementById('visitor-chart-data');
+  if (!dataElement || typeof window.Chart === 'undefined') return;
+  let data;
+  try { data = JSON.parse(dataElement.textContent); } catch (_error) { return; }
+  const trendRows = data.trendRows || [];
+  const regionRows = data.regionRows || [];
+  const topPages = data.topPages || [];
+  const charts = [];
+
+  if (trendRows.length && document.getElementById('trendChart')) {
+    charts.push(new window.Chart(document.getElementById('trendChart'), {
+      type: 'line',
+      data: {
+        labels: trendRows.map(function (row) { return row.d; }),
+        datasets: [
+          { label: 'PV', data: trendRows.map(function (row) { return row.pv; }), borderColor: '#7B2638', backgroundColor: 'rgba(123,38,56,0.15)', tension: 0.3, fill: true },
+          { label: 'UV', data: trendRows.map(function (row) { return row.uv; }), borderColor: '#C47184', backgroundColor: 'rgba(196,113,132,0.15)', tension: 0.3, fill: true }
+        ]
+      },
+      options: { plugins: { legend: { position: 'bottom' } } }
+    }));
+  }
+
+  if (regionRows.length && document.getElementById('regionChart')) {
+    charts.push(new window.Chart(document.getElementById('regionChart'), {
+      type: 'bar',
+      data: {
+        labels: regionRows.map(function (row) {
+          const parts = String(row.region || '').split(' / ').filter(Boolean);
+          if (parts.length >= 3) return parts[1] + ' ' + parts[2];
+          if (parts.length === 2) return parts[1];
+          return parts[0] || '未知';
+        }),
+        datasets: [{ label: 'PV', data: regionRows.map(function (row) { return row.pv; }), backgroundColor: 'rgba(58,125,68,0.6)' }]
+      },
+      options: { indexAxis: 'y', plugins: { legend: { display: false } } }
+    }));
+  }
+
+  if (topPages.length && document.getElementById('pagesChart')) {
+    charts.push(new window.Chart(document.getElementById('pagesChart'), {
+      type: 'bar',
+      data: {
+        labels: topPages.map(function (row) { return row.path || '/'; }),
+        datasets: [{ label: 'PV', data: topPages.map(function (row) { return row.pv; }), backgroundColor: 'rgba(95,175,106,0.7)' }]
+      },
+      options: { plugins: { legend: { display: false } } }
+    }));
+  }
+  window.__adminCharts = charts;
+}
+
+function initAdminPage() {
+  initAdminEditor();
+  initVisitorCharts();
+  document.dispatchEvent(new CustomEvent('admin:page-ready', { detail: { url: location.href } }));
+}
+
+document.addEventListener('admin:before-swap', destroyAdminPage);
+
+function updateGuestbookPendingBadge(count) {
+  const link = document.querySelector('.admin-nav a[href="/admin/guestbook"]');
+  if (!link) return;
+  let badge = link.querySelector('.admin-nav-count');
+  if (count > 0) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'admin-nav-count';
+      link.appendChild(badge);
+    }
+    badge.textContent = count > 99 ? '99+' : String(count);
+    badge.dataset.count = String(count);
+    badge.setAttribute('aria-label', count + ' 条待审核');
+  } else if (badge) {
+    badge.remove();
+  }
+}
+
+function nextGuestbookFocusId(form) {
+  const cards = Array.from(document.querySelectorAll('.guestbook-admin-card[data-message-id]'));
+  const current = form.closest('.guestbook-admin-card');
+  if (current) {
+    const index = cards.indexOf(current);
+    const next = cards[index + 1] || cards[index - 1];
+    return next ? next.dataset.messageId : '';
+  }
+  const selected = new Set(new FormData(form).getAll('message_ids').map(String));
+  const remaining = cards.find(function (card) { return !selected.has(card.dataset.messageId); });
+  return remaining ? remaining.dataset.messageId : '';
+}
+
+document.addEventListener('submit', async function (e) {
+  const form = e.target.closest('form[data-guestbook-form]');
+  if (!form || e.defaultPrevented || form.dataset.submitting === '1') return;
+  e.preventDefault();
+
+  const submitter = e.submitter;
+  const formData = new FormData(form);
+  if (submitter && submitter.name) formData.set(submitter.name, submitter.value);
+  const requestBody = new URLSearchParams();
+  formData.forEach(function (value, key) {
+    if (typeof value === 'string') requestBody.append(key, value);
+  });
+  const focusId = nextGuestbookFocusId(form);
+  const buttons = Array.from(form.querySelectorAll('button[type="submit"]'));
+  form.dataset.submitting = '1';
+  buttons.forEach(function (button) { button.disabled = true; });
+
+  try {
+    const response = await fetch(form.action, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+      },
+      body: requestBody,
+      credentials: 'same-origin'
+    });
+    const result = await response.json().catch(function () { return {}; });
+    if (!response.ok || !result.ok) throw new Error(result.error || ('HTTP ' + response.status));
+
+    updateGuestbookPendingBadge(Number(result.counts && result.counts.pending) || 0);
+    Toast.success(result.notice || '留言已更新');
+    await window.__adminPjax(location.href, false, { silent: true, preserveScroll: true });
+    const focusCard = focusId && document.querySelector('.guestbook-admin-card[data-message-id="' + focusId + '"]');
+    if (focusCard) focusCard.focus({ preventScroll: true });
+  } catch (error) {
+    Toast.error(error.message || '操作失败，请稍后重试');
+    delete form.dataset.submitting;
+    buttons.forEach(function (button) { button.disabled = false; });
+  }
+});
 
 // Delete post
 async function deletePost(id) {
-  if (!confirm('Delete this post?')) return;
+  if (!confirm('确定删除这篇文章吗？')) return;
   try {
     const res = await fetch(`/api/posts/${id}`, { method: 'DELETE' });
     if (res.ok) {
-      Toast.success('Post deleted');
-      setTimeout(() => location.reload(), 500);
+      Toast.success('文章已删除');
+      const fromEditor = /\/admin\/posts\/\d+\/edit$/.test(location.pathname);
+      await window.__adminPjax(fromEditor ? '/admin/posts' : location.href, fromEditor, { silent: true, preserveScroll: !fromEditor });
     } else {
-      Toast.error('Failed to delete');
+      Toast.error('删除失败');
     }
   } catch (err) {
     Toast.error('Error: ' + err.message);
@@ -171,14 +381,15 @@ async function deletePost(id) {
 
 // Delete work
 async function deleteWork(id) {
-  if (!confirm('Delete this work?')) return;
+  if (!confirm('确定删除这个作品吗？')) return;
   try {
     const res = await fetch(`/api/works/${id}`, { method: 'DELETE' });
     if (res.ok) {
-      Toast.success('Work deleted');
-      setTimeout(() => location.reload(), 500);
+      Toast.success('作品已删除');
+      const fromEditor = /\/admin\/works\/\d+\/edit$/.test(location.pathname);
+      await window.__adminPjax(fromEditor ? '/admin/works' : location.href, fromEditor, { silent: true, preserveScroll: !fromEditor });
     } else {
-      Toast.error('Failed to delete');
+      Toast.error('删除失败');
     }
   } catch (err) {
     Toast.error('Error: ' + err.message);
@@ -224,14 +435,14 @@ document.addEventListener('submit', async function (e) {
     }
     const resJson = await res.json().catch(() => ({}));
     if (res.ok) {
-      Toast.success('Post saved');
+      Toast.success('文章已保存');
       if (pid == null && resJson.id) {
-        setTimeout(function () { location.href = '/admin/posts/' + resJson.id + '/edit'; }, 400);
+        await window.__adminPjax('/admin/posts/' + resJson.id + '/edit', true);
       } else {
-        setTimeout(function () { location.href = '/admin/posts'; }, 500);
+        await window.__adminPjax('/admin/posts', true);
       }
     } else {
-      Toast.error(resJson.error || 'Failed to save');
+      Toast.error(resJson.error || '保存失败');
       submitBtn.classList.remove('btn-loading');
     }
   } catch (err) {
@@ -280,14 +491,14 @@ document.addEventListener('submit', async function (e) {
     }
     const resJson = await res.json().catch(() => ({}));
     if (res.ok) {
-      Toast.success('Work saved');
+      Toast.success('作品已保存');
       if (wid == null && resJson.id) {
-        setTimeout(function () { location.href = '/admin/works/' + resJson.id + '/edit'; }, 400);
+        await window.__adminPjax('/admin/works/' + resJson.id + '/edit', true);
       } else {
-        setTimeout(function () { location.href = '/admin/works'; }, 500);
+        await window.__adminPjax('/admin/works', true);
       }
     } else {
-      Toast.error(resJson.error || 'Failed to save');
+      Toast.error(resJson.error || '保存失败');
       submitBtn.classList.remove('btn-loading');
     }
   } catch (err) {
@@ -327,13 +538,217 @@ document.addEventListener('change', async function (e) {
     const res = await fetch(url, { method: 'POST', body: formData, credentials: 'same-origin' });
     const resJson = await res.json().catch(function () { return {}; });
     if (res.ok) {
-      Toast.success('Image uploaded');
-      setTimeout(function () { location.reload(); }, 400);
+      Toast.success('图片已上传');
+      await window.__adminPjax(location.href, false, { silent: true, preserveScroll: true });
     } else {
-      Toast.error(resJson.error || ('Upload failed (' + res.status + ')'));
+      Toast.error(resJson.error || ('上传失败（' + res.status + '）'));
     }
   } catch (err) {
     Toast.error('Error: ' + err.message);
   }
   input.value = '';
 });
+
+// Media URL copy and work ordering use delegated events so both keep working
+// after the admin shell swaps page content through PJAX.
+document.addEventListener('click', async function (e) {
+  const copyButton = e.target.closest('.media-copy');
+  if (copyButton) {
+    const value = copyButton.dataset.url || '';
+    try {
+      await navigator.clipboard.writeText(location.origin + value);
+      Toast.success('图片地址已复制');
+    } catch (_err) {
+      const input = copyButton.parentElement && copyButton.parentElement.querySelector('input');
+      if (input) { input.select(); document.execCommand('copy'); }
+      Toast.success('图片地址已复制');
+    }
+    return;
+  }
+
+  const blacklistAdd = e.target.closest('[data-blacklist-add]');
+  const blacklistRemove = e.target.closest('[data-blacklist-remove]');
+  if (blacklistAdd || blacklistRemove) {
+    const ip = (blacklistAdd || blacklistRemove).dataset.ip || '';
+    const removing = Boolean(blacklistRemove);
+    if (!ip) return;
+    const prompt = removing
+      ? '确定将 ' + ip + ' 从黑名单中移除？'
+      : '确定要将 ' + ip + ' 加入黑名单？该 IP 将无法访问网站。';
+    if (!confirm(prompt)) return;
+    try {
+      const response = await fetch(removing ? '/admin/visitors/blacklist/remove' : '/admin/visitors/blacklist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ ip: ip, reason: removing ? '' : '手动拉黑' })
+      });
+      const result = await response.json().catch(function () { return {}; });
+      if (!response.ok) throw new Error(result.error || '操作失败');
+      Toast.success(removing ? '已移出黑名单' : '已加入黑名单');
+      await window.__adminPjax(location.href, false, { silent: true, preserveScroll: true });
+    } catch (error) {
+      Toast.error(error.message || '网络错误');
+    }
+    return;
+  }
+
+  const orderButton = e.target.closest('.work-order-btn');
+  if (!orderButton) return;
+  const card = orderButton.closest('.work-admin-card');
+  const container = card && card.parentElement;
+  if (!card || !container) return;
+  const direction = orderButton.dataset.direction;
+  if (direction === 'up' && card.previousElementSibling) {
+    container.insertBefore(card, card.previousElementSibling);
+  } else if (direction === 'down' && card.nextElementSibling) {
+    container.insertBefore(card.nextElementSibling, card);
+  } else {
+    return;
+  }
+  persistWorkOrder(container);
+});
+
+document.addEventListener('submit', async function (e) {
+  const form = e.target.closest('form[data-blacklist-form]');
+  if (!form) return;
+  e.preventDefault();
+  const ip = String(new FormData(form).get('ip') || '').trim();
+  const reason = String(new FormData(form).get('reason') || '').trim();
+  if (!ip) return;
+  try {
+    const response = await fetch('/admin/visitors/blacklist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ ip: ip, reason: reason })
+    });
+    const result = await response.json().catch(function () { return {}; });
+    if (!response.ok) throw new Error(result.error || '操作失败');
+    Toast.success('已加入黑名单');
+    await window.__adminPjax(location.href, false, { silent: true, preserveScroll: true });
+  } catch (error) {
+    Toast.error(error.message || '网络错误');
+  }
+});
+
+document.addEventListener('submit', async function (e) {
+  const form = e.target.closest('form[data-admin-async-form]');
+  if (!form || e.defaultPrevented || form.dataset.submitting === '1') return;
+  e.preventDefault();
+  const submitButton = e.submitter || form.querySelector('button[type="submit"]');
+  form.dataset.submitting = '1';
+  if (submitButton) submitButton.disabled = true;
+  try {
+    const formData = new FormData(form);
+    const multipart = form.enctype === 'multipart/form-data';
+    const headers = { Accept: 'application/json' };
+    let body = formData;
+    if (!multipart) {
+      body = new URLSearchParams();
+      formData.forEach(function (value, key) {
+        if (typeof value === 'string') body.append(key, value);
+      });
+      headers['Content-Type'] = 'application/x-www-form-urlencoded;charset=UTF-8';
+    }
+    const response = await fetch(form.action, {
+      method: (form.method || 'POST').toUpperCase(),
+      headers: headers,
+      credentials: 'same-origin',
+      body: body
+    });
+    const result = await response.json().catch(function () { return {}; });
+    if (!response.ok || !result.ok) throw new Error(result.error || ('HTTP ' + response.status));
+    Toast.success(result.notice || '操作已完成');
+    await window.__adminPjax(location.href, false, { silent: true, preserveScroll: true });
+  } catch (error) {
+    Toast.error(error.message || '操作失败');
+    delete form.dataset.submitting;
+    if (submitButton) submitButton.disabled = false;
+  }
+});
+
+document.addEventListener('submit', function (e) {
+  const form = e.target.closest('form[data-admin-pjax-form]');
+  if (!form || e.defaultPrevented) return;
+  e.preventDefault();
+  const target = new URL(form.action, location.origin);
+  target.search = new URLSearchParams(new FormData(form)).toString();
+  window.__adminPjax(target.href, true);
+});
+
+let draggedWorkCard = null;
+
+document.addEventListener('dragstart', function (e) {
+  const card = e.target.closest('.work-admin-card[draggable="true"]');
+  if (!card) return;
+  draggedWorkCard = card;
+  card.classList.add('is-dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', card.dataset.workId || '');
+});
+
+document.addEventListener('dragover', function (e) {
+  const target = e.target.closest('.work-admin-card[draggable="true"]');
+  if (!target || !draggedWorkCard || target === draggedWorkCard) return;
+  e.preventDefault();
+  const box = target.getBoundingClientRect();
+  const insertAfter = e.clientY > box.top + box.height / 2;
+  target.parentElement.insertBefore(draggedWorkCard, insertAfter ? target.nextElementSibling : target);
+});
+
+document.addEventListener('drop', function (e) {
+  if (!draggedWorkCard) return;
+  e.preventDefault();
+  persistWorkOrder(draggedWorkCard.parentElement);
+});
+
+document.addEventListener('dragend', function () {
+  if (draggedWorkCard) draggedWorkCard.classList.remove('is-dragging');
+  draggedWorkCard = null;
+});
+
+document.addEventListener('change', function (e) {
+  const selectAll = e.target.closest('[data-guestbook-select-all]');
+  const messageCheckbox = e.target.closest('.guestbook-select');
+  if (!selectAll && !messageCheckbox) return;
+
+  const checkboxes = Array.from(document.querySelectorAll('.guestbook-select'));
+  if (selectAll) checkboxes.forEach(function (checkbox) { checkbox.checked = selectAll.checked; });
+  const selected = checkboxes.filter(function (checkbox) { return checkbox.checked; });
+  const counter = document.querySelector('[data-guestbook-selected]');
+  if (counter) counter.textContent = '已选 ' + selected.length + ' 条';
+  document.querySelectorAll('[data-guestbook-bulk-button]').forEach(function (button) {
+    button.disabled = selected.length === 0;
+  });
+  const master = document.querySelector('[data-guestbook-select-all]');
+  if (master && !selectAll) {
+    master.checked = selected.length === checkboxes.length;
+    master.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+  }
+});
+
+async function persistWorkOrder(container) {
+  const status = document.getElementById('work-order-status');
+  const cards = Array.from(container.querySelectorAll('.work-admin-card[data-work-id]'));
+  const order = cards.map(function (card, index) {
+    return { id: Number(card.dataset.workId), sort_order: index };
+  });
+  if (status) status.textContent = '正在保存…';
+  try {
+    const res = await fetch('/api/works/reorder', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ order: order })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (status) status.textContent = '顺序已保存';
+    Toast.success('作品顺序已保存');
+  } catch (_err) {
+    if (status) status.textContent = '保存失败，请刷新后重试';
+    Toast.error('作品顺序保存失败');
+  }
+}
+
+initAdminPage();

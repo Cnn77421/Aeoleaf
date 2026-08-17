@@ -3,36 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="view-transition" content="same-origin">
   <title><%= title %></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="<%= asset('/css/main.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/admin.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/admin-v2.css') %>">
+  <%- include('partials/styles') %>
 </head>
 <body class="admin-body">
-  <aside class="admin-sidebar">
-    <div class="admin-logo">
-      <a href="/">aeoleaf <span>风叶</span></a>
-    </div>
-    <nav class="admin-nav">
-      <a href="/admin/dashboard">Dashboard</a>
-      <a href="/admin/posts">Posts</a>
-      <a href="/admin/works">Works</a>
-      <a href="/admin/visitors">Visitors</a>
-      <a href="/admin/settings" class="active">Settings</a>
-    </nav>
-    <div class="admin-footer">
-      <a href="/" target="_blank">View Site</a>
-      <form method="POST" action="/admin/logout" style="margin-top:0.5rem">
-        <button type="submit" class="btn-link">Log Out</button>
-      </form>
-    </div>
-  </aside>
+  <%- include('partials/sidebar', { activePage: 'settings' }) %>
   <main class="admin-main">
     <div class="admin-header">
-      <h1>Settings</h1>
+      <div><h1>站点设置</h1><p class="dashboard-subtitle">配置品牌信息、首页展示与社交链接</p></div>
     </div>
     <% if (typeof notice !== 'undefined' && notice) { %>
     <div class="admin-notice admin-notice--ok" role="status"><%= notice %></div>
@@ -40,72 +19,80 @@
     <% if (typeof saveError !== 'undefined' && saveError) { %>
     <div class="admin-notice admin-notice--err" role="alert"><%= saveError %></div>
     <% } %>
-    <form method="POST" action="/admin/settings" class="settings-form" accept-charset="UTF-8" enctype="multipart/form-data">
+    <form method="POST" action="/admin/settings" class="settings-form" accept-charset="UTF-8" enctype="multipart/form-data" data-admin-async-form>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <div class="form-group">
-        <label>Site Title</label>
-        <input type="text" name="site_title" value="<%= settings.site_title || '' %>">
+        <label for="site-title">站点标题</label>
+        <input id="site-title" type="text" name="site_title" value="<%= settings.site_title || '' %>">
       </div>
       <div class="form-group">
-        <label>Site Subtitle</label>
-        <input type="text" name="site_subtitle" value="<%= settings.site_subtitle || '' %>">
+        <label for="site-subtitle">站点副标题</label>
+        <input id="site-subtitle" type="text" name="site_subtitle" value="<%= settings.site_subtitle || '' %>">
       </div>
       <div class="form-group">
-        <label>首页背景图（桌面端）</label>
-        <input type="text" name="home_hero_image" value="<%= settings.home_hero_image || '' %>" placeholder="/uploads/general/... 或 https://...">
-        <input type="file" name="home_hero_desktop_file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic,image/heif,image/bmp">
+        <label for="home-hero-image">首页背景图（桌面端）</label>
+        <input id="home-hero-image" type="text" name="home_hero_image" value="<%= settings.home_hero_image || '' %>" placeholder="/uploads/general/... 或 https://...">
+        <label for="home-hero-desktop-file" class="visually-hidden">上传桌面端背景图</label>
+        <input id="home-hero-desktop-file" type="file" name="home_hero_desktop_file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic,image/heif,image/bmp">
         <p class="form-hint">上传新图片会覆盖上方 URL；留空并保存可恢复自动回退背景。</p>
       </div>
       <div class="form-group">
-        <label>桌面端背景焦点</label>
-        <select name="home_hero_position">
+        <label for="home-hero-position">桌面端背景焦点</label>
+        <select id="home-hero-position" name="home_hero_position">
           <% [['center center','居中'],['center top','中上'],['center bottom','中下'],['left center','左侧'],['right center','右侧'],['left top','左上'],['right top','右上'],['left bottom','左下'],['right bottom','右下']].forEach(function (opt) { %>
           <option value="<%= opt[0] %>"<%= (settings.home_hero_position || 'center center') === opt[0] ? ' selected' : '' %>><%= opt[1] %></option>
           <% }); %>
         </select>
       </div>
       <div class="form-group">
-        <label>首页背景图（移动端，可选）</label>
-        <input type="text" name="home_hero_image_mobile" value="<%= settings.home_hero_image_mobile || '' %>" placeholder="留空则使用桌面背景">
-        <input type="file" name="home_hero_mobile_file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic,image/heif,image/bmp">
+        <label for="home-hero-image-mobile">首页背景图（移动端，可选）</label>
+        <input id="home-hero-image-mobile" type="text" name="home_hero_image_mobile" value="<%= settings.home_hero_image_mobile || '' %>" placeholder="留空则使用桌面背景">
+        <label for="home-hero-mobile-file" class="visually-hidden">上传移动端背景图</label>
+        <input id="home-hero-mobile-file" type="file" name="home_hero_mobile_file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic,image/heif,image/bmp">
       </div>
       <div class="form-group">
-        <label>移动端背景焦点</label>
-        <select name="home_hero_position_mobile">
+        <label for="home-hero-position-mobile">移动端背景焦点</label>
+        <select id="home-hero-position-mobile" name="home_hero_position_mobile">
           <% [['center center','居中'],['center top','中上'],['center bottom','中下'],['left center','左侧'],['right center','右侧'],['left top','左上'],['right top','右上'],['left bottom','左下'],['right bottom','右下']].forEach(function (opt) { %>
           <option value="<%= opt[0] %>"<%= (settings.home_hero_position_mobile || 'center center') === opt[0] ? ' selected' : '' %>><%= opt[1] %></option>
           <% }); %>
         </select>
       </div>
       <div class="form-group">
-        <label>About Text (Markdown)</label>
-        <textarea name="about_text" rows="10"><%= settings.about_text || '' %></textarea>
+        <label for="about-text">关于页正文（Markdown）</label>
+        <textarea id="about-text" name="about_text" rows="10"><%= settings.about_text || '' %></textarea>
       </div>
       <div class="form-group">
-        <label>About Image URL</label>
-        <input type="text" name="about_image" value="<%= settings.about_image || '' %>">
+        <label for="about-image">关于页图片 URL</label>
+        <input id="about-image" type="text" name="about_image" value="<%= settings.about_image || '' %>">
       </div>
       <div class="form-group">
-        <label>About 页副标题（留空则用站点副标题）</label>
-        <input type="text" name="about_tagline" value="<%= settings.about_tagline || '' %>" placeholder="一句话介绍自己或本站">
+        <label for="about-tagline">关于页副标题（留空则用站点副标题）</label>
+        <input id="about-tagline" type="text" name="about_tagline" value="<%= settings.about_tagline || '' %>" placeholder="一句话介绍自己或本站">
       </div>
       <div class="form-group">
-        <label>About 页 SEO / 分享摘要（留空则从 About 正文截取）</label>
-        <textarea name="about_meta" rows="2" placeholder="用于 meta description 与 Open Graph"><%= settings.about_meta || '' %></textarea>
+        <label for="about-meta">关于页 SEO / 分享摘要（留空则从正文截取）</label>
+        <textarea id="about-meta" name="about_meta" rows="2" placeholder="用于 meta description 与 Open Graph"><%= settings.about_meta || '' %></textarea>
       </div>
       <div class="form-group">
-        <label>联系邮箱</label>
-        <input type="text" name="contact_email" value="<%= settings.contact_email || '' %>" placeholder="you@example.com">
+        <label for="contact-email">联系邮箱</label>
+        <input id="contact-email" type="email" name="contact_email" value="<%= settings.contact_email || '' %>" placeholder="you@example.com">
       </div>
       <div class="form-group">
-        <label>QQ</label>
-        <input type="text" name="contact_qq" value="<%= settings.contact_qq || '' %>" placeholder="选填">
+        <label for="contact-qq">QQ</label>
+        <input id="contact-qq" type="text" name="contact_qq" value="<%= settings.contact_qq || '' %>" placeholder="选填">
       </div>
       <div class="form-group">
-        <label>社交链接（JSON 数组）</label>
-        <textarea name="social_links" rows="5" placeholder='[{"label":"GitHub","url":"https://github.com/..."}]'><%= settings.social_links || '[]' %></textarea>
+        <label for="guestbook-sensitive-words">留言敏感词</label>
+        <textarea id="guestbook-sensitive-words" name="guestbook_sensitive_words" rows="5" maxlength="5000" placeholder="每行一个词，也可以用逗号分隔"><%= settings.guestbook_sensitive_words || '' %></textarea>
+        <p class="form-hint">命中后会在待审核队列中标记风险，不会自动删除或公开。</p>
+      </div>
+      <div class="form-group">
+        <label for="social-links">社交链接（JSON 数组）</label>
+        <textarea id="social-links" name="social_links" rows="5" placeholder='[{"label":"GitHub","url":"https://github.com/..."}]'><%= settings.social_links || '[]' %></textarea>
         <p class="form-hint">每项包含 label 与 url；url 仅支持 http(s)、mailto: 或以 / 开头的站内路径。</p>
       </div>
-      <button type="submit" class="btn-primary">Save Settings</button>
+      <button type="submit" class="btn-primary">保存设置</button>
     </form>
   </main>
   <script src="<%= asset('/js/toast.js') %>"></script>

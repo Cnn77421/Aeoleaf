@@ -20,6 +20,7 @@
   --home-backdrop-saturation: 100%;
   --home-backdrop-brightness: 100%;
   --home-backdrop-wash: 0;
+  --home-theme-wash: 0.04;
   position: fixed;
   inset: 0;
   z-index: 0;
@@ -63,8 +64,12 @@
 
 .ref-home-backdrop__wash {
   background: rgba(247, 249, 250, 0.84);
-  opacity: var(--home-backdrop-wash);
+  opacity: calc(var(--home-backdrop-wash) + var(--home-theme-wash));
   will-change: opacity;
+}
+
+[data-theme="dark"] .ref-home-backdrop {
+  --home-theme-wash: 0.18;
 }
 
 [data-theme="dark"] .ref-home-backdrop__wash {

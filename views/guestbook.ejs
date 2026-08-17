@@ -6,7 +6,7 @@
   description: '留言板 — 给风叶留下你的祝福',
   canonicalPath: '/guestbook',
   twitterCard: 'summary',
-  extraCss: ['/css/guestbook.css', '/css/public-pages.css']
+  extraCss: ['/css/public-pages.css', '/css/guestbook.css']
 }) %>
 </head>
 <body class="guestbook-page">
@@ -53,11 +53,19 @@
             <span id="gb-char-count" class="gb-form__char-count">0 / 500</span>
             <button type="submit" id="gb-submit" class="gb-form__submit">送出祝福</button>
           </div>
+          <p id="gb-submit-status" class="gb-form__status" role="status" hidden></p>
         </form>
       </section>
 
       <!-- Messages -->
       <section class="gb-messages">
+        <header class="gb-wall__heading">
+          <div>
+            <span class="gb-wall__eyebrow">Message wall</span>
+            <h2>风里的来信</h2>
+          </div>
+          <span id="gb-wall-count" class="gb-wall__count" data-count="<%= messages.length %>"><%= messages.length %> 张留言</span>
+        </header>
         <div id="gb-list" class="gb-list">
           <% if (messages.length === 0) { %>
             <div class="gb-empty">
@@ -65,19 +73,25 @@
             </div>
           <% } else { %>
             <% messages.forEach(function(msg) { %>
-              <article class="gb-card" data-id="<%= msg.id %>">
-                <div class="gb-card__header">
+              <article class="gb-card" data-id="<%= msg.id %>" tabindex="0">
+                <div class="gb-card__photo">
+                  <span class="gb-card__quote" aria-hidden="true">“</span>
                   <% if (msg.avatar) { %>
                     <img src="<%= msg.avatar %>" alt="" class="gb-card__avatar">
                   <% } else { %>
                     <img src="https://ui-avatars.com/api/?name=<%= encodeURIComponent(msg.name) %>&background=random&color=fff&rounded=true&bold=true&size=128" alt="" class="gb-card__avatar">
                   <% } %>
+                </div>
+                <div class="gb-card__caption">
                   <div class="gb-card__meta">
                     <span class="gb-card__name"><%= msg.name %></span>
-                    <time class="gb-card__time"><%= msg.created_at %></time>
+                    <time class="gb-card__time" title="<%= msg.created_at %>"><%= msg.created_at %></time>
                   </div>
+                  <div class="gb-card__body"><%= msg.message %></div>
+                  <% if (msg.admin_reply) { %>
+                  <div class="gb-card__reply"><strong>站长回复</strong><span><%= msg.admin_reply %></span></div>
+                  <% } %>
                 </div>
-                <div class="gb-card__body"><%= msg.message %></div>
               </article>
             <% }); %>
           <% } %>
@@ -101,6 +115,7 @@
     var avatarStyleEl = document.getElementById('gb-avatar-style');
     var charCount = document.getElementById('gb-char-count');
     var submitBtn = document.getElementById('gb-submit');
+    var submitStatus = document.getElementById('gb-submit-status');
 
     // Restore saved name
     try {
@@ -132,29 +147,22 @@
       charCount.textContent = msgInput.value.length + ' / 500';
     });
 
-    function makeAvatarHtml(name, avatar) {
-      if (avatar) return '<img src="' + avatar + '" alt="" class="gb-card__avatar">';
-      var url = avatarUrl(name);
-      return '<img src="' + url + '" alt="" class="gb-card__avatar">';
+    function compactTime(value) {
+      var match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (!match) return value;
+      return Number(match[2]) + '月' + Number(match[3]) + '日';
     }
 
-    function createCard(msg) {
-      var article = document.createElement('article');
-      article.className = 'gb-card gb-card--new';
-      article.dataset.id = msg.id;
-
-      article.innerHTML =
-        '<div class="gb-card__header">' +
-          makeAvatarHtml(msg.name, msg.avatar) +
-          '<div class="gb-card__meta">' +
-            '<span class="gb-card__name">' + msg.name + '</span>' +
-            '<time class="gb-card__time">' + msg.created_at + '</time>' +
-          '</div>' +
-        '</div>' +
-        '<div class="gb-card__body">' + msg.message + '</div>';
-
-      return article;
+    function compactExistingTimes() {
+      var times = list.querySelectorAll('.gb-card__time');
+      times.forEach(function (time) {
+        var fullTime = time.textContent.trim();
+        time.title = fullTime;
+        time.textContent = compactTime(fullTime);
+      });
     }
+
+    compactExistingTimes();
 
     form.addEventListener('submit', function (e) {
       e.preventDefault();
@@ -179,20 +187,11 @@
 
           try { localStorage.setItem('gb_name', name); } catch (_e) {}
 
-          var empty = list.querySelector('.gb-empty');
-          if (empty) empty.remove();
-
-          var card = createCard(data);
-          list.insertBefore(card, list.firstChild);
-
           msgInput.value = '';
           charCount.textContent = '0 / 500';
-
-          if (window.confetti) {
-            confetti({ particleCount: 40, spread: 50, origin: { y: 0.7 }, disableForReducedMotion: true });
-          }
-
-          submitBtn.textContent = '已送出!';
+          submitStatus.textContent = '留言已提交，审核通过后会显示在留言墙。';
+          submitStatus.hidden = false;
+          submitBtn.textContent = '已提交审核';
           setTimeout(function () {
             submitBtn.textContent = '送出祝福';
             submitBtn.disabled = false;

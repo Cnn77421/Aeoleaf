@@ -167,6 +167,7 @@ function initDB() {
       ('home_hero_position_mobile', 'center center'),
       ('contact_email', ''),
       ('contact_qq', ''),
+      ('guestbook_sensitive_words', ''),
       ('social_links', '[]');
   `);
 
@@ -244,9 +245,37 @@ function initDB() {
       name TEXT NOT NULL,
       message TEXT NOT NULL,
       avatar TEXT DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pending',
+      risk_flags TEXT NOT NULL DEFAULT '[]',
+      ip TEXT DEFAULT '',
+      admin_reply TEXT DEFAULT '',
+      replied_at TEXT DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
   `);
+
+  try { rawDb.exec("ALTER TABLE guestbook ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE guestbook ADD COLUMN risk_flags TEXT NOT NULL DEFAULT '[]'"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE guestbook ADD COLUMN ip TEXT DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE guestbook ADD COLUMN admin_reply TEXT DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE guestbook ADD COLUMN replied_at TEXT DEFAULT ''"); } catch (e) {}
+  rawDb.exec('CREATE INDEX IF NOT EXISTS idx_guestbook_status ON guestbook(status)');
+
+  rawDb.exec(`
+    CREATE TABLE IF NOT EXISTS guestbook_audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guestbook_id INTEGER,
+      action TEXT NOT NULL,
+      previous_status TEXT DEFAULT '',
+      new_status TEXT DEFAULT '',
+      message_name TEXT DEFAULT '',
+      message_excerpt TEXT DEFAULT '',
+      details TEXT DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+  `);
+  rawDb.exec('CREATE INDEX IF NOT EXISTS idx_guestbook_audit_created ON guestbook_audit_log(created_at)');
+  rawDb.exec('CREATE INDEX IF NOT EXISTS idx_guestbook_audit_message ON guestbook_audit_log(guestbook_id)');
 
   refreshBlacklistCache();
   return rawDb;

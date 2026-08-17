@@ -3,6 +3,7 @@ const { db } = require('../../config/db');
 const { rateLimit } = require('../../middleware/rateLimit');
 const { JSDOM } = require('jsdom');
 const createDOMPurify = require('dompurify');
+const { parseSensitiveWords, detectGuestbookRisk } = require('../../lib/guestbookModeration');
 
 const window = new JSDOM('').window;
 const DOMPurify = createDOMPurify(window);
@@ -14,9 +15,9 @@ const postLimiter = rateLimit({
   keyPrefix: 'guestbook:'
 });
 
-// GET /api/guestbook — list all messages
+// GET /api/guestbook — list public messages
 router.get('/', (req, res) => {
-  const rows = db.prepare('SELECT * FROM guestbook ORDER BY created_at DESC').all();
+  const rows = db.prepare("SELECT * FROM guestbook WHERE status = 'approved' ORDER BY created_at DESC").all();
   res.json(rows);
 });
 
@@ -36,9 +37,22 @@ router.post('/', postLimiter, (req, res) => {
     return res.status(400).json({ error: '昵称和留言内容不能为空' });
   }
 
+  const sensitiveSetting = db.prepare("SELECT value FROM settings WHERE key = 'guestbook_sensitive_words'").get();
+  const duplicate = db.prepare(`
+    SELECT COUNT(*) AS cnt FROM guestbook
+    WHERE name = ? AND message = ? AND created_at >= datetime('now', '-24 hours', 'localtime')
+  `).get(cleanName, cleanMessage).cnt > 0;
+  const riskFlags = detectGuestbookRisk({
+    name: cleanName,
+    message: cleanMessage,
+    sensitiveWords: parseSensitiveWords(sensitiveSetting?.value),
+    duplicate
+  });
+  const requestIp = String(req.ip || req.socket?.remoteAddress || '').slice(0, 100);
+
   const result = db.prepare(
-    'INSERT INTO guestbook (name, message, avatar) VALUES (?, ?, ?)'
-  ).run(cleanName, cleanMessage, cleanAvatar);
+    "INSERT INTO guestbook (name, message, avatar, status, risk_flags, ip) VALUES (?, ?, ?, 'pending', ?, ?)"
+  ).run(cleanName, cleanMessage, cleanAvatar, JSON.stringify(riskFlags), requestIp);
 
   const row = db.prepare('SELECT * FROM guestbook WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(row);

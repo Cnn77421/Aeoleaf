@@ -3,31 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="view-transition" content="same-origin">
   <title><%= title %></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="<%= asset('/css/main.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/admin.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/admin-v2.css') %>">
+  <%- include('partials/styles') %>
 </head>
 <body class="admin-body">
-  <aside class="admin-sidebar">
-    <div class="admin-logo"><a href="/">aeoleaf <span>风叶</span></a></div>
-    <nav class="admin-nav">
-      <a href="/admin/dashboard">Dashboard</a>
-      <a href="/admin/posts">Posts</a>
-      <a href="/admin/works">Works</a>
-      <a href="/admin/visitors" class="active">Visitors</a>
-      <a href="/admin/settings">Settings</a>
-    </nav>
-    <div class="admin-footer">
-      <a href="/" target="_blank">View Site</a>
-      <form method="POST" action="/admin/logout" style="margin-top:0.5rem">
-        <button type="submit" class="btn-link">Log Out</button>
-      </form>
-    </div>
-  </aside>
+  <%- include('partials/sidebar', { activePage: 'visitors' }) %>
 
   <main class="admin-main">
     <div class="breadcrumb">
@@ -63,7 +44,7 @@
         <h2>请求信息</h2>
         <div class="detail-grid">
           <div><strong>访问时间:</strong> <%= fmtTime(visitor.tracked_at) %></div>
-          <div><strong>IP:</strong> <%= visitor.ip || '—' %> <% if (visitor.ip) { %><button class="btn-link btn-danger-text" onclick="blacklistIp('<%= (visitor.ip || '').replace(/'/g, "\\'") %>')">拉黑</button><% } %></div>
+          <div><strong>IP:</strong> <%= visitor.ip || '—' %> <% if (visitor.ip) { %><button class="btn-link btn-danger-text" type="button" data-blacklist-add data-ip="<%= visitor.ip || '' %>">拉黑</button><% } %></div>
           <div><strong>完整 URL:</strong> <span style="word-break:break-all"><%= visitor.full_url || '—' %></span></div>
           <div><strong>路径:</strong> <%= visitor.path || '/' %></div>
           <div><strong>来源页面:</strong> <span style="word-break:break-all"><%= visitor.referer || '—' %></span></div>
@@ -178,25 +159,6 @@
       </div>
     </div>
   </main>
-  <script>
-    async function blacklistIp(ip) {
-      if (!ip) return;
-      if (!confirm('确定要将 ' + ip + ' 加入黑名单？该 IP 将无法访问网站。')) return;
-      try {
-        var res = await fetch('/admin/visitors/blacklist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ip: ip, reason: '手动拉黑' })
-        });
-        if (res.ok) {
-          alert('已拉黑');
-          if (window.__adminPjax) window.__adminPjax(location.href, false);
-          else location.reload();
-        }
-        else { alert('操作失败'); }
-      } catch (e) { alert('网络错误'); }
-    }
-  </script>
   <script src="<%= asset('/js/toast.js') %>"></script>
   <script src="<%= asset('/js/admin.js') %>"></script>
 </body>

@@ -1,0 +1,64 @@
+<aside class="navbar navbar-vertical navbar-expand-lg admin-sidebar" data-bs-theme="dark" aria-label="后台导航">
+  <div class="container-fluid">
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#admin-menu" aria-controls="admin-menu" aria-expanded="false" aria-label="展开导航">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="navbar-brand admin-logo">
+      <a href="/admin/dashboard" aria-label="Aeoleaf 后台首页">
+        <span class="admin-logo-mark">A</span>
+        <span class="admin-logo-copy">aeoleaf <small>风叶后台</small></span>
+      </a>
+    </div>
+    <div class="collapse navbar-collapse" id="admin-menu">
+      <ul class="navbar-nav admin-nav">
+        <li class="nav-item">
+          <a href="/admin/dashboard" class="nav-link <%= activePage === 'dashboard' ? 'active' : '' %>"<% if (activePage === 'dashboard') { %> aria-current="page"<% } %>>
+            <i class="ti ti-layout-dashboard" aria-hidden="true"></i><span class="nav-link-title">概览</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="/admin/posts" class="nav-link <%= activePage === 'posts' ? 'active' : '' %>"<% if (activePage === 'posts') { %> aria-current="page"<% } %>>
+            <i class="ti ti-file-text" aria-hidden="true"></i><span class="nav-link-title">文章</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="/admin/works" class="nav-link <%= activePage === 'works' ? 'active' : '' %>"<% if (activePage === 'works') { %> aria-current="page"<% } %>>
+            <i class="ti ti-folders" aria-hidden="true"></i><span class="nav-link-title">作品</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="/admin/guestbook" class="nav-link <%= activePage === 'guestbook' ? 'active' : '' %>"<% if (activePage === 'guestbook') { %> aria-current="page"<% } %>>
+            <i class="ti ti-message" aria-hidden="true"></i><span class="nav-link-title">留言</span>
+            <% if (guestbookPending > 0) { %><span class="admin-nav-count" data-count="<%= guestbookPending %>" aria-label="<%= guestbookPending %> 条待审核"><%= guestbookPending > 99 ? '99+' : guestbookPending %></span><% } %>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="/admin/media" class="nav-link <%= activePage === 'media' ? 'active' : '' %>"<% if (activePage === 'media') { %> aria-current="page"<% } %>>
+            <i class="ti ti-photo" aria-hidden="true"></i><span class="nav-link-title">媒体库</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="/admin/visitors" class="nav-link <%= activePage === 'visitors' ? 'active' : '' %>"<% if (activePage === 'visitors') { %> aria-current="page"<% } %>>
+            <i class="ti ti-chart-histogram" aria-hidden="true"></i><span class="nav-link-title">访客分析</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="/admin/settings" class="nav-link <%= activePage === 'settings' ? 'active' : '' %>"<% if (activePage === 'settings') { %> aria-current="page"<% } %>>
+            <i class="ti ti-settings" aria-hidden="true"></i><span class="nav-link-title">站点设置</span>
+          </a>
+        </li>
+      </ul>
+      <div class="admin-footer">
+        <a href="/" target="_blank" rel="noopener" class="nav-link">
+          <i class="ti ti-external-link" aria-hidden="true"></i><span class="nav-link-title">查看站点</span>
+        </a>
+        <form method="POST" action="/admin/logout">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button type="submit" class="nav-link admin-logout">
+            <i class="ti ti-logout-2" aria-hidden="true"></i><span class="nav-link-title">退出登录</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</aside>

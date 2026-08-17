@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <%- include('partials/styles') %>
+</head>
+<body class="admin-body">
+  <%- include('partials/sidebar', { activePage: 'guestbook' }) %>
+  <main class="admin-main">
+    <div class="admin-header">
+      <div><h1><%= view === 'audit' ? '审核日志' : '留言' %></h1><p class="dashboard-subtitle"><%= view === 'audit' ? '追踪留言审核、回复和删除操作' : '审核公开内容并回复访客' %></p></div>
+      <div class="admin-header-actions">
+        <a href="<%= view === 'audit' ? '/admin/guestbook' : '/admin/guestbook/audit' %>" class="btn-sm"><i class="ti ti-<%= view === 'audit' ? 'message' : 'history' %>"></i> <%= view === 'audit' ? '返回审核' : '审核日志' %></a>
+        <a href="/guestbook" target="_blank" rel="noopener" class="btn-sm"><i class="ti ti-external-link"></i> 查看留言墙</a>
+      </div>
+    </div>
+
+    <% if (notice) { %><div class="admin-notice" role="status"><%= notice %></div><% } %>
+
+    <% if (view === 'moderation') { %>
+    <nav class="guestbook-filters" aria-label="留言筛选">
+      <a class="<%= status === 'pending' ? 'active' : '' %>" href="/admin/guestbook">待审核 <span><%= counts.pending %></span></a>
+      <a class="<%= status === 'approved' ? 'active' : '' %>" href="/admin/guestbook?status=approved">公开 <span><%= counts.approved %></span></a>
+      <a class="<%= status === 'hidden' ? 'active' : '' %>" href="/admin/guestbook?status=hidden">已隐藏 <span><%= counts.hidden %></span></a>
+      <a class="<%= status === 'all' ? 'active' : '' %>" href="/admin/guestbook?status=all">全部 <span><%= counts.total %></span></a>
+    </nav>
+
+    <% if (messages.length) { %>
+    <form id="guestbook-bulk-form" method="POST" action="/admin/guestbook/bulk" class="guestbook-bulk-bar" data-guestbook-form onsubmit="return confirm('确认对选中的留言执行批量操作吗？')">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="return_to" value="<%= returnTo %>">
+      <label><input type="checkbox" data-guestbook-select-all> 全选当前列表</label>
+      <span data-guestbook-selected>已选 0 条</span>
+      <div>
+        <button class="btn-sm" type="submit" name="action" value="approve" data-guestbook-bulk-button disabled><i class="ti ti-check"></i> 批量通过</button>
+        <button class="btn-sm" type="submit" name="action" value="reject" data-guestbook-bulk-button disabled><i class="ti ti-eye-off"></i> 批量拒绝</button>
+        <button class="btn-sm btn-danger" type="submit" name="action" value="delete" data-guestbook-bulk-button disabled><i class="ti ti-trash"></i> 批量删除</button>
+      </div>
+    </form>
+    <% } %>
+
+    <div class="guestbook-admin-list">
+      <% if (!messages.length) { %>
+        <p class="empty-state">当前筛选下暂无留言</p>
+      <% } %>
+      <% messages.forEach(message => { %>
+        <article class="guestbook-admin-card" data-message-id="<%= message.id %>" tabindex="-1">
+          <header>
+            <input class="guestbook-select" type="checkbox" form="guestbook-bulk-form" name="message_ids" value="<%= message.id %>" aria-label="选择 <%= message.name %> 的留言">
+            <div class="guestbook-admin-author">
+              <img src="<%= message.avatar || ('https://ui-avatars.com/api/?name=' + encodeURIComponent(message.name)) %>" alt="">
+              <div><strong><%= message.name %></strong><time><%= message.created_at %></time></div>
+            </div>
+            <span class="badge badge-<%= message.status === 'approved' ? 'published' : 'draft' %>"><%= message.status === 'pending' ? '待审核' : (message.status === 'approved' ? '公开' : '已隐藏') %></span>
+          </header>
+          <% if (message.riskFlags.length) { %>
+          <div class="guestbook-risk" role="note"><i class="ti ti-alert-triangle"></i><strong>风险提示</strong><span><%= message.riskFlags.join('；') %></span></div>
+          <% } %>
+          <p class="guestbook-admin-message"><%= message.message %></p>
+          <% if (message.ip) { %><p class="guestbook-source">来源 IP：<code><%= message.ip %></code></p><% } %>
+          <form method="POST" action="/admin/guestbook/<%= message.id %>/reply" class="guestbook-reply-form" data-guestbook-form>
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="return_to" value="<%= returnTo %>">
+            <label for="reply-<%= message.id %>">站长回复</label>
+            <textarea id="reply-<%= message.id %>" name="admin_reply" rows="2" maxlength="1000" placeholder="留空保存可清除回复"><%= message.admin_reply || '' %></textarea>
+            <button class="btn-sm" type="submit"><i class="ti ti-message-reply"></i> 保存回复</button>
+          </form>
+          <footer>
+            <% if (message.status !== 'approved') { %>
+            <form method="POST" action="/admin/guestbook/<%= message.id %>/status" data-guestbook-form>
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="return_to" value="<%= returnTo %>">
+              <input type="hidden" name="status" value="approved">
+              <button class="btn-sm" type="submit"><i class="ti ti-check"></i> <%= message.status === 'pending' ? '通过并公开' : '恢复公开' %></button>
+            </form>
+            <% } %>
+            <% if (message.status !== 'hidden') { %>
+            <form method="POST" action="/admin/guestbook/<%= message.id %>/status" data-guestbook-form>
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="return_to" value="<%= returnTo %>">
+              <input type="hidden" name="status" value="hidden">
+              <button class="btn-sm" type="submit"><i class="ti ti-eye-off"></i> <%= message.status === 'pending' ? '拒绝' : '隐藏' %></button>
+            </form>
+            <% } %>
+            <form method="POST" action="/admin/guestbook/<%= message.id %>/delete" data-guestbook-form onsubmit="return confirm('确定永久删除这条留言吗？')">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="return_to" value="<%= returnTo %>">
+              <button class="btn-sm btn-danger" type="submit"><i class="ti ti-trash"></i> 删除</button>
+            </form>
+          </footer>
+        </article>
+      <% }); %>
+    </div>
+    <% } else { %>
+    <% const actionLabels = { approve: '通过公开', reject: '拒绝隐藏', reset: '退回待审', reply: '保存回复', clear_reply: '清除回复', delete: '删除留言' }; %>
+    <div class="guestbook-audit-list">
+      <% if (!auditLogs.length) { %><p class="empty-state">暂无审核操作记录</p><% } %>
+      <% auditLogs.forEach(log => { %>
+      <article class="guestbook-audit-item">
+        <header><strong><%= actionLabels[log.action] || log.action %></strong><time><%= log.created_at %></time></header>
+        <p><b><%= log.message_name || '未知访客' %></b>：<%= log.message_excerpt || '留言内容已不可用' %></p>
+        <footer>
+          <span>#<%= log.guestbook_id || '-' %></span>
+          <% if (log.previous_status || log.new_status) { %><span><%= log.previous_status || '—' %> → <%= log.new_status || '—' %></span><% } %>
+          <% if (log.details) { %><span><%= log.details %></span><% } %>
+        </footer>
+      </article>
+      <% }); %>
+    </div>
+    <% } %>
+  </main>
+  <script src="<%= asset('/js/toast.js') %>"></script>
+  <script src="<%= asset('/js/admin.js') %>"></script>
+</body>
+</html>

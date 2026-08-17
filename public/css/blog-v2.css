@@ -2,20 +2,10 @@
 
 .journal-page,
 .journal-post-page {
-  background:
-    radial-gradient(circle at 12% 8%, color-mix(in oklab, var(--accent) 7%, transparent), transparent 28%),
-    var(--bg);
+  background: var(--bg);
 }
 
-.journal-post-page { --nav-height: 76px; }
-
-html[data-theme="dark"] body.journal-post-page {
-  --bg: #202124;
-  --surface: #202124;
-  --bg-elev-1: #202124;
-  --bg-elev-2: #292a2e;
-  --border: #35373c;
-}
+.journal-post-page { --journal-header-offset: 2.625rem; }
 
 .journal-main { padding-top: calc(var(--nav-height) + 48px); }
 
@@ -195,12 +185,9 @@ html[data-theme="dark"] body.journal-post-page {
 .journal-pagination a:hover { color: var(--accent); border-color: var(--accent); }
 .journal-pagination strong { color: #fff; background: var(--accent); }
 
-/* Article detail */
-.journal-post-page .site-header {
-  background: linear-gradient(90deg, color-mix(in oklab, var(--bg) 82%, #365063), color-mix(in oklab, var(--bg) 84%, #624735));
-}
-.journal-post-page .nav-container { max-width: 1280px; min-height: 76px; }
-.journal-post-page .journal-main { padding-top: var(--nav-height); padding-bottom: 50px; }
+/* Article detail: keep the article layout, but use the same public header
+   proportions as the rest of the site instead of a wider/taller variant. */
+.journal-post-page .journal-main { padding-top: var(--journal-header-offset); padding-bottom: 50px; }
 .journal-post-page .journal-article {
   max-width: none;
   margin: 0;
