@@ -140,12 +140,121 @@ test('server routes, auth, CRUD, upload rejection, feeds, and tracking work toge
   });
   assert.equal(work.response.status, 201);
   assert.equal((await request(base, '/api/works/integration-work', { write: false })).json.featured, 1);
+  const reorderedWork = await request(base, '/api/works/reorder', {
+    method: 'PUT', headers: authHeaders,
+    json: { order: [{ id: work.json.id, sort_order: 0 }] }
+  });
+  assert.equal(reorderedWork.response.status, 200);
+  assert.equal(reorderedWork.json.ok, true);
+
+  const moderationSettings = new FormData();
+  moderationSettings.append('guestbook_sensitive_words', 'blockedterm');
+  const savedModerationSettings = await request(base, '/admin/settings', {
+    method: 'POST', headers: { ...authHeaders, Accept: 'application/json' }, body: moderationSettings
+  });
+  assert.equal(savedModerationSettings.response.status, 200);
+  assert.equal(savedModerationSettings.json.ok, true);
 
   const guestbook = await request(base, '/api/guestbook', {
     method: 'POST', json: { name: '<b>Alice</b>', message: '<script>x</script>Hello' }
   });
   assert.equal(guestbook.response.status, 201);
   assert.equal(guestbook.json.message.includes('<script>'), false);
+  assert.equal(guestbook.json.status, 'pending');
+  const publicMessagesBeforeApproval = await request(base, '/api/guestbook', { write: false });
+  assert.equal(publicMessagesBeforeApproval.json.some((message) => message.id === guestbook.json.id), false);
+
+  const riskyGuestbook = await request(base, '/api/guestbook', {
+    method: 'POST', json: { name: 'Link sender', message: 'https://one.example https://two.example' }
+  });
+  assert.equal(riskyGuestbook.response.status, 201);
+  assert.deepEqual(JSON.parse(riskyGuestbook.json.risk_flags), ['包含 2 个链接']);
+  const rejectCandidate = await request(base, '/api/guestbook', {
+    method: 'POST', json: { name: 'Reject me', message: 'Batch rejection candidate' }
+  });
+  const deleteCandidate = await request(base, '/api/guestbook', {
+    method: 'POST', json: { name: 'Delete me', message: 'Batch deletion candidate' }
+  });
+  const sensitiveGuestbook = await request(base, '/api/guestbook', {
+    method: 'POST', json: { name: 'Sensitive test', message: 'Contains BLOCKEDTERM here' }
+  });
+  assert.deepEqual(JSON.parse(sensitiveGuestbook.json.risk_flags), ['敏感词：blockedterm']);
+
+  let adminGuestbookPage;
+  const adminPaths = [
+    '/admin/dashboard', '/admin/posts', '/admin/posts/new', `/admin/posts/${post.json.id}/edit`,
+    '/admin/works', '/admin/works/new', `/admin/works/${work.json.id}/edit`,
+    '/admin/guestbook', '/admin/media', '/admin/settings', '/admin/visitors', '/admin/visitors/blacklist'
+  ];
+  for (const pathname of adminPaths) {
+    const page = await request(base, pathname, { headers: authHeaders, write: false });
+    assert.equal(page.response.status, 200, pathname);
+    assert.match(page.text, /name="_csrf" value="[^"]+"/, `${pathname} should expose a form token`);
+    if (pathname === '/admin/guestbook') adminGuestbookPage = page;
+    if (pathname === `/admin/posts/${post.json.id}/edit`) assert.match(page.text, new RegExp(`data-post-id="${post.json.id}"`));
+    if (pathname === `/admin/works/${work.json.id}/edit`) assert.match(page.text, new RegExp(`data-work-id="${work.json.id}"`));
+    if (pathname === '/admin/visitors') assert.match(page.text, /id="visitor-chart-data" type="application\/json"/);
+  }
+  const adminCsrf = adminGuestbookPage.text.match(/name="_csrf" value="([^"]+)"/)[1];
+  assert.match(adminGuestbookPage.text, /待审核/);
+  assert.match(adminGuestbookPage.text, /包含 2 个链接/);
+  assert.match(adminGuestbookPage.text, /admin-nav-count/);
+  assert.match(adminGuestbookPage.text, /name="return_to" value="\/admin\/guestbook"/);
+
+  const runBulk = (action, id, asJson = false) => request(base, '/admin/guestbook/bulk', {
+    method: 'POST',
+    headers: {
+      ...authHeaders,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      ...(asJson ? { Accept: 'application/json' } : {})
+    },
+    body: new URLSearchParams({
+      _csrf: adminCsrf,
+      action,
+      message_ids: String(id),
+      return_to: '/admin/guestbook?status=all'
+    })
+  });
+  const asyncBulkApproval = await runBulk('approve', riskyGuestbook.json.id, true);
+  assert.equal(asyncBulkApproval.response.status, 200);
+  assert.equal(asyncBulkApproval.json.ok, true);
+  assert.equal(asyncBulkApproval.json.status, 'approved');
+  assert.equal((await runBulk('reject', rejectCandidate.json.id)).response.status, 302);
+  const bulkDeleteFallback = await runBulk('delete', deleteCandidate.json.id);
+  assert.equal(bulkDeleteFallback.response.status, 302);
+  assert.equal(bulkDeleteFallback.response.headers.get('location'), '/admin/guestbook?status=all&ok=1');
+  const publicMessagesAfterBulk = await request(base, '/api/guestbook', { write: false });
+  assert.equal(publicMessagesAfterBulk.json.some((message) => message.id === riskyGuestbook.json.id), true);
+  assert.equal(publicMessagesAfterBulk.json.some((message) => message.id === rejectCandidate.json.id), false);
+
+  const hideMessage = await request(base, `/admin/guestbook/${guestbook.json.id}/status`, {
+    method: 'POST',
+    write: false,
+    headers: { ...authHeaders, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ _csrf: adminCsrf, status: 'hidden', return_to: '/admin/guestbook?status=approved' })
+  });
+  assert.equal(hideMessage.response.status, 302);
+  assert.equal(hideMessage.response.headers.get('location'), '/admin/guestbook?status=approved&ok=1');
+  const publicMessagesAfterHide = await request(base, '/api/guestbook', { write: false });
+  assert.equal(publicMessagesAfterHide.json.some((message) => message.id === guestbook.json.id), false);
+
+  const replyMessage = await request(base, `/admin/guestbook/${guestbook.json.id}/reply`, {
+    method: 'POST',
+    headers: { ...authHeaders, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ admin_reply: '感谢你的留言' })
+  });
+  assert.equal(replyMessage.response.status, 302);
+  await request(base, `/admin/guestbook/${guestbook.json.id}/status`, {
+    method: 'POST',
+    headers: { ...authHeaders, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ status: 'approved' })
+  });
+  const publicMessagesAfterReply = await request(base, '/api/guestbook', { write: false });
+  assert.equal(publicMessagesAfterReply.json.find((message) => message.id === guestbook.json.id).admin_reply, '感谢你的留言');
+  const auditPage = await request(base, '/admin/guestbook/audit', { headers: authHeaders, write: false });
+  assert.equal(auditPage.response.status, 200);
+  assert.match(auditPage.text, /批量删除/);
+  assert.match(auditPage.text, /保存回复/);
 
   const form = new FormData();
   form.append('image', new Blob(['<script>alert(1)</script>'], { type: 'image/png' }), 'attack.png');

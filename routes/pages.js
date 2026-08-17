@@ -543,7 +543,7 @@ router.get('/search', (req, res) => {
 });
 
 router.get('/guestbook', (req, res) => {
-  const messages = db.prepare('SELECT * FROM guestbook ORDER BY created_at DESC').all();
+  const messages = db.prepare("SELECT * FROM guestbook WHERE status = 'approved' ORDER BY created_at DESC").all();
   res.render('guestbook', {
     title: '留言板 — aeoleaf',
     messages,

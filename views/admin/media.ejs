@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <%- include('partials/styles') %>
+</head>
+<body class="admin-body">
+  <%- include('partials/sidebar', { activePage: 'media' }) %>
+  <main class="admin-main">
+    <div class="admin-header">
+      <div><h1>媒体库</h1><p class="dashboard-subtitle">复用已上传图片，并在删除前检查内容引用</p></div>
+    </div>
+
+    <% if (notice) { %><div class="admin-notice" role="status"><%= notice %></div><% } %>
+    <% if (mediaError) { %><div class="admin-notice admin-notice--error" role="alert"><%= mediaError %></div><% } %>
+
+    <form class="media-upload" method="POST" action="/admin/media/upload" enctype="multipart/form-data" data-admin-async-form>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div><strong>上传新图片</strong><small>JPG、PNG、WebP、GIF、AVIF 等，最大 8MB</small></div>
+      <input type="file" name="image" accept="image/*" required aria-label="选择图片">
+      <button type="submit" class="btn-primary"><i class="ti ti-upload"></i> 上传</button>
+    </form>
+
+    <div class="media-summary"><strong><%= media.length %></strong> 张图片 · <strong><%= media.filter(item => item.usedBy.length).length %></strong> 张正在使用</div>
+    <div class="media-grid">
+      <% if (!media.length) { %><p class="empty-state">暂无已上传图片</p><% } %>
+      <% media.forEach(item => { %>
+        <article class="media-card">
+          <a href="<%= item.url %>" target="_blank" rel="noopener" class="media-preview"><img src="<%= item.url %>" alt=""></a>
+          <div class="media-card-body">
+            <strong title="<%= item.name %>"><%= item.name %></strong>
+            <div class="media-meta"><span><%= item.folder %></span><span><%= item.size < 1024 * 1024 ? Math.max(1, Math.round(item.size / 1024)) + ' KB' : (item.size / 1024 / 1024).toFixed(1) + ' MB' %></span></div>
+            <div class="media-url-row">
+              <input type="text" value="<%= item.url %>" readonly aria-label="图片地址">
+              <button type="button" class="btn-sm media-copy" data-url="<%= item.url %>"><i class="ti ti-copy"></i> 复制</button>
+            </div>
+            <% if (item.usedBy.length) { %>
+              <p class="media-used"><i class="ti ti-link"></i> <%= item.usedBy.slice(0, 2).join('、') %><%= item.usedBy.length > 2 ? ' 等' : '' %></p>
+            <% } else { %>
+              <form method="POST" action="/admin/media/delete" data-admin-async-form onsubmit="return confirm('确定删除这张未引用的图片吗？')">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="url" value="<%= item.url %>">
+                <button type="submit" class="btn-sm btn-danger"><i class="ti ti-trash"></i> 删除</button>
+              </form>
+            <% } %>
+          </div>
+        </article>
+      <% }); %>
+    </div>
+  </main>
+  <script src="<%= asset('/js/toast.js') %>"></script>
+  <script src="<%= asset('/js/admin.js') %>"></script>
+</body>
+</html>

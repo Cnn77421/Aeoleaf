@@ -13,7 +13,7 @@ module.exports = {
     'no-empty': ['error', { allowEmptyCatch: true }],
     'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }]
   },
-  ignorePatterns: ['node_modules/', 'database/', 'public/uploads/', 'public/js/**'],
+  ignorePatterns: ['node_modules/', 'database/', 'public/uploads/', 'public/js/**', 'public/vendor/**'],
   overrides: [
     {
       files: ['public/**/*.js'],

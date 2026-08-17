@@ -4,92 +4,68 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="view-transition" content="same-origin">
   <title><%= title %></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
-  <link rel="stylesheet" href="<%= asset('/css/main.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/admin.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/admin-v2.css') %>">
+  <link rel="stylesheet" href="<%= asset('/vendor/easymde/easymde.min.css') %>">
+  <%- include('partials/styles') %>
 </head>
 <body class="admin-body">
-  <aside class="admin-sidebar">
-    <div class="admin-logo">
-      <a href="/">aeoleaf <span>风叶</span></a>
-    </div>
-    <nav class="admin-nav">
-      <a href="/admin/dashboard">Dashboard</a>
-      <a href="/admin/posts">Posts</a>
-      <a href="/admin/works" class="active">Works</a>
-      <a href="/admin/visitors">Visitors</a>
-      <a href="/admin/settings">Settings</a>
-    </nav>
-    <div class="admin-footer">
-      <a href="/" target="_blank">View Site</a>
-      <form method="POST" action="/admin/logout" style="margin-top:0.5rem">
-        <button type="submit" class="btn-link">Log Out</button>
-      </form>
-    </div>
-  </aside>
-  <main class="admin-main">
+  <%- include('partials/sidebar', { activePage: 'works' }) %>
+  <main class="admin-main" data-work-id="<%= work ? work.id : '' %>">
     <div class="admin-header">
-      <h1><%= isNew ? 'New Work' : 'Edit Work' %></h1>
+      <div><h1><%= isNew ? '新建作品' : '编辑作品' %></h1><p class="dashboard-subtitle">编辑作品介绍与展示信息</p></div>
+      <button type="submit" form="work-form" class="btn-primary admin-mobile-save"><i class="ti ti-device-floppy" aria-hidden="true"></i> 保存作品</button>
     </div>
     <form id="work-form" class="edit-form">
       <div class="form-main">
-        <input type="text" name="title" placeholder="Title" value="<%= work ? work.title : '' %>" required class="input-title">
-        <input type="text" name="slug" placeholder="slug-auto-generated" value="<%= work ? work.slug : '' %>" class="input-slug">
+        <input type="text" name="title" placeholder="作品标题" aria-label="作品标题" value="<%= work ? work.title : '' %>" required class="input-title">
+        <input type="text" name="slug" placeholder="URL 别名（留空自动生成）" aria-label="URL 别名" value="<%= work ? work.slug : '' %>" class="input-slug">
         <div class="form-group">
-          <label>Description</label>
-          <textarea name="description" placeholder="Short description for preview" rows="2"><%= work ? work.description : '' %></textarea>
+          <label for="work-description">作品摘要</label>
+          <textarea id="work-description" name="description" placeholder="用于作品列表的简短介绍" rows="2"><%= work ? work.description : '' %></textarea>
         </div>
         <div class="form-group">
-          <label>Content</label>
+          <label for="content-editor">作品内容</label>
           <textarea name="content" id="content-editor"><%= work ? work.content : '' %></textarea>
         </div>
       </div>
       <div class="form-sidebar">
         <div class="form-group">
-          <label><input type="checkbox" name="featured" <%= work && work.featured ? 'checked' : '' %>> Featured</label>
+          <label><input type="checkbox" name="featured" <%= work && work.featured ? 'checked' : '' %>> 设为精选</label>
         </div>
         <div class="form-group">
-          <label>Year</label>
-          <input type="number" name="year" value="<%= work ? work.year || '' : '' %>">
+          <label for="work-year">年份</label>
+          <input id="work-year" type="number" name="year" value="<%= work ? work.year || '' : '' %>">
         </div>
         <div class="form-group">
-          <label>Date (显示格式: 2026-01-15)</label>
-          <input type="text" name="date" placeholder="2026-01-15" value="<%= work ? work.date || '' : '' %>">
+          <label for="work-date">日期（格式：2026-01-15）</label>
+          <input id="work-date" type="text" name="date" placeholder="2026-01-15" value="<%= work ? work.date || '' : '' %>">
         </div>
         <div class="form-group">
-          <label>Tags</label>
-          <input type="text" name="tags" value="<%= work ? work.tags.join(', ') : '' %>">
+          <label for="work-tags">标签（逗号分隔）</label>
+          <input id="work-tags" type="text" name="tags" value="<%= work ? work.tags.join(', ') : '' %>">
         </div>
         <div class="form-group">
-          <label>External URL</label>
-          <input type="url" name="url" value="<%= work ? work.url : '' %>">
+          <label for="work-url">外部链接</label>
+          <input id="work-url" type="url" name="url" value="<%= work ? work.url : '' %>">
         </div>
         <div class="form-group">
-          <label>Cover Image</label>
+          <label for="cover-upload">封面图片</label>
           <% if (work && work.cover_image) { %>
             <img src="<%= work.cover_image %>" class="preview-img">
           <% } %>
           <input type="file" id="cover-upload" accept="image/*">
         </div>
-        <button type="submit" class="btn-primary btn-block">Save</button>
+        <button type="submit" class="btn-primary btn-block"><i class="ti ti-device-floppy"></i> 保存作品</button>
         <% if (work) { %>
-          <a href="/works/<%= work.slug %>" target="_blank" class="btn-link">View Work</a>
-          <button type="button" class="btn-danger btn-sm" onclick="deleteWork(<%= work.id %>)">Delete</button>
+          <a href="/works/<%= work.slug %>" target="_blank" rel="noopener" class="btn-link">查看作品</a>
+          <button type="button" class="btn-danger btn-sm" onclick="deleteWork(<%= work.id %>)">删除</button>
         <% } %>
       </div>
     </form>
-    <script>
-    window.__AEOL_ADMIN_CTX = { workId: <%= work ? work.id : 'null' %>, postId: null };
-    </script>
   </main>
-  <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+  <script src="<%= asset('/vendor/easymde/easymde.min.js') %>"></script>
   <script src="<%= asset('/js/toast.js') %>"></script>
   <script src="<%= asset('/js/admin.js') %>"></script>
-  <script src="<%= asset('/js/editor.js') %>"></script>
 </body>
 </html>

@@ -1,0 +1,18 @@
+<script>
+  (function () {
+    try {
+      var theme = localStorage.getItem('theme');
+      if (theme !== 'dark' && theme !== 'light') {
+        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) { /* keep the default light theme */ }
+  }());
+</script>
+<link rel="stylesheet" href="<%= asset('/vendor/tabler/tabler.min.css') %>">
+<link rel="stylesheet" href="<%= asset('/vendor/tabler/tabler-icons.min.css') %>">
+<link rel="stylesheet" href="<%= asset('/css/main.css') %>">
+<link rel="stylesheet" href="<%= asset('/css/admin.css') %>">
+<link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
+<link rel="stylesheet" href="<%= asset('/css/admin-v2.css') %>">
+<script defer src="<%= asset('/vendor/tabler/tabler.min.js') %>"></script>

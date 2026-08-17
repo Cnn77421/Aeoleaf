@@ -3,59 +3,44 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="view-transition" content="same-origin">
   <title><%= title %></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="<%= asset('/css/main.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/admin.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/admin-v2.css') %>">
+  <%- include('partials/styles') %>
 </head>
 <body class="admin-body">
-  <aside class="admin-sidebar">
-    <div class="admin-logo">
-      <a href="/">aeoleaf <span>风叶</span></a>
-    </div>
-    <nav class="admin-nav">
-      <a href="/admin/dashboard">Dashboard</a>
-      <a href="/admin/posts" class="active">Posts</a>
-      <a href="/admin/works">Works</a>
-      <a href="/admin/visitors">Visitors</a>
-      <a href="/admin/settings">Settings</a>
-    </nav>
-    <div class="admin-footer">
-      <a href="/" target="_blank">View Site</a>
-      <form method="POST" action="/admin/logout" style="margin-top:0.5rem">
-        <button type="submit" class="btn-link">Log Out</button>
-      </form>
-    </div>
-  </aside>
+  <%- include('partials/sidebar', { activePage: 'posts' }) %>
   <main class="admin-main">
     <div class="admin-header">
-      <h1>Posts</h1>
-      <a href="/admin/posts/new" class="btn-primary">New Post</a>
+      <div><h1>文章</h1><p class="dashboard-subtitle">管理博客文章与草稿</p></div>
+      <a href="/admin/posts/new" class="btn-primary"><i class="ti ti-plus"></i> 新建文章</a>
     </div>
     <table class="data-table">
       <thead>
         <tr>
-          <th>Title</th>
-          <th>Status</th>
-          <th>Date</th>
-          <th>Actions</th>
+          <th>标题</th>
+          <th>状态</th>
+          <th>浏览 / 访客</th>
+          <th>平均停留</th>
+          <th>阅读深度</th>
+          <th>创建日期</th>
+          <th>操作</th>
         </tr>
       </thead>
       <tbody>
         <% if (posts.length === 0) { %>
-        <tr><td colspan="4" class="empty-state">No posts yet</td></tr>
+        <tr><td colspan="7" class="empty-state">暂无文章</td></tr>
         <% } else { %>
           <% posts.forEach(post => { %>
           <tr>
-            <td><a href="/blog/<%= post.slug %>" target="_blank"><%= post.title %></a></td>
-            <td><span class="badge badge-<%= post.status %>"><%= post.status %></span></td>
-            <td><%= new Date(post.created_at).toLocaleDateString() %></td>
-            <td>
-              <a href="/admin/posts/<%= post.id %>/edit" class="btn-sm">Edit</a>
-              <button class="btn-sm btn-danger" onclick="deletePost(<%= post.id %>)">Delete</button>
+            <td data-label="标题"><a href="/blog/<%= post.slug %>" target="_blank" rel="noopener"><%= post.title %></a></td>
+            <td data-label="状态"><span class="badge badge-<%= post.status %>"><%= post.status === 'published' ? '已发布' : '草稿' %></span></td>
+            <td data-label="浏览 / 访客"><strong><%= post.analytics_pv %></strong> / <%= post.analytics_uv %></td>
+            <td data-label="平均停留"><%= post.analytics_avg_stay %> 秒</td>
+            <td data-label="阅读深度"><%= post.analytics_avg_scroll %>%</td>
+            <td data-label="创建日期"><%= new Date(post.created_at).toLocaleDateString('zh-CN') %></td>
+            <td data-label="操作">
+              <a href="/admin/posts/<%= post.id %>/edit" class="btn-sm"><i class="ti ti-edit"></i> 编辑</a>
+              <button class="btn-sm btn-danger" onclick="deletePost(<%= post.id %>)"><i class="ti ti-trash"></i> 删除</button>
             </td>
           </tr>
           <% }); %>

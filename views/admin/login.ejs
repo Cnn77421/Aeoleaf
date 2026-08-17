@@ -3,25 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="view-transition" content="same-origin">
   <title><%= title %></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="<%= asset('/css/main.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/admin.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/admin-v2.css') %>">
+  <%- include('partials/styles') %>
 </head>
 <body>
   <div class="login-container">
     <div class="login-card">
-      <h1>aeoleaf <span>风叶</span></h1>
+      <h1><span class="admin-logo-mark">A</span> aeoleaf <span>风叶后台</span></h1>
       <% if (error) { %>
       <p class="error-message"><%= error %></p>
       <% } %>
       <form method="POST" action="/admin/login">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="password" name="password" placeholder="Password" required autofocus>
-        <button type="submit" class="btn-primary">Login</button>
+        <input type="password" name="password" placeholder="管理员密码" aria-label="管理员密码" autocomplete="current-password" required autofocus>
+        <button type="submit" class="btn-primary"><i class="ti ti-login-2"></i> 登录后台</button>
       </form>
     </div>
   </div>

@@ -4,84 +4,71 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="view-transition" content="same-origin">
   <title><%= title %></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
-  <link rel="stylesheet" href="<%= asset('/css/main.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/admin.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/admin-v2.css') %>">
+  <link rel="stylesheet" href="<%= asset('/vendor/easymde/easymde.min.css') %>">
+  <%- include('partials/styles') %>
 </head>
 <body class="admin-body">
-  <aside class="admin-sidebar">
-    <div class="admin-logo">
-      <a href="/">aeoleaf <span>风叶</span></a>
-    </div>
-    <nav class="admin-nav">
-      <a href="/admin/dashboard">Dashboard</a>
-      <a href="/admin/posts" class="active">Posts</a>
-      <a href="/admin/works">Works</a>
-      <a href="/admin/visitors">Visitors</a>
-      <a href="/admin/settings">Settings</a>
-    </nav>
-    <div class="admin-footer">
-      <a href="/" target="_blank">View Site</a>
-      <form method="POST" action="/admin/logout" style="margin-top:0.5rem">
-        <button type="submit" class="btn-link">Log Out</button>
-      </form>
-    </div>
-  </aside>
-  <main class="admin-main">
+  <%- include('partials/sidebar', { activePage: 'posts' }) %>
+  <main class="admin-main" data-post-id="<%= post ? post.id : '' %>">
     <div class="admin-header">
-      <h1><%= isNew ? 'New Post' : 'Edit Post' %></h1>
+      <div><h1><%= isNew ? '新建文章' : '编辑文章' %></h1><p class="dashboard-subtitle">专注写作，发布设置位于右侧</p></div>
+      <button type="submit" form="post-form" class="btn-primary admin-mobile-save"><i class="ti ti-device-floppy" aria-hidden="true"></i> 保存文章</button>
     </div>
     <form id="post-form" class="edit-form">
       <div class="form-main">
-        <input type="text" name="title" placeholder="Title" value="<%= post ? post.title : '' %>" required class="input-title">
-        <input type="text" name="slug" placeholder="slug-auto-generated" value="<%= post ? post.slug : '' %>" class="input-slug">
+        <input type="text" name="title" placeholder="文章标题" aria-label="文章标题" value="<%= post ? post.title : '' %>" required class="input-title">
+        <input type="text" name="slug" placeholder="URL 别名（留空自动生成）" aria-label="URL 别名" value="<%= post ? post.slug : '' %>" class="input-slug">
         <div class="form-group">
-          <label>Content</label>
+          <label for="content-editor">正文内容</label>
           <textarea name="content" id="content-editor"><%= post ? post.content : '' %></textarea>
         </div>
       </div>
       <div class="form-sidebar">
+        <% if (performance) { %>
+        <section class="post-performance" aria-labelledby="post-performance-title">
+          <div class="post-performance-heading"><strong id="post-performance-title">文章表现</strong><a href="/admin/visitors">详情</a></div>
+          <div class="post-performance-grid">
+            <span><b><%= performance.pv %></b><small>浏览</small></span>
+            <span><b><%= performance.uv %></b><small>访客</small></span>
+            <span><b><%= performance.avgStay %>s</b><small>平均停留</small></span>
+            <span><b><%= performance.avgScroll %>%</b><small>阅读深度</small></span>
+          </div>
+        </section>
+        <% } %>
         <div class="form-group">
-          <label>Status</label>
-          <select name="status">
-            <option value="draft" <%= post && post.status === 'draft' ? 'selected' : '' %>>Draft</option>
-            <option value="published" <%= post && post.status === 'published' ? 'selected' : '' %>>Published</option>
+          <label for="post-status">发布状态</label>
+          <select id="post-status" name="status">
+            <option value="draft" <%= post && post.status === 'draft' ? 'selected' : '' %>>草稿</option>
+            <option value="published" <%= post && post.status === 'published' ? 'selected' : '' %>>已发布</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Excerpt</label>
-          <textarea name="excerpt" rows="3"><%= post ? post.excerpt : '' %></textarea>
+          <label for="post-excerpt">文章摘要</label>
+          <textarea id="post-excerpt" name="excerpt" rows="3"><%= post ? post.excerpt : '' %></textarea>
         </div>
         <div class="form-group">
-          <label>Tags (comma-separated)</label>
-          <input type="text" name="tags" value="<%= post ? post.tags.join(', ') : '' %>">
+          <label for="post-tags">标签（逗号分隔）</label>
+          <input id="post-tags" type="text" name="tags" value="<%= post ? post.tags.join(', ') : '' %>">
         </div>
         <div class="form-group">
-          <label>Cover Image</label>
+          <label for="cover-upload">封面图片</label>
           <% if (post && post.cover_image) { %>
             <img src="<%= post.cover_image %>" class="preview-img">
           <% } %>
           <input type="file" id="cover-upload" accept="image/*">
         </div>
-        <button type="submit" class="btn-primary btn-block">Save</button>
+        <button type="submit" class="btn-primary btn-block"><i class="ti ti-device-floppy"></i> 保存文章</button>
         <% if (post) { %>
-          <a href="/blog/<%= post.slug %>" target="_blank" class="btn-link">View Post</a>
-          <button type="button" class="btn-danger btn-sm" onclick="deletePost(<%= post.id %>)">Delete</button>
+          <a href="/blog/<%= post.slug %>" target="_blank" class="btn-link"><i class="ti ti-external-link"></i> 查看文章</a>
+          <button type="button" class="btn-danger btn-sm" onclick="deletePost(<%= post.id %>)"><i class="ti ti-trash"></i> 删除</button>
         <% } %>
       </div>
     </form>
-    <script>
-    window.__AEOL_ADMIN_CTX = { postId: <%= post ? post.id : 'null' %>, workId: null };
-    </script>
   </main>
-  <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+  <script src="<%= asset('/vendor/easymde/easymde.min.js') %>"></script>
   <script src="<%= asset('/js/toast.js') %>"></script>
   <script src="<%= asset('/js/admin.js') %>"></script>
-  <script src="<%= asset('/js/editor.js') %>"></script>
 </body>
 </html>
