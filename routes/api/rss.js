@@ -18,7 +18,7 @@ router.get('/rss.xml', (req, res) => {
   const siteSubtitle = getSetting('site_subtitle') || '风叶';
 
   const posts = db.prepare(
-    "SELECT * FROM posts WHERE status = 'published' AND deleted_at = '' ORDER BY created_at DESC LIMIT 20"
+    "SELECT * FROM posts WHERE status = 'published' AND deleted_at = '' AND COALESCE(noindex, 0) = 0 ORDER BY created_at DESC LIMIT 20"
   ).all();
 
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';

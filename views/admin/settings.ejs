@@ -20,18 +20,18 @@
     <div class="admin-notice admin-notice--err" role="alert"><%= saveError %></div>
     <% } %>
     <div class="settings-shell">
-      <aside class="settings-nav" aria-label="设置分类">
-        <a href="#settings-brand" class="active"><i class="ti ti-id"></i> 品牌信息</a>
-        <a href="#settings-home"><i class="ti ti-photo"></i> 首页展示</a>
-        <a href="#settings-about"><i class="ti ti-user"></i> 关于页面</a>
-        <a href="#settings-contact"><i class="ti ti-mail"></i> 联系方式</a>
-        <a href="#settings-moderation"><i class="ti ti-shield"></i> 内容审核</a>
-        <a href="#settings-trash"><i class="ti ti-trash"></i> 回收站</a>
-        <a href="#settings-social"><i class="ti ti-link"></i> 社交链接</a>
+      <aside class="settings-nav" aria-label="设置分类" role="tablist" aria-orientation="vertical">
+        <a href="#settings-brand" id="settings-tab-brand" class="active" role="tab" aria-controls="settings-brand" aria-selected="true" tabindex="0"><i class="ti ti-id"></i> 品牌信息</a>
+        <a href="#settings-home" id="settings-tab-home" role="tab" aria-controls="settings-home" aria-selected="false" tabindex="-1"><i class="ti ti-photo"></i> 首页展示</a>
+        <a href="#settings-about" id="settings-tab-about" role="tab" aria-controls="settings-about" aria-selected="false" tabindex="-1"><i class="ti ti-user"></i> 关于页面</a>
+        <a href="#settings-contact" id="settings-tab-contact" role="tab" aria-controls="settings-contact" aria-selected="false" tabindex="-1"><i class="ti ti-mail"></i> 联系方式</a>
+        <a href="#settings-moderation" id="settings-tab-moderation" role="tab" aria-controls="settings-moderation" aria-selected="false" tabindex="-1"><i class="ti ti-shield"></i> 内容审核</a>
+        <a href="#settings-trash" id="settings-tab-trash" role="tab" aria-controls="settings-trash" aria-selected="false" tabindex="-1"><i class="ti ti-trash"></i> 回收站</a>
+        <a href="#settings-social" id="settings-tab-social" role="tab" aria-controls="settings-social" aria-selected="false" tabindex="-1"><i class="ti ti-link"></i> 社交链接</a>
       </aside>
     <form method="POST" action="/admin/settings" class="settings-form" accept-charset="UTF-8" enctype="multipart/form-data" data-admin-async-form>
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <section class="settings-section" id="settings-brand">
+      <section class="settings-section" id="settings-brand" role="tabpanel" aria-labelledby="settings-tab-brand">
         <header><h2>品牌信息</h2><p>设置网站的公开名称与简介。</p></header>
       <div class="form-group">
         <label for="site-title">站点标题</label>
@@ -42,7 +42,7 @@
         <input id="site-subtitle" type="text" name="site_subtitle" value="<%= settings.site_subtitle || '' %>">
       </div>
       </section>
-      <section class="settings-section" id="settings-home">
+      <section class="settings-section" id="settings-home" role="tabpanel" aria-labelledby="settings-tab-home" hidden>
         <header><h2>首页展示</h2><p>配置桌面端与移动端背景图片和视觉焦点。</p></header>
       <div class="form-group">
         <label for="home-hero-image">首页背景图（桌面端）</label>
@@ -74,7 +74,7 @@
         </select>
       </div>
       </section>
-      <section class="settings-section" id="settings-about">
+      <section class="settings-section" id="settings-about" role="tabpanel" aria-labelledby="settings-tab-about" hidden>
         <header><h2>关于页面</h2><p>维护关于页内容、图片与分享摘要。</p></header>
       <div class="form-group">
         <label for="about-text">关于页正文（Markdown）</label>
@@ -93,7 +93,7 @@
         <textarea id="about-meta" name="about_meta" rows="2" placeholder="用于 meta description 与 Open Graph"><%= settings.about_meta || '' %></textarea>
       </div>
       </section>
-      <section class="settings-section" id="settings-contact">
+      <section class="settings-section" id="settings-contact" role="tabpanel" aria-labelledby="settings-tab-contact" hidden>
         <header><h2>联系方式</h2><p>设置访客可以看到的联系渠道。</p></header>
       <div class="form-group">
         <label for="contact-email">联系邮箱</label>
@@ -104,7 +104,7 @@
         <input id="contact-qq" type="text" name="contact_qq" value="<%= settings.contact_qq || '' %>" placeholder="选填">
       </div>
       </section>
-      <section class="settings-section" id="settings-moderation">
+      <section class="settings-section" id="settings-moderation" role="tabpanel" aria-labelledby="settings-tab-moderation" hidden>
         <header><h2>内容审核</h2><p>配置留言风险标记规则。</p></header>
       <div class="form-group">
         <label for="guestbook-sensitive-words">留言敏感词</label>
@@ -112,7 +112,7 @@
         <p class="form-hint">命中后会在待审核队列中标记风险，不会自动删除或公开。</p>
       </div>
       </section>
-      <section class="settings-section" id="settings-trash">
+      <section class="settings-section" id="settings-trash" role="tabpanel" aria-labelledby="settings-tab-trash" hidden>
         <header><h2>回收站保留期限</h2><p>默认关闭自动清理；开启后，服务会每 6 小时清理一次到期项目。</p></header>
         <div class="form-group">
           <label><input type="checkbox" name="trash_retention_enabled" value="1"<%= settings.trash_retention_enabled === '1' ? ' checked' : '' %>> 自动清理到期项目</label>
@@ -123,7 +123,7 @@
           <p class="form-hint">彻底删除不可恢复；关闭自动清理时，此数值不会触发任何删除。</p>
         </div>
       </section>
-      <section class="settings-section" id="settings-social">
+      <section class="settings-section" id="settings-social" role="tabpanel" aria-labelledby="settings-tab-social" hidden>
         <header><h2>社交链接</h2><p>维护网站展示的外部账号与站内链接。</p></header>
       <div class="form-group">
         <label for="social-links">社交链接（JSON 数组）</label>

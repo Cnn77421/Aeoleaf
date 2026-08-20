@@ -17,6 +17,7 @@
       <button type="submit" form="post-form" class="btn-primary admin-mobile-save"><i class="ti ti-device-floppy" aria-hidden="true"></i> 保存文章</button>
     </div>
     <form id="post-form" class="edit-form">
+      <% if (post) { %><input type="hidden" name="content_revision" value="<%= post.content_revision %>"><% } %>
       <div class="form-main">
         <input type="text" name="title" placeholder="文章标题" aria-label="文章标题" value="<%= post ? post.title : '' %>" required class="input-title">
         <input type="text" name="slug" placeholder="URL 别名（留空自动生成）" aria-label="URL 别名" value="<%= post ? post.slug : '' %>" class="input-slug">
@@ -41,9 +42,20 @@
         <div class="form-group">
           <label for="post-status">发布状态</label>
           <select id="post-status" name="status">
-            <option value="draft" <%= post && post.status === 'draft' ? 'selected' : '' %>>草稿</option>
+            <option value="draft" <%= post && post.status === 'draft' && !post.scheduled_at ? 'selected' : '' %>>草稿</option>
+            <option value="scheduled" <%= post && post.status === 'draft' && post.scheduled_at ? 'selected' : '' %>>预约发布</option>
             <option value="published" <%= post && post.status === 'published' ? 'selected' : '' %>>已发布</option>
           </select>
+        </div>
+        <div class="form-group" data-schedule-field>
+          <label for="post-scheduled-at">预约发布时间</label>
+          <input id="post-scheduled-at" type="datetime-local" name="scheduled_at" value="<%= post && post.scheduled_at ? post.scheduled_at.replace(' ', 'T').slice(0, 16) : '' %>">
+          <small class="form-hint">到点后自动公开，按服务器本地时区执行。</small>
+        </div>
+        <div class="form-group" data-unpublish-field>
+          <label for="post-unpublish-at">自动下线时间（可选）</label>
+          <input id="post-unpublish-at" type="datetime-local" name="unpublish_at" value="<%= post && post.unpublish_at ? post.unpublish_at.replace(' ', 'T').slice(0, 16) : '' %>">
+          <small class="form-hint">到点后自动转回草稿，不会删除文章。</small>
         </div>
         <div class="form-group">
           <label for="post-excerpt">文章摘要</label>
@@ -60,11 +72,20 @@
           <% } %>
           <input type="file" id="cover-upload" accept="image/*">
         </div>
+        <details class="seo-editor"<%= post && (post.seo_title || post.seo_description || post.canonical_url || post.og_image || post.noindex) ? ' open' : '' %>>
+          <summary><span><i class="ti ti-world-search"></i> SEO 设置</span><small>搜索结果与分享卡片</small></summary>
+          <div class="form-group"><label for="post-seo-title">SEO 标题</label><input id="post-seo-title" name="seo_title" maxlength="70" value="<%= post ? post.seo_title : '' %>" placeholder="留空使用文章标题"><small class="form-hint">建议 30–60 个字符。</small></div>
+          <div class="form-group"><label for="post-seo-description">Meta 描述</label><textarea id="post-seo-description" name="seo_description" maxlength="180" rows="3" placeholder="留空使用文章摘要"><%= post ? post.seo_description : '' %></textarea><small class="form-hint">建议 70–160 个字符。</small></div>
+          <div class="form-group"><label for="post-canonical-url">Canonical URL</label><input id="post-canonical-url" name="canonical_url" value="<%= post ? post.canonical_url : '' %>" placeholder="留空使用当前文章地址"></div>
+          <div class="form-group"><label for="post-og-image">分享图片 URL</label><input id="post-og-image" name="og_image" value="<%= post ? post.og_image : '' %>" placeholder="留空使用文章封面或全站默认图"></div>
+          <label class="admin-check-row"><input type="checkbox" name="noindex" value="1" <%= post && post.noindex ? 'checked' : '' %>><span><strong>禁止搜索引擎收录</strong><small>同时从 sitemap 与 RSS 中排除</small></span></label>
+        </details>
         <button type="submit" class="btn-primary btn-block"><i class="ti ti-device-floppy"></i> 保存文章</button>
         <% if (post) { %>
           <button type="button" class="btn-secondary btn-block" data-revisions-toggle><i class="ti ti-history"></i> 历史版本</button>
           <div class="revision-list" data-revisions-list hidden></div>
-          <a href="/blog/<%= post.slug %>" target="_blank" class="btn-link"><i class="ti ti-external-link"></i> 查看文章</a>
+          <button type="button" class="btn-secondary btn-block" data-post-preview><i class="ti ti-eye"></i> 生成预览链接</button>
+          <% if (post.status === 'published') { %><a href="/blog/<%= post.slug %>" target="_blank" class="btn-link"><i class="ti ti-external-link"></i> 查看公开文章</a><% } %>
           <button type="button" class="btn-danger btn-sm" onclick="deletePost(<%= post.id %>)"><i class="ti ti-trash"></i> 删除</button>
         <% } %>
       </div>

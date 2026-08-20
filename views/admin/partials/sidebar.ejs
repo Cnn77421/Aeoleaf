@@ -40,6 +40,7 @@
             <i class="ti ti-photo" aria-hidden="true"></i><span class="nav-link-title">媒体库</span>
           </a>
         </li>
+        <li class="nav-item"><a href="/admin/seo" class="nav-link <%= activePage === 'seo' ? 'active' : '' %>"<% if (activePage === 'seo') { %> aria-current="page"<% } %>><i class="ti ti-world-search" aria-hidden="true"></i><span class="nav-link-title">SEO</span></a></li>
         <li class="nav-item">
           <a href="/admin/trash" class="nav-link <%= activePage === 'trash' ? 'active' : '' %>"<% if (activePage === 'trash') { %> aria-current="page"<% } %>>
             <i class="ti ti-trash" aria-hidden="true"></i><span class="nav-link-title">回收站</span>
@@ -47,6 +48,7 @@
           </a>
         </li>
         <li class="admin-nav-label">数据与系统</li>
+        <li class="nav-item"><a href="/admin/notifications" class="nav-link <%= activePage === 'notifications' ? 'active' : '' %>"<% if (activePage === 'notifications') { %> aria-current="page"<% } %>><i class="ti ti-bell" aria-hidden="true"></i><span class="nav-link-title">通知中心</span><% if (notificationUnread > 0) { %><span class="admin-nav-count" data-count="<%= notificationUnread %>"><%= notificationUnread > 99 ? '99+' : notificationUnread %></span><% } %></a></li>
         <li class="nav-item">
           <a href="/admin/visitors" class="nav-link <%= activePage === 'visitors' ? 'active' : '' %>"<% if (activePage === 'visitors') { %> aria-current="page"<% } %>>
             <i class="ti ti-chart-histogram" aria-hidden="true"></i><span class="nav-link-title">访客分析</span>
@@ -57,6 +59,7 @@
             <i class="ti ti-settings" aria-hidden="true"></i><span class="nav-link-title">站点设置</span>
           </a>
         </li>
+        <li class="nav-item"><a href="/admin/health" class="nav-link <%= activePage === 'health' ? 'active' : '' %>"<% if (activePage === 'health') { %> aria-current="page"<% } %>><i class="ti ti-heart-rate-monitor" aria-hidden="true"></i><span class="nav-link-title">系统健康</span></a></li>
         <li class="nav-item">
           <a href="/admin/backups" class="nav-link <%= activePage === 'backups' ? 'active' : '' %>"<% if (activePage === 'backups') { %> aria-current="page"<% } %>>
             <i class="ti ti-database-export" aria-hidden="true"></i><span class="nav-link-title">备份与恢复</span>
@@ -65,6 +68,11 @@
         <li class="nav-item">
           <a href="/admin/audit" class="nav-link <%= activePage === 'audit' ? 'active' : '' %>"<% if (activePage === 'audit') { %> aria-current="page"<% } %>>
             <i class="ti ti-history" aria-hidden="true"></i><span class="nav-link-title">操作审计</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="/admin/security" class="nav-link <%= activePage === 'security' ? 'active' : '' %>"<% if (activePage === 'security') { %> aria-current="page"<% } %>>
+            <i class="ti ti-shield-lock" aria-hidden="true"></i><span class="nav-link-title">登录安全</span>
           </a>
         </li>
       </ul>
@@ -97,6 +105,7 @@
       <a href="/admin/settings">设置</a>
     </nav>
     <div class="admin-topbar-actions">
+      <a href="/admin/notifications" class="admin-icon-button admin-notification-button" aria-label="通知中心" title="通知中心"><i class="ti ti-bell" aria-hidden="true"></i><% if (notificationUnread > 0) { %><span aria-label="<%= notificationUnread %> 条未读"><%= notificationUnread > 9 ? '9+' : notificationUnread %></span><% } %></a>
       <button type="button" class="admin-search-trigger" data-admin-command-open aria-label="搜索后台功能">
         <i class="ti ti-search" aria-hidden="true"></i><span>搜索</span><kbd>⌘K</kbd>
       </button>
@@ -120,11 +129,15 @@
       <a href="/admin/works" data-admin-command-item>作品</a>
       <a href="/admin/guestbook" data-admin-command-item>留言</a>
       <a href="/admin/media" data-admin-command-item>媒体库</a>
+      <a href="/admin/seo" data-admin-command-item>SEO 控制中心</a>
       <a href="/admin/trash" data-admin-command-item>回收站</a>
       <a href="/admin/visitors" data-admin-command-item>访客分析</a>
+      <a href="/admin/notifications" data-admin-command-item>通知中心</a>
       <a href="/admin/settings" data-admin-command-item>站点设置</a>
+      <a href="/admin/health" data-admin-command-item>系统健康</a>
       <a href="/admin/backups" data-admin-command-item>备份与恢复</a>
       <a href="/admin/audit" data-admin-command-item>操作审计</a>
+      <a href="/admin/security" data-admin-command-item>登录安全</a>
     </div>
   </section>
 </div>

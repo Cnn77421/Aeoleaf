@@ -20,6 +20,7 @@
         <select class="admin-toolbar-select" data-admin-list-status aria-label="按状态筛选">
           <option value="">全部状态</option>
           <option value="published">已发布</option>
+          <option value="scheduled">预约发布</option>
           <option value="draft">草稿</option>
         </select>
         <span class="admin-toolbar-count"><%= posts.length %> 篇文章</span>
@@ -41,10 +42,10 @@
         <% if (posts.length === 0) { %>
         <tr><td colspan="7" class="empty-state">暂无文章</td></tr>
         <% } else { %>
-          <% posts.forEach(post => { %>
-          <tr data-admin-filter-row data-search="<%= post.title.toLowerCase() %>" data-status="<%= post.status %>">
-            <td data-label="标题"><a href="/blog/<%= post.slug %>" target="_blank" rel="noopener"><%= post.title %></a></td>
-            <td data-label="状态"><span class="badge badge-<%= post.status %>"><%= post.status === 'published' ? '已发布' : '草稿' %></span></td>
+          <% posts.forEach(post => { const displayStatus = post.status === 'draft' && post.scheduled_at ? 'scheduled' : post.status; %>
+          <tr data-admin-filter-row data-search="<%= post.title.toLowerCase() %>" data-status="<%= displayStatus %>">
+            <td data-label="标题"><a href="/admin/posts/<%= post.id %>/edit"><%= post.title %></a></td>
+            <td data-label="状态"><span class="badge badge-<%= displayStatus %>"><%= displayStatus === 'published' ? '已发布' : (displayStatus === 'scheduled' ? '预约发布' : '草稿') %></span><% if (displayStatus === 'scheduled') { %><small class="schedule-caption"><%= post.scheduled_at.slice(0, 16) %></small><% } %></td>
             <td data-label="浏览 / 访客"><strong><%= post.analytics_pv %></strong> / <%= post.analytics_uv %></td>
             <td data-label="平均停留"><%= post.analytics_avg_stay %> 秒</td>
             <td data-label="阅读深度"><%= post.analytics_avg_scroll %>%</td>

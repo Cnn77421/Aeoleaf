@@ -4,6 +4,7 @@ const session = require('express-session');
 const compression = require('compression');
 const helmet = require('helmet');
 const path = require('path');
+const crypto = require('crypto');
 const { pathWithoutQuery } = require('./lib/pathWithoutQuery');
 const { asset } = require('./lib/assetVersion');
 const { validateRuntimeConfig } = require('./lib/runtimeConfig');
@@ -11,6 +12,9 @@ const { SQLiteSessionStore } = require('./lib/sqliteSessionStore');
 const { initDB, flushDB, closeDB, db, isBlacklisted } = require('./config/db');
 const { runTrashCleanup } = require('./lib/trashCleanup');
 const { createBackup, scheduleDue } = require('./lib/backupService');
+const { runPublishSchedule } = require('./lib/publishScheduler');
+const { logAudit } = require('./lib/auditLog');
+const { runHealthChecks, recordHealthSnapshot } = require('./lib/healthCheck');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -40,6 +44,8 @@ let shuttingDown = false;
 let trashCleanupTimer = null;
 let backupScheduleTimer = null;
 let scheduledBackupRunning = false;
+let publishScheduleTimer = null;
+let healthCheckTimer = null;
 
 async function shutdown(exitCode, reason) {
   if (shuttingDown) return;
@@ -59,6 +65,8 @@ async function shutdown(exitCode, reason) {
     if (sessionStore) sessionStore.close();
     if (trashCleanupTimer) clearInterval(trashCleanupTimer);
     if (backupScheduleTimer) clearInterval(backupScheduleTimer);
+    if (publishScheduleTimer) clearInterval(publishScheduleTimer);
+    if (healthCheckTimer) clearInterval(healthCheckTimer);
     await flushDB();
     closeDB();
   } catch (err) {
@@ -88,12 +96,40 @@ process.once('SIGTERM', () => { void shutdown(0); });
     if (scheduledBackupRunning || !scheduleDue()) return;
     scheduledBackupRunning = true;
     try { await createBackup({ trigger: 'scheduled' }); }
-    catch (error) { console.error('[backup] scheduled backup failed:', error.message); }
+    catch (error) {
+      console.error('[backup] scheduled backup failed:', error.message);
+      try { logAudit(db, null, { action: 'backup.scheduled', entityType: 'backup', outcome: 'failure', summary: { reason: error.message } }); } catch {}
+    }
     finally { scheduledBackupRunning = false; }
   };
   backupScheduleTimer = setInterval(() => { void runScheduledBackup(); }, 15 * 60 * 1000);
   backupScheduleTimer.unref();
   void runScheduledBackup();
+  runPublishSchedule(db);
+  publishScheduleTimer = setInterval(() => {
+    try { runPublishSchedule(db); }
+    catch (error) {
+      console.error('[publish] scheduled operation failed:', error.message);
+      try { logAudit(db, null, { action: 'post.schedule_run', entityType: 'post', outcome: 'failure', summary: { reason: error.message } }); } catch {}
+    }
+  }, 60 * 1000);
+  publishScheduleTimer.unref();
+  const runHealthMonitor = () => {
+    try {
+      const health = runHealthChecks(db);
+      const state = recordHealthSnapshot(db, health);
+      if (!state.changed) return;
+      if (state.status === 'ok' && state.previousStatus) {
+        logAudit(db, null, { action: 'health.recovered', entityType: 'system', summary: { previousStatus: state.previousStatus } });
+      } else if (state.status !== 'ok') {
+        const problems = health.checks.filter((item) => item.status !== 'ok').map((item) => item.label).join('、');
+        logAudit(db, null, { action: 'health.degraded', entityType: 'system', outcome: state.status === 'error' ? 'failure' : 'success', summary: { status: state.status, message: problems || '系统状态异常' } });
+      }
+    } catch (error) { console.error('[health] monitor failed:', error.message); }
+  };
+  runHealthMonitor();
+  healthCheckTimer = setInterval(runHealthMonitor, 5 * 60 * 1000);
+  healthCheckTimer.unref();
 
 // Only compress text-like payloads; skip images, fonts, video where the
 // bytes are already compressed (compression wastes CPU for no gain).
@@ -151,6 +187,8 @@ app.set('views', path.join(__dirname, 'views'));
 
 app.locals.asset = asset;
 app.use((req, res, next) => {
+  req.id = String(req.get('x-request-id') || crypto.randomUUID()).slice(0, 200);
+  res.setHeader('X-Request-ID', req.id);
   res.locals.baseUrl = resolveBaseUrl(req);
   const now = new Date();
   res.locals.isBirthday = (now.getMonth() === 4 && now.getDate() === 21);
@@ -265,6 +303,18 @@ app.use((req, res, next) => {
   // never depend on a session cookie.
   if (req.path === '/api/track') return next();
   return sessionMiddleware(req, res, next);
+});
+
+app.use((req, _res, next) => {
+  if (req.session?.admin && req.session.security) {
+    const now = Date.now();
+    if (now - Number(req.session.security.lastSeenAt || 0) >= 60_000) {
+      req.session.security.lastSeenAt = now;
+      req.session.security.ip = String(req.ip || req.socket?.remoteAddress || '').replace(/^::ffff:/, '');
+      req.session.security.userAgent = String(req.get('user-agent') || '').slice(0, 1000);
+    }
+  }
+  next();
 });
 
 const { requireSameOrigin } = require('./middleware/sameOrigin');

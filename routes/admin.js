@@ -5,6 +5,8 @@
 const router = require('express').Router();
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const sharp = require('sharp');
 const {
   db,
   saveDBSync,
@@ -23,7 +25,7 @@ const {
   removeFromBlacklist,
   getBlacklistIps
 } = require('../config/db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireAdmin, isRecentlyAuthenticated } = require('../middleware/auth');
 const { rateLimit } = require('../middleware/rateLimit');
 const { getCsrfToken } = require('../middleware/sameOrigin');
 const { uploadGeneral, validateUploadedFiles } = require('../middleware/upload');
@@ -33,6 +35,10 @@ const { trashMedia } = require('../lib/trash');
 const {
   createBackup, listBackups, getBackup, deleteBackup, restoreBackup, recentEvents
 } = require('../lib/backupService');
+const { getLoginState, recordFailure, clearFailures, initializeSession } = require('../lib/loginSecurity');
+const passkeyService = require('../lib/passkeys');
+const { runHealthChecks } = require('../lib/healthCheck');
+const { getAdvancedAnalytics } = require('../lib/advancedAnalytics');
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -116,32 +122,41 @@ router.get('/login', (req, res) => {
   res.render('admin/login', {
     title: '后台登录 — aeoleaf',
     error: null,
-    csrfToken: getCsrfToken(req)
+    csrfToken: getCsrfToken(req),
+    passkeyCount: db.prepare('SELECT COUNT(*) AS count FROM admin_passkeys').get().count
   });
 });
 
 router.post('/login', loginLimiter, (req, res, next) => {
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   const adminPass = process.env.ADMIN_PASSWORD || '';
+  const loginState = getLoginState(db, req);
 
-  const renderFail = (reason) => {
-    logAudit(db, req, { action: 'auth.login', entityType: 'admin', outcome: 'failure', summary: { reason } });
-    return res.status(401).render('admin/login', {
+  const renderFail = (reason, status = 401, extra = {}) => {
+    logAudit(db, req, { action: 'auth.login', entityType: 'admin', outcome: 'failure', summary: { reason, ...extra } });
+    return res.status(status).render('admin/login', {
       title: '后台登录 — aeoleaf',
-      error: 'Incorrect password',
-      csrfToken: getCsrfToken(req)
+      error: status === 429 ? '登录尝试过多，请稍后再试' : 'Incorrect password',
+      csrfToken: getCsrfToken(req),
+      passkeyCount: db.prepare('SELECT COUNT(*) AS count FROM admin_passkeys').get().count
     });
   };
 
+  if (loginState.locked) return renderFail('temporarily_locked', 429, { lockedUntil: loginState.lockedUntil });
+
   if (!password || !adminPass) return renderFail(!adminPass ? 'disabled' : 'missing_password');
 
-  if (!passwordMatches(password)) return renderFail('incorrect_password');
+  if (!passwordMatches(password)) {
+    const failed = recordFailure(db, req);
+    return renderFail(failed.locked ? 'temporarily_locked' : 'incorrect_password', failed.locked ? 429 : 401, { failures: failed.failures });
+  }
 
   req.session.regenerate((err) => {
     if (err) return next(err);
-    req.session.admin = true;
+    initializeSession(req);
     req.session.save((err2) => {
       if (err2) return next(err2);
+      clearFailures(db, req);
       logAudit(db, req, { action: 'auth.login', entityType: 'admin', outcome: 'success' });
       res.redirect('/admin/dashboard');
     });
@@ -149,7 +164,7 @@ router.post('/login', loginLimiter, (req, res, next) => {
 });
 
 router.post('/logout', requireAdmin, (req, res) => {
-  logAudit(db, req, { action: 'auth.logout', entityType: 'admin' });
+  logAudit(db, req, { action: 'auth.logout', entityType: 'admin', entityId: req.sessionID || '' });
   req.session.destroy(() => res.redirect('/admin/login'));
 });
 
@@ -159,14 +174,15 @@ router.post('/logout', requireAdmin, (req, res) => {
 router.use(requireAdmin, (req, res, next) => {
   res.locals.csrfToken = getCsrfToken(req);
   res.locals.guestbookPending = db.prepare("SELECT COUNT(*) AS cnt FROM guestbook WHERE status = 'pending' AND deleted_at = ''").get().cnt;
-  res.locals.trashCount = db.prepare(`
+    res.locals.trashCount = db.prepare(`
     SELECT (SELECT COUNT(*) FROM posts WHERE deleted_at != '')
       + (SELECT COUNT(*) FROM works WHERE deleted_at != '')
       + (SELECT COUNT(*) FROM guestbook WHERE deleted_at != '')
       + (SELECT COUNT(*) FROM media_trash) AS cnt
-  `).get().cnt;
-  next();
-});
+    `).get().cnt;
+    res.locals.notificationUnread = db.prepare("SELECT COUNT(*) AS cnt FROM notifications WHERE read_at = ''").get().cnt;
+    next();
+  });
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
@@ -184,19 +200,131 @@ router.get('/dashboard', requireAdmin, (req, res) => {
   res.render('admin/dashboard', { title: '后台概览 — aeoleaf', stats, recentPosts, recentWorks });
 });
 
+// ─── Notifications ──────────────────────────────────────────────────────────
+
+router.get('/notifications', requireAdmin, (req, res) => {
+  const filter = ['all', 'unread', 'error', 'warning'].includes(req.query.filter) ? req.query.filter : 'all';
+  let where = '';
+  const params = [];
+  if (filter === 'unread') where = "WHERE read_at = ''";
+  else if (filter === 'error' || filter === 'warning') { where = 'WHERE severity = ?'; params.push(filter); }
+  const notifications = db.prepare(`SELECT * FROM notifications ${where} ORDER BY id DESC LIMIT 300`).all(...params);
+  const counts = db.prepare(`SELECT COUNT(*) AS total, SUM(CASE WHEN read_at='' THEN 1 ELSE 0 END) AS unread, SUM(CASE WHEN severity='error' THEN 1 ELSE 0 END) AS errors FROM notifications`).get();
+  res.render('admin/notifications', { title: '通知中心 — aeoleaf', notifications, counts, filter });
+});
+
+router.post('/notifications/read-all', requireAdmin, (req, res) => {
+  const result = db.prepare("UPDATE notifications SET read_at=datetime('now', 'localtime') WHERE read_at='' ").run();
+  logAudit(db, req, { action: 'notification.read_all', entityType: 'notification', summary: { count: result.changes } });
+  return wantsJson(req) ? res.json({ ok: true, count: result.changes }) : res.redirect('/admin/notifications');
+});
+
+router.post('/notifications/:id/read', requireAdmin, (req, res) => {
+  const result = db.prepare("UPDATE notifications SET read_at=CASE WHEN read_at='' THEN datetime('now', 'localtime') ELSE read_at END WHERE id=?").run(req.params.id);
+  if (!result.changes) return res.status(404).send('Notification not found');
+  return wantsJson(req) ? res.json({ ok: true }) : res.redirect('/admin/notifications');
+});
+
+router.post('/notifications/:id/delete', requireAdmin, (req, res) => {
+  const result = db.prepare('DELETE FROM notifications WHERE id=?').run(req.params.id);
+  if (!result.changes) return res.status(404).send('Notification not found');
+  logAudit(db, req, { action: 'notification.delete', entityType: 'notification', entityId: req.params.id });
+  return wantsJson(req) ? res.json({ ok: true }) : res.redirect('/admin/notifications');
+});
+
+// ─── System health ──────────────────────────────────────────────────────────
+router.get('/health', requireAdmin, (req, res) => {
+  const health = runHealthChecks(db);
+  if (wantsJson(req)) return res.json(health);
+  const history = db.prepare('SELECT * FROM health_snapshots ORDER BY id DESC LIMIT 20').all();
+  return res.render('admin/health', { title: '系统健康 — aeoleaf', health, history });
+});
+
 router.get('/audit', requireAdmin, (req, res) => {
   const action = String(req.query.action || '').trim();
   const outcome = String(req.query.outcome || '').trim();
+  const entityType = String(req.query.entity_type || '').trim();
+  const dateFrom = /^\d{4}-\d{2}-\d{2}$/.test(req.query.date_from || '') ? req.query.date_from : '';
+  const dateTo = /^\d{4}-\d{2}-\d{2}$/.test(req.query.date_to || '') ? req.query.date_to : '';
   let where = ' WHERE 1=1';
   const params = [];
   if (action) { where += ' AND action LIKE ?'; params.push(`%${action}%`); }
   if (outcome === 'success' || outcome === 'failure') { where += ' AND outcome = ?'; params.push(outcome); }
+  if (entityType) { where += ' AND entity_type = ?'; params.push(entityType); }
+  if (dateFrom) { where += ' AND created_at >= ?'; params.push(`${dateFrom} 00:00:00`); }
+  if (dateTo) { where += ' AND created_at <= ?'; params.push(`${dateTo} 23:59:59`); }
   const entries = db.prepare(`SELECT * FROM audit_log${where} ORDER BY id DESC LIMIT 200`).all(...params)
     .map((entry) => {
       try { return { ...entry, summary: JSON.parse(entry.summary_json || '{}') }; }
       catch { return { ...entry, summary: {} }; }
     });
-  res.render('admin/audit', { title: '操作审计 — aeoleaf', entries, filters: { action, outcome } });
+  const entityTypes = db.prepare("SELECT DISTINCT entity_type FROM audit_log WHERE entity_type != '' ORDER BY entity_type").all().map((row) => row.entity_type);
+  res.render('admin/audit', { title: '操作审计 — aeoleaf', entries, entityTypes, filters: { action, outcome, entityType, dateFrom, dateTo } });
+});
+
+router.get('/security', requireAdmin, (req, res) => {
+  const now = Date.now();
+  const sessions = db.prepare(`SELECT sid, expires_at, created_at, last_seen_at, ip, user_agent
+    FROM admin_sessions WHERE expires_at > ? ORDER BY last_seen_at DESC`).all(now).map((session) => ({
+      ...session,
+      current: session.sid === req.sessionID,
+      device: /mobile|android|iphone|ipad/i.test(session.user_agent || '') ? '移动设备' : '桌面设备'
+    }));
+  const recentAuth = Number(req.session.security?.authenticatedAt || 0);
+  const failedLogins = db.prepare("SELECT * FROM audit_log WHERE action IN ('auth.login','auth.passkey_login') AND outcome = 'failure' ORDER BY id DESC LIMIT 10").all();
+  const lockedIps = db.prepare('SELECT * FROM admin_login_attempts WHERE locked_until > ? ORDER BY locked_until DESC').all(now);
+  const adminAccesses = db.prepare(`SELECT id, tracked_at, path, ip, device_type, os_name, browser_name, stay_duration_ms, fingerprint_id
+    FROM visitors WHERE path LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 30`).all();
+  res.render('admin/security', { title: '登录安全 — aeoleaf', sessions, recentAuth, passkeys: passkeyService.passkeys(db), failedLogins, lockedIps, adminAccesses });
+});
+
+router.post('/security/passkeys/register/options', requireAdmin, async (req, res, next) => {
+  if (!isRecentlyAuthenticated(req)) return res.status(403).json({ error: '注册通行密钥前需要重新验证密码', code: 'REAUTH_REQUIRED' });
+  try { res.json(await passkeyService.registrationOptions(db, req)); } catch (error) { next(error); }
+});
+
+router.post('/security/passkeys/register/verify', requireAdmin, async (req, res) => {
+  if (!isRecentlyAuthenticated(req)) return res.status(403).json({ error: '注册通行密钥前需要重新验证密码', code: 'REAUTH_REQUIRED' });
+  try {
+    const verified = await passkeyService.verifyRegistration(db, req, req.body.response, req.body.name);
+    logAudit(db, req, { action: 'auth.passkey_register', entityType: 'passkey', outcome: verified ? 'success' : 'failure' });
+    return res.status(verified ? 200 : 400).json({ ok: verified });
+  } catch (error) {
+    logAudit(db, req, { action: 'auth.passkey_register', entityType: 'passkey', outcome: 'failure', summary: { reason: error.message } });
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/security/passkeys/:id/delete', requireAdmin, (req, res) => {
+  if (!isRecentlyAuthenticated(req)) return res.status(403).json({ error: '删除通行密钥前需要重新验证密码', code: 'REAUTH_REQUIRED' });
+  const removed = db.prepare('DELETE FROM admin_passkeys WHERE id = ?').run(req.params.id).changes;
+  logAudit(db, req, { action: 'auth.passkey_delete', entityType: 'passkey', entityId: req.params.id, summary: { removed } });
+  return wantsJson(req) ? res.json({ ok: true, removed }) : res.redirect('/admin/security?ok=passkey_deleted');
+});
+
+router.post('/security/reauth', requireAdmin, (req, res) => {
+  if (!passwordMatches(req.body.password)) {
+    logAudit(db, req, { action: 'auth.reauthenticate', entityType: 'admin', outcome: 'failure' });
+    return wantsJson(req) ? res.status(403).json({ error: '管理员密码错误' }) : res.redirect('/admin/security?err=password');
+  }
+  req.session.security = req.session.security || {};
+  req.session.security.authenticatedAt = Date.now();
+  logAudit(db, req, { action: 'auth.reauthenticate', entityType: 'admin' });
+  return wantsJson(req) ? res.json({ ok: true }) : res.redirect('/admin/security?ok=reauth');
+});
+
+router.post('/security/sessions/revoke-others', requireAdmin, (req, res) => {
+  const removed = db.prepare('DELETE FROM admin_sessions WHERE sid != ?').run(req.sessionID).changes;
+  logAudit(db, req, { action: 'auth.sessions_revoke_others', entityType: 'session', entityId: req.sessionID, summary: { removed } });
+  return wantsJson(req) ? res.json({ ok: true, removed }) : res.redirect('/admin/security?ok=revoked');
+});
+
+router.post('/security/sessions/:sid/revoke', requireAdmin, (req, res) => {
+  const sid = String(req.params.sid || '');
+  const removed = db.prepare('DELETE FROM admin_sessions WHERE sid = ?').run(sid).changes;
+  logAudit(db, req, { action: 'auth.session_revoke', entityType: 'session', entityId: sid, summary: { current: sid === req.sessionID, removed } });
+  if (sid === req.sessionID) return req.session.destroy(() => res.redirect('/admin/login'));
+  return wantsJson(req) ? res.json({ ok: true, removed }) : res.redirect('/admin/security?ok=revoked');
 });
 
 // ─── Posts (edit pages; JSON CRUD lives in routes/api/posts.js) ────────────────
@@ -540,6 +668,10 @@ router.get('/trash', requireAdmin, (req, res) => {
 router.post('/trash/bulk', requireAdmin, (req, res) => {
   const action = String(req.body.action || '');
   if (!['restore', 'destroy'].includes(action)) return res.status(400).send('Invalid action');
+  if (action === 'destroy' && !isRecentlyAuthenticated(req)) {
+    logAudit(db, req, { action: 'trash.destroy', entityType: 'trash', outcome: 'failure', summary: { reason: 'reauth_required' } });
+    return wantsJson(req) ? res.status(403).json({ error: '彻底删除前需要重新验证管理员身份', code: 'REAUTH_REQUIRED' }) : res.redirect('/admin/security?err=reauth');
+  }
   const rawKeys = Array.isArray(req.body.item_keys) ? req.body.item_keys : [req.body.item_keys];
   const keys = rawKeys.map(parseTrashKey).filter(Boolean).slice(0, 200);
   if (!keys.length) return wantsJson(req) ? res.status(400).json({ error: '请选择项目' }) : res.redirect('/admin/trash');
@@ -649,7 +781,7 @@ function loadMediaReferences() {
   return sources;
 }
 
-function loadMediaFiles() {
+async function loadMediaFiles() {
   const uploadsRoot = path.resolve(__dirname, '../public/uploads');
   const references = loadMediaReferences();
   const media = [];
@@ -662,25 +794,42 @@ function loadMediaFiles() {
       const stat = fs.statSync(abs);
       const url = `/uploads/${folder}/${entry.name}`;
       const usedBy = references.filter((item) => item.text.includes(url)).map((item) => item.label);
-      media.push({ url, folder, name: entry.name, size: stat.size, updatedAt: stat.mtime, usedBy });
+      const hash = crypto.createHash('sha256').update(fs.readFileSync(abs)).digest('hex');
+      media.push({ url, folder, name: entry.name, size: stat.size, updatedAt: stat.mtime, usedBy, hash, abs });
     });
   });
+  const hashCounts = media.reduce((counts, item) => { counts[item.hash] = (counts[item.hash] || 0) + 1; return counts; }, {});
+  await Promise.all(media.map(async (item) => {
+    try {
+      const metadata = await sharp(item.abs).metadata();
+      item.width = metadata.width || 0;
+      item.height = metadata.height || 0;
+      item.format = metadata.format || path.extname(item.name).slice(1);
+    } catch {
+      item.width = 0; item.height = 0; item.format = path.extname(item.name).slice(1);
+    }
+    item.duplicate = hashCounts[item.hash] > 1;
+    item.needsOptimization = item.size > 500 * 1024 || item.width > 1920;
+    delete item.abs;
+  }));
   return media.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-router.get('/media', requireAdmin, (req, res) => {
+router.get('/media', requireAdmin, async (req, res, next) => {
   const errorMap = {
     upload: '上传失败，仅支持 8MB 以内且内容真实的图片。',
     empty: '请选择要上传的图片。',
     used: '图片仍被文章、作品或站点设置引用，无法删除。',
     invalid: '图片路径无效。'
   };
-  res.render('admin/media', {
-    title: '媒体库 — aeoleaf',
-    media: loadMediaFiles(),
-    notice: req.query.ok === 'uploaded' ? '图片已上传' : req.query.ok === 'deleted' ? '图片已删除' : null,
-    mediaError: errorMap[req.query.err] || null
-  });
+  try {
+    const media = await loadMediaFiles();
+    res.render('admin/media', {
+      title: '媒体库 — aeoleaf', media,
+      notice: req.query.ok === 'uploaded' ? '图片已上传' : req.query.ok === 'deleted' ? '图片已删除' : req.query.ok === 'optimized' ? '已生成 WebP 优化副本' : null,
+      mediaError: errorMap[req.query.err] || null
+    });
+  } catch (error) { next(error); }
 });
 
 router.post('/media/upload', requireAdmin, parseMediaUpload, (req, res) => {
@@ -690,14 +839,84 @@ router.post('/media/upload', requireAdmin, parseMediaUpload, (req, res) => {
   res.redirect('/admin/media?ok=uploaded');
 });
 
-router.post('/media/delete', requireAdmin, (req, res) => {
+router.post('/media/delete', requireAdmin, async (req, res) => {
   const url = String(req.body.url || '').trim();
-  const item = loadMediaFiles().find((file) => file.url === url);
+  const item = (await loadMediaFiles()).find((file) => file.url === url);
   if (!item) return wantsJson(req) ? res.status(400).json({ error: '图片路径无效' }) : res.redirect('/admin/media?err=invalid');
   if (item.usedBy.length) return wantsJson(req) ? res.status(409).json({ error: '图片仍被内容引用，无法删除' }) : res.redirect('/admin/media?err=used');
   if (!trashMedia(db, req, url, { reason: 'media_library' })) return wantsJson(req) ? res.status(400).json({ error: '图片删除失败' }) : res.redirect('/admin/media?err=invalid');
   if (wantsJson(req)) return res.json({ ok: true, notice: '图片已移入回收站' });
   res.redirect('/admin/media?ok=deleted');
+});
+
+router.post('/media/optimize', requireAdmin, async (req, res) => {
+  const url = String(req.body.url || '').trim();
+  const item = (await loadMediaFiles()).find((file) => file.url === url);
+  if (!item) return wantsJson(req) ? res.status(400).json({ error: '图片路径无效' }) : res.redirect('/admin/media?err=invalid');
+  const source = path.resolve(__dirname, '../public', item.url.replace(/^\//, ''));
+  const sourceRoot = path.resolve(__dirname, '../public/uploads');
+  if (!source.startsWith(sourceRoot + path.sep)) return res.status(400).json({ error: '图片路径无效' });
+  const parsed = path.parse(source);
+  const output = path.join(parsed.dir, `${parsed.name}-optimized-${Date.now()}.webp`);
+  try {
+    await sharp(source).rotate().resize({ width: 1920, withoutEnlargement: true }).webp({ quality: 82, effort: 4 }).toFile(output);
+    const optimizedUrl = `/uploads/${item.folder}/${path.basename(output)}`;
+    const optimizedSize = fs.statSync(output).size;
+    logAudit(db, req, { action: 'media.optimize', entityType: 'media', entityId: optimizedUrl, summary: { source: item.url, originalSize: item.size, optimizedSize } });
+    if (wantsJson(req)) return res.json({ ok: true, url: optimizedUrl, originalSize: item.size, optimizedSize });
+    return res.redirect('/admin/media?ok=optimized');
+  } catch (error) {
+    try { if (fs.existsSync(output)) fs.unlinkSync(output); } catch {}
+    return wantsJson(req) ? res.status(400).json({ error: '图片优化失败' }) : res.redirect('/admin/media?err=upload');
+  }
+});
+
+// ─── SEO control center ─────────────────────────────────────────────────────
+
+function inspectPostSeo(post) {
+  const title = String(post.seo_title || post.title || '').trim();
+  const description = String(post.seo_description || post.excerpt || '').trim();
+  const image = String(post.og_image || post.cover_image || '').trim();
+  const issues = [];
+  if (!description) issues.push('缺少描述');
+  else if (description.length < 50) issues.push('描述偏短');
+  else if (description.length > 160) issues.push('描述超过 160 字');
+  if (title.length < 10) issues.push('标题偏短');
+  else if (title.length > 60) issues.push('标题超过 60 字');
+  if (!image) issues.push('缺少分享图');
+  if (post.canonical_url && !/^(https?:\/\/|\/)/i.test(post.canonical_url)) issues.push('Canonical 格式无效');
+  return { ...post, seoTitle: title, seoDescription: description, seoImage: image, issues };
+}
+
+router.get('/seo', requireAdmin, (req, res) => {
+  const posts = db.prepare("SELECT * FROM posts WHERE deleted_at = '' ORDER BY status DESC, updated_at DESC").all().map(inspectPostSeo);
+  const published = posts.filter((post) => post.status === 'published');
+  res.render('admin/seo', {
+    title: 'SEO 控制中心 — aeoleaf',
+    settings: loadSettingsMap(),
+    posts,
+    metrics: {
+      published: published.length,
+      healthy: published.filter((post) => !post.issues.length && !post.noindex).length,
+      issues: published.reduce((sum, post) => sum + post.issues.length, 0),
+      excluded: published.filter((post) => post.noindex).length
+    },
+    notice: req.query.ok === '1' ? 'SEO 默认设置已保存' : null
+  });
+});
+
+router.post('/seo/settings', requireAdmin, (req, res) => {
+  const description = String(req.body.seo_default_description || '').trim().slice(0, 300);
+  const image = String(req.body.seo_default_og_image || '').trim().slice(0, 2000);
+  const save = db.transaction(() => {
+    const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+    stmt.run('seo_default_description', description);
+    stmt.run('seo_default_og_image', image);
+  });
+  save();
+  logAudit(db, req, { action: 'seo.settings_update', entityType: 'settings', summary: { descriptionLength: description.length, hasDefaultImage: !!image } });
+  if (wantsJson(req)) return res.json({ ok: true });
+  return res.redirect('/admin/seo?ok=1');
 });
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
@@ -839,7 +1058,7 @@ function renderAdminVisitorsList(req, res, next) {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = 20;
     const filters = visitorFiltersFromQuery(req);
-    const view = req.query.view === 'sessions' ? 'sessions' : 'detail';
+    const view = req.query.view === 'detail' ? 'detail' : 'sessions';
 
     const allowedSortCols = ['tracked_at', 'ip', 'stay_duration_ms'];
     const sortBy = allowedSortCols.includes(req.query.sortBy) ? req.query.sortBy : 'tracked_at';
@@ -878,6 +1097,14 @@ function renderAdminVisitorsList(req, res, next) {
 }
 
 router.get('/visitors', requireAdmin, renderAdminVisitorsList);
+
+router.get('/visitors/advanced', requireAdmin, (req, res, next) => {
+  try {
+    const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 30;
+    const analytics = getAdvancedAnalytics(db, days);
+    res.render('admin/visitors-advanced', { title: '高级访客分析 — aeoleaf', analytics });
+  } catch (error) { next(error); }
+});
 
 function renderVisitorFingerprint(req, res, next) {
   try {
@@ -937,12 +1164,14 @@ function renderVisitorDetail(req, res, next) {
     if (!visitor) return renderPublic404(res);
     const session = visitor.visitor_session_id ? getVisitorSessionById(visitor.visitor_session_id) : null;
     const pathRows = visitor.visitor_session_id ? getVisitorPathBySession(visitor.visitor_session_id) : [visitor];
+    const adminVisit = String(visitor.path || '').startsWith('/admin/');
+    const scopedPathRows = pathRows.filter((row) => String(row.path || '').startsWith('/admin/') === adminVisit);
 
     res.render('admin/visitor-detail', {
       title: `访客 #${visitor.id} — aeoleaf`,
       visitor,
       session,
-      pathRows
+      pathRows: scopedPathRows
     });
   } catch (err) {
     next(err);

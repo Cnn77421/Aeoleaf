@@ -31,7 +31,7 @@ router.get('/sitemap.xml', (req, res) => {
   const baseUrl = escapeXml(resolveBaseUrl(req));
 
   const posts = db.prepare(
-    "SELECT slug, updated_at FROM posts WHERE status = 'published' AND deleted_at = '' ORDER BY updated_at DESC"
+    "SELECT slug, updated_at FROM posts WHERE status = 'published' AND deleted_at = '' AND COALESCE(noindex, 0) = 0 ORDER BY updated_at DESC"
   ).all();
 
   const works = db.prepare(
