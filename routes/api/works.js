@@ -86,7 +86,7 @@ router.get('/:id/revisions', requireAdmin, (req, res) => {
 router.post('/:id/autosave', requireAdmin, (req, res) => {
   const work = db.prepare("SELECT * FROM works WHERE id = ? AND deleted_at = ''").get(req.params.id);
   if (!work) return res.status(404).json({ error: 'Not found' });
-  const result = saveVersion(db, 'work', work.id, workDraft(work, req.body || {}), 'autosave');
+  const result = saveVersion(db, 'work', work.id, workDraft(work, req.body || {}), 'autosave', req.sessionID);
   res.json({ ok: true, saved: result.created });
 });
 
@@ -98,8 +98,8 @@ router.post('/:id/revisions/:versionId/restore', requireAdmin, (req, res) => {
   const snap = version.snapshot;
   const conflict = db.prepare('SELECT id FROM works WHERE slug = ? AND id != ?').get(snap.slug, work.id);
   if (conflict) return res.status(409).json({ error: '该历史版本的 URL 别名已被占用' });
-  saveVersion(db, 'work', work.id, snapshotFor('work', work), 'before_restore');
-  db.prepare(`UPDATE works SET title=?, slug=?, description=?, content=?, cover_image=?, images=?, tags=?, url=?, year=?, date=?, featured=?, sort_order=?, updated_at=datetime('now') WHERE id=?`)
+  saveVersion(db, 'work', work.id, snapshotFor('work', work), 'before_restore', req.sessionID);
+  db.prepare(`UPDATE works SET title=?, slug=?, description=?, content=?, cover_image=?, images=?, tags=?, url=?, year=?, date=?, featured=?, sort_order=?, content_revision=content_revision+1, updated_at=datetime('now') WHERE id=?`)
     .run(snap.title, snap.slug, snap.description || '', snap.content || '', snap.cover_image || '', snap.images || '[]', snap.tags || '[]', snap.url || '', snap.year, snap.date || '', snap.featured ? 1 : 0, Number(snap.sort_order) || 0, work.id);
   logAudit(db, req, { action: 'work.restore', entityType: 'work', entityId: work.id, summary: { versionId: version.id } });
   res.json({ ok: true });
@@ -142,7 +142,7 @@ router.post('/', requireAdmin, optionalWorkCover, (req, res) => {
   }
 
   const work = db.prepare('SELECT * FROM works WHERE id = ?').get(newId);
-  saveVersion(db, 'work', newId, snapshotFor('work', work), 'created');
+  saveVersion(db, 'work', newId, snapshotFor('work', work), 'created', req.sessionID);
   logAudit(db, req, { action: 'work.create', entityType: 'work', entityId: newId, summary: { title: work.title, slug: work.slug } });
   res.status(201).json({ ...work, tags: JSON.parse(work.tags || '[]'), images: JSON.parse(work.images || '[]') });
 });
@@ -163,6 +163,9 @@ router.put('/:id', requireAdmin, optionalWorkCover, (req, res) => {
   const { title, slug, description, content, tags, url, year, date, featured, sort_order } = req.body;
   const work = db.prepare("SELECT * FROM works WHERE id = ? AND deleted_at = ''").get(req.params.id);
   if (!work) return res.status(404).json({ error: 'Not found' });
+  if (req.body.content_revision && Number(req.body.content_revision) !== Number(work.content_revision)) {
+    return res.status(409).json({ error: '作品已在其他页面被修改，请刷新后合并更改', code: 'EDIT_CONFLICT', currentUpdatedAt: work.updated_at });
+  }
 
   const newSlug = slug || work.slug;
   if (newSlug !== work.slug) {
@@ -170,7 +173,7 @@ router.put('/:id', requireAdmin, optionalWorkCover, (req, res) => {
     if (existing) return res.status(409).json({ error: 'Slug already exists' });
   }
 
-  saveVersion(db, 'work', work.id, snapshotFor('work', work), 'before_save');
+  saveVersion(db, 'work', work.id, snapshotFor('work', work), 'before_save', req.sessionID);
 
   let yearVal = work.year;
   if (year !== undefined) {
@@ -183,7 +186,7 @@ router.put('/:id', requireAdmin, optionalWorkCover, (req, res) => {
     : work.sort_order;
 
   db.prepare(
-    `UPDATE works SET title=?, slug=?, description=?, content=?, tags=?, url=?, year=?, date=?, featured=?, sort_order=?, updated_at=datetime('now')
+    `UPDATE works SET title=?, slug=?, description=?, content=?, tags=?, url=?, year=?, date=?, featured=?, sort_order=?, content_revision=content_revision+1, updated_at=datetime('now')
      WHERE id=?`
   ).run(
     title ?? work.title, newSlug,
@@ -213,7 +216,7 @@ router.delete('/:id', requireAdmin, (req, res) => {
   const work = db.prepare("SELECT * FROM works WHERE id = ? AND deleted_at = ''").get(req.params.id);
   if (!work) return res.status(404).json({ error: 'Not found' });
 
-  saveVersion(db, 'work', work.id, snapshotFor('work', work), 'before_delete');
+  saveVersion(db, 'work', work.id, snapshotFor('work', work), 'before_delete', req.sessionID);
   const tombstoneSlug = `__trash_work_${work.id}_${Date.now()}`;
   db.prepare("UPDATE works SET deleted_at = datetime('now', 'localtime'), deleted_slug = slug, slug = ?, updated_at = datetime('now') WHERE id = ?")
     .run(tombstoneSlug, work.id);
@@ -227,7 +230,7 @@ router.post('/:id/cover', requireAdmin, wrapUpload(uploadWork.single('cover')), 
   if (!work) return res.status(404).json({ error: 'Not found' });
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-  saveVersion(db, 'work', work.id, snapshotFor('work', work), 'before_cover');
+  saveVersion(db, 'work', work.id, snapshotFor('work', work), 'before_cover', req.sessionID);
   if (work.cover_image) trashMedia(db, req, work.cover_image, { reason: 'cover_replaced', workId: work.id });
   const url = '/uploads/works/' + req.file.filename;
   db.prepare("UPDATE works SET cover_image = ?, updated_at = datetime('now') WHERE id = ?").run(url, work.id);

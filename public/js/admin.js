@@ -113,6 +113,7 @@
       var newMain = doc.querySelector(MAIN_SEL);
       if (!newMain) throw new Error('no main');
       var incomingPending = doc.querySelector('.admin-nav a[href="/admin/guestbook"] .admin-nav-count');
+      var incomingNotifications = doc.querySelector('.admin-nav a[href="/admin/notifications"] .admin-nav-count');
 
       await loadPageAssets(doc);
       document.dispatchEvent(new CustomEvent('admin:before-swap'));
@@ -140,6 +141,7 @@
 
       updateNav(url);
       updateGuestbookPendingBadge(incomingPending ? Number(incomingPending.dataset.count) || 0 : 0);
+      updateNotificationBadge(incomingNotifications ? Number(incomingNotifications.dataset.count) || 0 : 0);
       mainEl.removeAttribute('aria-busy');
 
       if (opts.preserveScroll) {
@@ -313,6 +315,32 @@ function toggleAdminTheme() {
 
 document.addEventListener('click', function (event) {
   if (event.target.closest('[data-admin-theme-toggle]')) toggleAdminTheme();
+});
+
+document.addEventListener('click', function (event) {
+  const trigger = event.target.closest('[data-audit-detail]');
+  const close = event.target.closest('[data-audit-close]');
+  const drawer = document.querySelector('[data-audit-drawer]');
+  const backdrop = document.querySelector('.audit-drawer-backdrop');
+  if (close && drawer) {
+    drawer.classList.remove('is-open'); drawer.setAttribute('aria-hidden', 'true');
+    if (backdrop) backdrop.hidden = true;
+    return;
+  }
+  if (!trigger || !drawer) return;
+  const set = function (selector, value) { const el = drawer.querySelector(selector); if (el) el.textContent = value || '—'; };
+  set('[data-audit-title]', trigger.dataset.action);
+  set('[data-audit-entity]', trigger.dataset.entity);
+  set('[data-audit-outcome]', trigger.dataset.outcome);
+  set('[data-audit-time]', trigger.dataset.time);
+  set('[data-audit-ip]', trigger.dataset.ip);
+  set('[data-audit-request]', trigger.dataset.request);
+  set('[data-audit-agent]', trigger.dataset.agent);
+  let summary = trigger.dataset.summary || '{}';
+  try { summary = JSON.stringify(JSON.parse(summary), null, 2); } catch (_error) {}
+  set('[data-audit-summary]', summary);
+  drawer.classList.add('is-open'); drawer.setAttribute('aria-hidden', 'false');
+  if (backdrop) backdrop.hidden = false;
 });
 
 const trashSelectAll = document.querySelector('[data-trash-select-all]');
@@ -592,15 +620,18 @@ function initVisitorCharts() {
 
 function filterAdminList() {
   const search = document.querySelector('[data-admin-list-search]');
-  const status = document.querySelector('[data-admin-list-status]');
+  const statuses = Array.from(document.querySelectorAll('[data-admin-list-status]'));
   const rows = Array.from(document.querySelectorAll('[data-admin-filter-row]'));
   if (!rows.length) return;
   const query = search ? search.value.trim().toLowerCase() : '';
-  const selectedStatus = status ? status.value : '';
   let visibleCount = 0;
   rows.forEach(function (row) {
     const matchesSearch = !query || (row.dataset.search || '').includes(query);
-    const matchesStatus = !selectedStatus || row.dataset.status === selectedStatus;
+    const matchesStatus = statuses.every(function (filter) {
+      const selected = filter.value;
+      const key = filter.dataset.filterKey || 'status';
+      return !selected || row.dataset[key] === selected;
+    });
     row.hidden = !(matchesSearch && matchesStatus);
     if (!row.hidden) visibleCount += 1;
   });
@@ -616,66 +647,170 @@ document.addEventListener('change', function (event) {
   if (event.target.matches('[data-admin-list-status]')) filterAdminList();
 });
 
-document.addEventListener('click', function (event) {
-  const settingsLink = event.target.closest('.settings-nav a');
-  if (!settingsLink) return;
-  document.querySelectorAll('.settings-nav a').forEach(function (link) { link.classList.remove('active'); });
-  settingsLink.classList.add('active');
-});
+function initVisitorsPageNavigation() {
+  const tabs = Array.from(document.querySelectorAll('.visitors-page-tabs [role="tab"][aria-controls]'));
+  if (!tabs.length) return;
+  const panels = tabs.map(function (tab) { return document.getElementById(tab.getAttribute('aria-controls')); });
+  if (panels.some(function (panel) { return !panel; })) return;
 
-document.addEventListener('click', function (event) {
-  const analyticsTab = event.target.closest('.visitors-page-tabs a');
-  if (!analyticsTab) return;
-  document.querySelectorAll('.visitors-page-tabs a').forEach(function (link) {
-    const active = link === analyticsTab;
-    link.classList.toggle('active', active);
-    if (active) link.setAttribute('aria-current', 'page');
-    else link.removeAttribute('aria-current');
-  });
-});
-
-let settingsSectionObserver = null;
-
-function initSettingsSectionNavigation() {
-  if (settingsSectionObserver) {
-    settingsSectionObserver.disconnect();
-    settingsSectionObserver = null;
+  function activateVisitorsPanel(id, options) {
+    const opts = options || {};
+    const nextIndex = panels.findIndex(function (panel) { return panel.id === id; });
+    if (nextIndex < 0) return;
+    tabs.forEach(function (tab) {
+      const active = tab.getAttribute('aria-controls') === id;
+      tab.classList.toggle('active', active);
+      tab.setAttribute('aria-selected', active ? 'true' : 'false');
+      tab.setAttribute('tabindex', active ? '0' : '-1');
+    });
+    panels.forEach(function (panel) { panel.hidden = panel.id !== id; });
+    if (opts.updateUrl && history.replaceState) {
+      const url = new URL(location.href);
+      if (id === 'visitors-records') url.searchParams.set('section', 'records');
+      else url.searchParams.delete('section');
+      url.hash = '';
+      history.replaceState(history.state, '', url.pathname + url.search);
+    }
+    if (opts.focus) tabs[nextIndex].focus({ preventScroll: true });
   }
 
+  tabs.forEach(function (tab, index) {
+    if (tab.dataset.visitorsTabReady === 'true') return;
+    tab.dataset.visitorsTabReady = 'true';
+    tab.addEventListener('click', function () {
+      activateVisitorsPanel(tab.getAttribute('aria-controls'), { updateUrl: true });
+    });
+    tab.addEventListener('keydown', function (event) {
+      let nextIndex = index;
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') nextIndex = (index + 1) % tabs.length;
+      else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') nextIndex = (index - 1 + tabs.length) % tabs.length;
+      else if (event.key === 'Home') nextIndex = 0;
+      else if (event.key === 'End') nextIndex = tabs.length - 1;
+      else return;
+      event.preventDefault();
+      activateVisitorsPanel(tabs[nextIndex].getAttribute('aria-controls'), { updateUrl: true, focus: true });
+    });
+  });
+
+  const params = new URLSearchParams(location.search);
+  const showRecords = params.get('section') === 'records' || location.hash === '#visitors-table';
+  activateVisitorsPanel(showRecords ? 'visitors-records' : 'analytics-overview');
+}
+
+function closeVisitorQuickDrawer() {
+  const drawer = document.querySelector('[data-visitor-quick-drawer]');
+  const backdrop = document.querySelector('.visitor-quick-backdrop');
+  if (!drawer) return;
+  drawer.classList.remove('is-open');
+  drawer.setAttribute('aria-hidden', 'true');
+  if (backdrop) backdrop.hidden = true;
+}
+
+document.addEventListener('click', async function (event) {
+  const close = event.target.closest('[data-visitor-quick-close]');
+  if (close) return closeVisitorQuickDrawer();
+
+  const copy = event.target.closest('[data-copy-value]');
+  if (copy) {
+    const value = copy.dataset.copyValue || '';
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      Toast.success('已复制');
+    } catch (_error) {
+      Toast.error('复制失败');
+    }
+    return;
+  }
+
+  const trigger = event.target.closest('[data-visitor-quick]');
+  const drawer = document.querySelector('[data-visitor-quick-drawer]');
+  const backdrop = document.querySelector('.visitor-quick-backdrop');
+  if (!trigger || !drawer) return;
+  const fields = {
+    '[data-visitor-quick-quality]': trigger.dataset.quality,
+    '[data-visitor-quick-time]': trigger.dataset.time,
+    '[data-visitor-quick-device]': trigger.dataset.device,
+    '[data-visitor-quick-location]': trigger.dataset.location,
+    '[data-visitor-quick-ip]': trigger.dataset.ip,
+    '[data-visitor-quick-entry]': trigger.dataset.entry,
+    '[data-visitor-quick-exit]': trigger.dataset.exit,
+    '[data-visitor-quick-pages]': trigger.dataset.pages,
+    '[data-visitor-quick-duration]': trigger.dataset.duration,
+    '[data-visitor-quick-scroll]': trigger.dataset.scroll
+  };
+  Object.keys(fields).forEach(function (selector) {
+    const node = drawer.querySelector(selector);
+    if (node) node.textContent = fields[selector] || '—';
+  });
+  const detail = drawer.querySelector('[data-visitor-quick-detail]');
+  if (detail) detail.href = trigger.dataset.detail || '/admin/visitors';
+  drawer.classList.add('is-open');
+  drawer.setAttribute('aria-hidden', 'false');
+  if (backdrop) backdrop.hidden = false;
+}
+);
+
+document.addEventListener('keydown', function (event) {
+  if (event.key === 'Escape') closeVisitorQuickDrawer();
+});
+
+function initSettingsSectionNavigation() {
   const nav = document.querySelector('.settings-nav');
   if (!nav) return;
 
-  const links = Array.from(nav.querySelectorAll('a[href^="#"]'));
-  const sections = links.map(function (link) {
-    return document.querySelector(link.getAttribute('href'));
-  }).filter(Boolean);
-  if (!sections.length) return;
+  const links = Array.from(nav.querySelectorAll('[role="tab"][aria-controls]'));
+  const panels = links.map(function (link) {
+    return document.getElementById(link.getAttribute('aria-controls'));
+  });
+  if (!links.length || panels.some(function (panel) { return !panel; })) return;
 
-  function activateSection(id) {
+  function activateSection(id, options) {
+    const opts = options || {};
+    const nextIndex = panels.findIndex(function (panel) { return panel.id === id; });
+    if (nextIndex < 0) return;
+
     links.forEach(function (link) {
-      const active = link.getAttribute('href') === '#' + id;
+      const active = link.getAttribute('aria-controls') === id;
       link.classList.toggle('active', active);
-      if (active) link.setAttribute('aria-current', 'true');
-      else link.removeAttribute('aria-current');
+      link.setAttribute('aria-selected', active ? 'true' : 'false');
+      link.setAttribute('tabindex', active ? '0' : '-1');
     });
+
+    panels.forEach(function (panel) { panel.hidden = panel.id !== id; });
+
+    if (opts.updateUrl && history.replaceState) {
+      history.replaceState(history.state, '', location.pathname + location.search + '#' + id);
+    }
+    if (opts.focus) links[nextIndex].focus({ preventScroll: true });
   }
 
-  if (!('IntersectionObserver' in window)) return;
+  links.forEach(function (link, index) {
+    if (link.dataset.settingsTabReady === 'true') return;
+    link.dataset.settingsTabReady = 'true';
 
-  settingsSectionObserver = new IntersectionObserver(function (entries) {
-    const visible = entries.filter(function (entry) { return entry.isIntersecting; });
-    if (!visible.length) return;
-    visible.sort(function (a, b) {
-      return Math.abs(a.boundingClientRect.top - 96) - Math.abs(b.boundingClientRect.top - 96);
+    link.addEventListener('click', function (event) {
+      event.preventDefault();
+      activateSection(link.getAttribute('aria-controls'), { updateUrl: true });
     });
-    activateSection(visible[0].target.id);
-  }, {
-    root: null,
-    rootMargin: '-80px 0px -65% 0px',
-    threshold: 0
+
+    link.addEventListener('keydown', function (event) {
+      let nextIndex = index;
+      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') nextIndex = (index + 1) % links.length;
+      else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') nextIndex = (index - 1 + links.length) % links.length;
+      else if (event.key === 'Home') nextIndex = 0;
+      else if (event.key === 'End') nextIndex = links.length - 1;
+      else return;
+      event.preventDefault();
+      activateSection(links[nextIndex].getAttribute('aria-controls'), { updateUrl: true, focus: true });
+    });
   });
 
-  sections.forEach(function (section) { settingsSectionObserver.observe(section); });
+  const requestedId = location.hash ? location.hash.slice(1) : '';
+  const initialId = panels.some(function (panel) { return panel.id === requestedId; })
+    ? requestedId
+    : links.find(function (link) { return link.getAttribute('aria-selected') === 'true'; })?.getAttribute('aria-controls') || panels[0].id;
+  activateSection(initialId);
 }
 
 function initAdminPage() {
@@ -683,9 +818,47 @@ function initAdminPage() {
   initContentAutosave();
   initVisitorCharts();
   filterAdminList();
+  initVisitorsPageNavigation();
   initSettingsSectionNavigation();
+  syncPostScheduleFields();
   document.dispatchEvent(new CustomEvent('admin:page-ready', { detail: { url: location.href } }));
 }
+
+function syncPostScheduleFields() {
+  const status = document.getElementById('post-status');
+  if (!status) return;
+  const scheduled = document.querySelector('[data-schedule-field]');
+  const unpublish = document.querySelector('[data-unpublish-field]');
+  if (scheduled) scheduled.hidden = status.value !== 'scheduled';
+  if (unpublish) unpublish.hidden = status.value === 'draft';
+}
+
+document.addEventListener('change', function (event) {
+  if (event.target && event.target.id === 'post-status') syncPostScheduleFields();
+});
+
+document.addEventListener('click', async function (event) {
+  const button = event.target.closest('[data-post-preview]');
+  if (!button) return;
+  const postId = adminCtx().postId;
+  if (postId == null) return Toast.error('请先保存文章，再生成预览链接');
+  const previewWindow = window.open('', '_blank');
+  button.disabled = true;
+  try {
+    const response = await fetch('/api/posts/' + postId + '/preview-token', { method: 'POST', credentials: 'same-origin' });
+    const data = await response.json().catch(function () { return {}; });
+    if (!response.ok || !data.url) throw new Error(data.error || '生成失败');
+    const absoluteUrl = new URL(data.url, location.origin).href;
+    if (previewWindow) previewWindow.location = absoluteUrl;
+    if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(absoluteUrl).catch(function () {});
+    Toast.success('预览已打开，链接 1 小时内有效');
+  } catch (error) {
+    if (previewWindow) previewWindow.close();
+    Toast.error(error.message || '生成预览失败');
+  } finally {
+    button.disabled = false;
+  }
+});
 
 document.addEventListener('admin:before-swap', destroyAdminPage);
 
@@ -704,6 +877,28 @@ function updateGuestbookPendingBadge(count) {
     badge.setAttribute('aria-label', count + ' 条待审核');
   } else if (badge) {
     badge.remove();
+  }
+}
+
+function updateNotificationBadge(count) {
+  const link = document.querySelector('.admin-nav a[href="/admin/notifications"]');
+  const topLink = document.querySelector('.admin-notification-button');
+  if (link) {
+    let badge = link.querySelector('.admin-nav-count');
+    if (count > 0) {
+      if (!badge) { badge = document.createElement('span'); badge.className = 'admin-nav-count'; link.appendChild(badge); }
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.dataset.count = String(count);
+      badge.setAttribute('aria-label', count + ' 条未读');
+    } else if (badge) badge.remove();
+  }
+  if (topLink) {
+    let badge = topLink.querySelector('span');
+    if (count > 0) {
+      if (!badge) { badge = document.createElement('span'); topLink.appendChild(badge); }
+      badge.textContent = count > 9 ? '9+' : String(count);
+      badge.setAttribute('aria-label', count + ' 条未读');
+    } else if (badge) badge.remove();
   }
 }
 
@@ -961,7 +1156,8 @@ document.addEventListener('click', async function (event) {
     window.__contentRevisions = result.revisions;
     list.innerHTML = result.revisions.length ? result.revisions.map(function (revision) {
       const title = revision.snapshot && revision.snapshot.title ? revision.snapshot.title : '未命名版本';
-      return '<div class="revision-item"><span><strong>' + escapeHtml(title) + '</strong><small>' + escapeHtml(revision.created_at) + ' · ' + escapeHtml(revision.source) + '</small></span><span class="revision-actions"><button type="button" class="btn-secondary btn-sm" data-revision-compare="' + revision.id + '">对比</button><button type="button" class="btn-secondary btn-sm" data-revision-restore="' + revision.id + '">恢复</button></span><div class="revision-diff" data-revision-diff hidden></div></div>';
+      const actor = revision.actor_id ? ' · 会话 ' + revision.actor_id.slice(0, 8) : '';
+      return '<div class="revision-item"><span><strong>' + escapeHtml(title) + '</strong><small>' + escapeHtml(revision.created_at) + ' · ' + escapeHtml(revision.source) + escapeHtml(actor) + '</small></span><span class="revision-actions"><button type="button" class="btn-secondary btn-sm" data-revision-compare="' + revision.id + '">对比</button><button type="button" class="btn-secondary btn-sm" data-revision-restore="' + revision.id + '">恢复</button></span><div class="revision-diff" data-revision-diff hidden></div></div>';
     }).join('') : '<p class="revision-empty">还没有历史版本</p>';
   } catch (error) {
     list.innerHTML = '<p class="revision-empty">' + escapeHtml(error.message || '加载失败') + '</p>';

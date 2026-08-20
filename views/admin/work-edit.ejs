@@ -17,6 +17,7 @@
       <button type="submit" form="work-form" class="btn-primary admin-mobile-save"><i class="ti ti-device-floppy" aria-hidden="true"></i> 保存作品</button>
     </div>
     <form id="work-form" class="edit-form">
+      <% if (work) { %><input type="hidden" name="content_revision" value="<%= work.content_revision %>"><% } %>
       <div class="form-main">
         <input type="text" name="title" placeholder="作品标题" aria-label="作品标题" value="<%= work ? work.title : '' %>" required class="input-title">
         <input type="text" name="slug" placeholder="URL 别名（留空自动生成）" aria-label="URL 别名" value="<%= work ? work.slug : '' %>" class="input-slug">

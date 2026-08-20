@@ -24,6 +24,10 @@
         <input id="admin-password" type="password" name="password" placeholder="请输入密码" aria-label="管理员密码" autocomplete="current-password" required autofocus>
         <button type="submit" class="btn-primary">登录</button>
       </form>
+      <% if (passkeyCount > 0) { %>
+      <div class="login-divider"><span>或</span></div>
+      <button type="button" class="btn-secondary btn-block" data-passkey-login><i class="ti ti-key"></i> 使用通行密钥登录</button>
+      <% } %>
       <p class="login-footnote">受安全会话和 CSRF 防护保护</p>
     </div>
     <div class="login-brand-panel" aria-hidden="true">
@@ -35,5 +39,7 @@
       <blockquote>“写作是在时间里种下一片叶子。”</blockquote>
     </div>
   </div>
+  <script src="<%= asset('/vendor/simplewebauthn-browser.min.js') %>"></script>
+  <script src="<%= asset('/js/passkeys.js') %>"></script>
 </body>
 </html>

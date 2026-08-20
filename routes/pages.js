@@ -6,6 +6,7 @@ const { marked } = require('marked');
 
 const createDOMPurify = require('dompurify');
 const { JSDOM } = require('jsdom');
+const { verifyPreviewToken } = require('../lib/previewToken');
 
 const window = new JSDOM('').window;
 const DOMPurify = createDOMPurify(window);
@@ -208,6 +209,8 @@ function getPublicProfileData() {
     siteSubtitle: getSetting('site_subtitle') || '风叶',
     aboutSummary: plainTextFromMarkdown(getSetting('about_text') || '', 180),
     aboutImage: getSetting('about_image') || '',
+    seoDefaultDescription: getSetting('seo_default_description') || '',
+    seoDefaultOgImage: getSetting('seo_default_og_image') || '',
     statsData: {
       postsCount: db.prepare("SELECT COUNT(*) as cnt FROM posts WHERE status='published' AND deleted_at = ''").get()?.cnt || 0,
       worksCount: db.prepare("SELECT COUNT(*) as cnt FROM works WHERE deleted_at = ''").get()?.cnt || 0,
@@ -417,13 +420,7 @@ router.get('/blog', (req, res) => {
   });
 });
 
-router.get('/blog/:slug', (req, res) => {
-  const post = db.prepare("SELECT * FROM posts WHERE slug = ? AND status = ? AND deleted_at = ''")
-    .get(req.params.slug, 'published');
-  if (!post) return renderPublic404(res);
-
-  db.prepare('UPDATE posts SET views = views + 1 WHERE id = ?').run(post.id);
-
+function renderPostPage(res, post, options = {}) {
   const readMinutes = estimateReadMinutes(post.content);
   const bodyWithoutDuplicateTitle = removeDuplicateLeadHeading(render(post.content), post.title);
   const enhancedBody = enhanceArticleHtml(bodyWithoutDuplicateTitle);
@@ -439,8 +436,28 @@ router.get('/blog/:slug', (req, res) => {
     readMinutes,
     toc,
     tocVisible,
+    isPreview: !!options.isPreview,
+    noIndex: !!options.isPreview,
     ...getPublicProfileData()
   });
+}
+
+router.get('/preview/posts/:id', (req, res) => {
+  if (!verifyPreviewToken(req.query.token, req.params.id)) return renderPublic404(res);
+  const post = db.prepare("SELECT * FROM posts WHERE id = ? AND deleted_at = ''").get(req.params.id);
+  if (!post) return renderPublic404(res);
+  res.set('Cache-Control', 'no-store, private');
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  return renderPostPage(res, post, { isPreview: true });
+});
+
+router.get('/blog/:slug', (req, res) => {
+  const post = db.prepare("SELECT * FROM posts WHERE slug = ? AND status = ? AND deleted_at = ''")
+    .get(req.params.slug, 'published');
+  if (!post) return renderPublic404(res);
+
+  db.prepare('UPDATE posts SET views = views + 1 WHERE id = ?').run(post.id);
+  return renderPostPage(res, post);
 });
 
 router.get('/works', (req, res) => {

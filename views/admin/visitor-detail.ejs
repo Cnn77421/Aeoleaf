@@ -37,10 +37,23 @@
         if (n < 1000) return n + 'ms';
         return (n / 1000).toFixed(1) + 's';
       }
+      var stayMs = Number(visitor.stay_duration_ms || 0);
+      var scrollDepth = Number(visitor.max_scroll_depth || 0);
+      var engagementState = visitor.is_bot ? 'bot' : (stayMs >= 30000 || scrollDepth >= 75 ? 'engaged' : (stayMs > 0 && stayMs < 5000 ? 'quick' : 'normal'));
+      var engagementLabel = engagementState === 'bot' ? '机器人访问' : (engagementState === 'engaged' ? '高参与访问' : (engagementState === 'quick' ? '快速离开' : '普通访问'));
+      var scopedSessionDuration = (pathRows || []).reduce(function(total, row) { return total + Number(row.stay_duration_ms || 0); }, 0);
     %>
 
-    <div class="detail-sections">
-      <div class="recent-section">
+    <section class="visitor-detail-summary" aria-label="访问摘要">
+      <article><span>访问页面</span><strong><%= visitor.path || '/' %></strong><small><%= fmtTime(visitor.tracked_at) %></small></article>
+      <article><span>停留时间</span><strong><%= fmtStay(stayMs) %></strong><small>进入至离开</small></article>
+      <article><span>滚动深度</span><strong><%= scrollDepth ? scrollDepth.toFixed(1) + '%' : '—' %></strong><small>页面最大阅读位置</small></article>
+      <article><span>会话规模</span><strong><%= (pathRows || []).length || 1 %> 页</strong><small><%= session ? fmtStay(scopedSessionDuration) : '单页访问' %></small></article>
+      <article class="visitor-detail-status"><span>参与状态</span><strong class="visitor-quality visitor-quality--<%= engagementState %>"><%= engagementLabel %></strong><small><%= visitor.is_bot ? '自动识别' : '根据停留与滚动判断' %></small></article>
+    </section>
+
+    <div class="detail-sections visitor-detail-sections">
+      <div class="recent-section visitor-detail-card">
         <h2>请求信息</h2>
         <div class="detail-grid">
           <div><strong>访问时间:</strong> <%= fmtTime(visitor.tracked_at) %></div>
@@ -52,7 +65,7 @@
         </div>
       </div>
 
-      <div class="recent-section">
+      <div class="recent-section visitor-detail-card">
         <h2>设备与环境</h2>
         <div class="detail-grid">
           <div><strong>设备类型:</strong> <%= visitor.device_type || '—' %></div>
@@ -70,7 +83,7 @@
         </div>
       </div>
 
-      <div class="recent-section">
+      <div class="recent-section visitor-detail-card">
         <h2>地域与网络</h2>
         <div class="detail-grid">
           <div><strong>地域:</strong> <%= [visitor.country, visitor.province, visitor.city].filter(Boolean).join(' / ') || '—' %></div>
@@ -81,7 +94,7 @@
         </div>
       </div>
 
-      <div class="recent-section">
+      <div class="recent-section visitor-detail-card">
         <h2>行为数据</h2>
         <div class="detail-grid">
           <div><strong>进入时间:</strong> <%= fmtTime(visitor.page_enter_at) %></div>
@@ -92,7 +105,8 @@
         </div>
       </div>
 
-      <div class="recent-section">
+      <% if (visitor.utm_source || visitor.utm_medium || visitor.utm_campaign || visitor.search_keyword) { %>
+      <div class="recent-section visitor-detail-card">
         <h2>来源与营销</h2>
         <div class="detail-grid">
           <div><strong>UTM 来源:</strong> <%= visitor.utm_source || '—' %></div>
@@ -101,19 +115,20 @@
           <div><strong>搜索关键词:</strong> <%= visitor.search_keyword || '—' %></div>
         </div>
       </div>
+      <% } %>
 
-      <div class="recent-section">
-        <h2>标识信息</h2>
+      <details class="recent-section visitor-detail-card visitor-technical-card">
+        <summary><span><strong>诊断标识</strong><small>指纹、请求及会话标识</small></span><i class="ti ti-chevron-down"></i></summary>
         <div class="detail-grid">
-          <div><strong>指纹 ID:</strong> <span style="word-break:break-all"><%= visitor.fingerprint_id %></span></div>
-          <div><strong>请求 ID:</strong> <span style="word-break:break-all"><%= visitor.request_id || '—' %></span></div>
-          <div><strong>页面视图 ID:</strong> <span style="word-break:break-all"><%= visitor.page_view_id || '—' %></span></div>
-          <div><strong>会话 ID:</strong> <%= visitor.session_id || '—' %></div>
+          <div><strong>指纹 ID:</strong> <span style="word-break:break-all"><%= visitor.fingerprint_id %></span><button type="button" class="visitor-copy" data-copy-value="<%= visitor.fingerprint_id || '' %>">复制</button></div>
+          <div><strong>请求 ID:</strong> <span style="word-break:break-all"><%= visitor.request_id || '—' %></span><button type="button" class="visitor-copy" data-copy-value="<%= visitor.request_id || '' %>">复制</button></div>
+          <div><strong>页面视图 ID:</strong> <span style="word-break:break-all"><%= visitor.page_view_id || '—' %></span><button type="button" class="visitor-copy" data-copy-value="<%= visitor.page_view_id || '' %>">复制</button></div>
+          <div><strong>会话 ID:</strong> <%= visitor.session_id || '—' %><button type="button" class="visitor-copy" data-copy-value="<%= visitor.session_id || '' %>">复制</button></div>
         </div>
-      </div>
+      </details>
 
       <% if (session) { %>
-      <div class="recent-section">
+      <div class="recent-section visitor-detail-card">
         <h2>会话信息</h2>
         <div class="detail-grid">
           <div><strong>会话编号:</strong> #<%= session.id %></div>
@@ -125,37 +140,18 @@
       </div>
       <% } %>
 
-      <div class="recent-section visitors-table-section">
-        <h2>访问路径</h2>
-        <div class="visitors-table-wrap">
-          <table class="admin-table visitors-table visitors-table-compact">
-            <thead>
-              <tr>
-                <th>时间</th>
-                <th>完整 URL</th>
-                <th>路径</th>
-                <th>来源页面</th>
-                <th>停留</th>
-                <th>滚动</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% if (!pathRows || pathRows.length === 0) { %>
-                <tr><td colspan="6">暂无访问路径</td></tr>
-              <% } %>
-              <% (pathRows || []).forEach(function(row) { %>
-              <tr>
-                <td style="white-space:nowrap"><%= fmtTime(row.tracked_at) %></td>
-                <td class="cell-referer"><%= row.full_url %></td>
-                <td class="cell-path"><%= row.path %></td>
-                <td class="cell-referer"><%= row.referer %></td>
-                <td><%= fmtStay(row.stay_duration_ms) %></td>
-                <td><%= row.max_scroll_depth ? Number(row.max_scroll_depth).toFixed(1) + '%' : '—' %></td>
-              </tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
+      <div class="recent-section visitor-path-card">
+        <header><div><h2>会话路径</h2><p>按时间顺序还原本次访问旅程</p></div><span class="visitors-filter-count"><%= (pathRows || []).length %> 个页面</span></header>
+        <% if (!pathRows || pathRows.length === 0) { %><p class="empty-state">暂无访问路径</p><% } %>
+        <ol class="visitor-path-timeline">
+          <% (pathRows || []).forEach(function(row, index) { %>
+          <li>
+            <span class="visitor-path-index"><%= index + 1 %></span>
+            <div class="visitor-path-main"><strong><%= row.path || '/' %></strong><small><%= fmtTime(row.tracked_at) %></small><span title="<%= row.full_url || '' %>"><%= row.full_url || row.path || '/' %></span></div>
+            <div class="visitor-path-metrics"><span><i class="ti ti-clock"></i><%= fmtStay(row.stay_duration_ms) %></span><span><i class="ti ti-arrow-down"></i><%= row.max_scroll_depth ? Number(row.max_scroll_depth).toFixed(1) + '%' : '—' %></span></div>
+          </li>
+          <% }) %>
+        </ol>
       </div>
     </div>
   </main>

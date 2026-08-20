@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <%- include('partials/styles') %>
+</head>
+<body class="admin-body">
+  <%- include('partials/sidebar', { activePage: 'seo' }) %>
+  <main class="admin-main">
+    <div class="admin-header">
+      <div><h1>SEO 控制中心</h1><p class="dashboard-subtitle">统一检查搜索摘要、分享卡片、Canonical 与收录状态</p></div>
+      <div class="admin-heading-actions"><a class="btn-secondary" href="/sitemap.xml" target="_blank" rel="noopener"><i class="ti ti-sitemap"></i> Sitemap</a><a class="btn-secondary" href="/rss.xml" target="_blank" rel="noopener"><i class="ti ti-rss"></i> RSS</a></div>
+    </div>
+    <% if (notice) { %><div class="admin-notice" role="status"><%= notice %></div><% } %>
+
+    <section class="seo-metrics" aria-label="SEO 概况">
+      <article><small>已发布</small><strong><%= metrics.published %></strong></article>
+      <article><small>检查通过</small><strong><%= metrics.healthy %></strong></article>
+      <article><small>待处理问题</small><strong><%= metrics.issues %></strong></article>
+      <article><small>禁止收录</small><strong><%= metrics.excluded %></strong></article>
+    </section>
+
+    <section class="security-card seo-default-card">
+      <header><div><h2>全站默认值</h2><p>单篇文章未填写时使用；文章标题和摘要仍优先。</p></div></header>
+      <form method="POST" action="/admin/seo/settings" data-admin-async-form>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="form-group"><label for="seo-default-description">默认 Meta 描述</label><textarea id="seo-default-description" name="seo_default_description" maxlength="300" rows="3"><%= settings.seo_default_description || '' %></textarea></div>
+        <div class="form-group"><label for="seo-default-image">默认分享图片 URL</label><input id="seo-default-image" name="seo_default_og_image" value="<%= settings.seo_default_og_image || '' %>" placeholder="/uploads/general/cover.webp"></div>
+        <button class="btn-primary" type="submit"><i class="ti ti-device-floppy"></i> 保存默认值</button>
+      </form>
+    </section>
+
+    <section class="admin-data-view seo-audit">
+      <div class="admin-data-toolbar"><label class="admin-toolbar-search"><i class="ti ti-search"></i><input type="search" placeholder="筛选文章…" data-admin-list-search></label><select class="admin-toolbar-select" data-admin-list-status><option value="">全部结果</option><option value="issue">有问题</option><option value="healthy">检查通过</option><option value="excluded">禁止收录</option></select><span class="admin-toolbar-count"><%= posts.length %> 篇</span></div>
+      <div class="admin-table-shell"><table class="data-table" data-admin-filter-table><thead><tr><th>文章</th><th>搜索摘要</th><th>收录</th><th>检查结果</th><th>操作</th></tr></thead><tbody>
+        <% posts.forEach(post => { const result = post.noindex ? 'excluded' : (post.issues.length ? 'issue' : 'healthy'); %>
+        <tr data-admin-filter-row data-search="<%= post.title.toLowerCase() %>" data-status="<%= result %>">
+          <td data-label="文章"><strong><%= post.title %></strong><small class="seo-path">/blog/<%= post.slug %></small></td>
+          <td data-label="搜索摘要"><span class="seo-serp-title"><%= post.seoTitle %></span><small class="seo-serp-description"><%= post.seoDescription || '未设置描述' %></small></td>
+          <td data-label="收录"><span class="badge badge-<%= post.noindex ? 'draft' : 'published' %>"><%= post.noindex ? 'noindex' : 'index' %></span></td>
+          <td data-label="检查结果"><% if (post.issues.length) { %><div class="seo-issues"><% post.issues.forEach(issue => { %><span><i class="ti ti-alert-circle"></i><%= issue %></span><% }) %></div><% } else { %><span class="seo-ok"><i class="ti ti-circle-check"></i>通过</span><% } %></td>
+          <td data-label="操作"><a class="btn-sm" href="/admin/posts/<%= post.id %>/edit"><i class="ti ti-edit"></i> 编辑</a></td>
+        </tr>
+        <% }) %>
+      </tbody></table></div><p class="empty-state admin-filter-empty" data-admin-filter-empty hidden>没有符合条件的文章</p>
+    </section>
+  </main>
+  <script src="<%= asset('/js/toast.js') %>"></script><script src="<%= asset('/js/admin.js') %>"></script>
+</body>
+</html>

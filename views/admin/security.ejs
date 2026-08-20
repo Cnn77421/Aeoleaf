@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title><%= title %></title><%- include('partials/styles') %></head>
+<body class="admin-body">
+  <%- include('partials/sidebar', { activePage: 'security' }) %>
+  <main class="admin-main">
+    <div class="admin-header"><div><h1>登录安全</h1><p class="dashboard-subtitle">管理身份验证与当前登录设备</p></div></div>
+    <div class="security-grid">
+      <section class="admin-card security-card">
+        <header><div><h2>身份确认</h2><p>高风险操作要求近期验证管理员密码</p></div><span class="badge bg-success-lt">密码恢复入口已启用</span></header>
+        <form method="post" action="/admin/security/reauth" class="security-reauth-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label for="reauth-password">管理员密码</label>
+          <div><input id="reauth-password" type="password" name="password" autocomplete="current-password" required><button class="btn-primary" type="submit">重新验证</button></div>
+        </form>
+      </section>
+      <section class="admin-card security-card">
+        <header><div><h2>安全事件</h2><p>近期失败登录与临时锁定</p></div><% if (lockedIps.length) { %><span class="badge bg-danger-lt"><%= lockedIps.length %> 个 IP 已锁定</span><% } else { %><span class="badge bg-success-lt">暂无锁定</span><% } %></header>
+        <div class="session-list">
+          <% failedLogins.forEach(function(event) { %><article class="session-item"><span class="session-icon"><i class="ti ti-alert-triangle"></i></span><div><strong>登录验证失败</strong><small><%= event.ip || '未知 IP' %> · <%= event.created_at %></small><small>Request ID：<%= event.request_id || '—' %></small></div><a class="btn-secondary btn-sm" href="/admin/audit?action=auth.&outcome=failure">详情</a></article><% }) %>
+          <% if (!failedLogins.length) { %><p class="text-secondary">近期没有失败登录记录。</p><% } %>
+        </div>
+      </section>
+      <section class="admin-card security-card security-card--access">
+        <header><div><h2>后台访问活动</h2><p>后台页面访问从访客分析中分流至此，保留最近 30 条</p></div><span class="badge badge-scheduled"><%= adminAccesses.length %> 条记录</span></header>
+        <div class="security-access-list">
+          <% adminAccesses.forEach(function(access) { %>
+          <article class="security-access-item">
+            <span class="session-icon"><i class="ti ti-shield-lock"></i></span>
+            <div class="security-access-main">
+              <strong><%= access.path %></strong>
+              <small><%= new Date(Number(access.tracked_at)).toLocaleString('zh-CN') %> · <%= access.ip || '未知 IP' %></small>
+            </div>
+            <div class="security-access-device"><span><%= access.device_type || '未知设备' %></span><small><%= [access.os_name, access.browser_name].filter(Boolean).join(' · ') || '环境未知' %></small></div>
+            <a class="btn-secondary btn-sm" href="/admin/visitor/<%= access.id %>">查看</a>
+          </article>
+          <% }) %>
+          <% if (!adminAccesses.length) { %><p class="text-secondary">暂无后台页面访问记录。</p><% } %>
+        </div>
+      </section>
+      <section class="admin-card security-card">
+        <header><div><h2>通行密钥</h2><p>使用 Windows Hello、Touch ID 或安全密钥登录</p></div><button type="button" class="btn-primary btn-sm" data-passkey-register><i class="ti ti-key"></i> 添加通行密钥</button></header>
+        <div class="session-list">
+          <% passkeys.forEach(function(key) { %><article class="session-item"><span class="session-icon"><i class="ti ti-key"></i></span><div><strong><%= key.name %></strong><small><%= key.device_type || '未知设备' %> · 创建于 <%= key.created_at %></small><small>最近使用：<%= key.last_used_at || '尚未使用' %></small></div><form method="post" action="/admin/security/passkeys/<%= encodeURIComponent(key.id) %>/delete" onsubmit="return confirm('确定删除这个通行密钥吗？')"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn-danger btn-sm" type="submit">删除</button></form></article><% }) %>
+          <% if (!passkeys.length) { %><p class="text-secondary">尚未添加通行密钥。添加前请先在上方重新验证密码。</p><% } %>
+        </div>
+      </section>
+      <section class="admin-card security-card">
+        <header><div><h2>活跃会话</h2><p>共 <%= sessions.length %> 个尚未过期的登录会话</p></div>
+          <form method="post" action="/admin/security/sessions/revoke-others" onsubmit="return confirm('确定退出其他所有设备吗？')"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn-secondary btn-sm" type="submit">退出其他设备</button></form>
+        </header>
+        <div class="session-list">
+          <% sessions.forEach(function(session) { %>
+          <article class="session-item">
+            <span class="session-icon"><i class="ti <%= session.device === '移动设备' ? 'ti-device-mobile' : 'ti-device-desktop' %>"></i></span>
+            <div><strong><%= session.last_seen_at ? session.device : '旧版会话' %><% if (session.current) { %> <span class="badge bg-success-lt">当前会话</span><% } %></strong><small><%= session.ip || '未知 IP' %> · 最后活动 <%= session.last_seen_at ? new Date(session.last_seen_at).toLocaleString('zh-CN') : '升级前，暂无记录' %></small><small title="<%= session.user_agent %>"><%= (session.user_agent || '升级前会话，暂无浏览器信息').slice(0, 100) %></small></div>
+            <form method="post" action="/admin/security/sessions/<%= encodeURIComponent(session.sid) %>/revoke" onsubmit="return confirm('确定撤销这个登录会话吗？')"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn-danger btn-sm" type="submit"><%= session.current ? '退出' : '撤销' %></button></form>
+          </article>
+          <% }) %>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script src="<%= asset('/vendor/simplewebauthn-browser.min.js') %>"></script><script src="<%= asset('/js/passkeys.js') %>"></script><script src="<%= asset('/js/toast.js') %>"></script><script src="<%= asset('/js/admin.js') %>"></script>
+</body></html>

@@ -23,6 +23,10 @@
   var _extraCss = Array.isArray(typeof extraCss !== 'undefined' ? extraCss : null) ? extraCss : [];
   var _extraHead = (typeof extraHead !== 'undefined' && extraHead) ? extraHead : '';
   var _noIndex = !!(typeof noIndex !== 'undefined' && noIndex);
+  var _canonicalUrl = (typeof canonicalUrl !== 'undefined' && canonicalUrl)
+    ? (/^https?:\/\//i.test(canonicalUrl) ? canonicalUrl : _baseUrl + (canonicalUrl.charAt(0) === '/' ? canonicalUrl : '/' + canonicalUrl))
+    : _baseUrl + _canonicalPath;
+  var _ogImageUrl = /^https?:\/\//i.test(_ogImg) ? _ogImg : _baseUrl + (_ogImg.charAt(0) === '/' ? _ogImg : '/' + _ogImg);
 %>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -50,21 +54,21 @@
   <meta name="theme-color" content="#0A0A0B" media="(prefers-color-scheme: dark)">
   <meta name="color-scheme" content="light dark">
   <% if (_noIndex) { %><meta name="robots" content="noindex"><% } %>
-  <link rel="canonical" href="<%= _baseUrl %><%= _canonicalPath %>">
+  <link rel="canonical" href="<%= _canonicalUrl %>">
 
   <!-- Open Graph -->
   <meta property="og:title" content="<%= _title %>">
   <meta property="og:description" content="<%= _desc %>">
   <meta property="og:type" content="<%= _ogType %>">
-  <meta property="og:url" content="<%= _baseUrl %><%= _canonicalPath %>">
-  <meta property="og:image" content="<%= _baseUrl %><%= _ogImg %>">
+  <meta property="og:url" content="<%= _canonicalUrl %>">
+  <meta property="og:image" content="<%= _ogImageUrl %>">
   <meta property="og:site_name" content="aeoleaf 风叶">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="<%= _twitterCard %>">
   <meta name="twitter:title" content="<%= _title %>">
   <meta name="twitter:description" content="<%= _desc %>">
-  <meta name="twitter:image" content="<%= _baseUrl %><%= _ogImg %>">
+  <meta name="twitter:image" content="<%= _ogImageUrl %>">
 
   <link rel="icon" type="image/svg+xml" href="/images/favicon.svg">
   <link rel="alternate icon" href="/favicon.ico">

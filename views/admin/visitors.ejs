@@ -13,30 +13,36 @@
 
   <main class="admin-main admin-main--wide">
     <div class="dashboard-container">
-      <div class="dashboard-welcome visitors-heading">
+      <div class="dashboard-welcome visitors-heading visitors-heading--redesigned">
         <div>
+          <span class="admin-eyebrow">数据与系统 / Analytics</span>
           <h1>访客分析</h1>
-          <p class="dashboard-subtitle">实时访问统计、轨迹和设备画像</p>
+          <p class="dashboard-subtitle">掌握访问趋势、内容表现与访客行为</p>
         </div>
         <div class="admin-heading-actions">
-          <a class="btn-sm visitors-export" download href="/admin/visitors/export.csv?startTime=<%= filters.startTime || '' %>&endTime=<%= filters.endTime || '' %>&ip=<%= encodeURIComponent(filters.ip || '') %>&city=<%= encodeURIComponent(filters.city || '') %>&deviceType=<%= encodeURIComponent(filters.deviceType || '') %>&fingerprint=<%= encodeURIComponent(filters.fingerprint || '') %>"><i class="ti ti-download"></i> 导出数据</a>
+          <span class="visitors-period"><i class="ti ti-calendar-stats" aria-hidden="true"></i> 最近 7 天</span>
+          <a class="btn-sm visitors-export" download href="/admin/visitors/export.csv?startTime=<%= filters.startTime || '' %>&endTime=<%= filters.endTime || '' %>&ip=<%= encodeURIComponent(filters.ip || '') %>&city=<%= encodeURIComponent(filters.city || '') %>&deviceType=<%= encodeURIComponent(filters.deviceType || '') %>&fingerprint=<%= encodeURIComponent(filters.fingerprint || '') %>"><i class="ti ti-download" aria-hidden="true"></i> 导出 CSV</a>
         </div>
       </div>
 
-      <nav class="visitors-page-tabs" aria-label="访客分析页面分区">
-        <a href="#analytics-overview" class="active" aria-current="page">数据概览</a>
-        <a href="#visitors-table">访客记录</a>
-      </nav>
+      <div class="visitors-subnav">
+        <div class="visitors-page-tabs" role="tablist" aria-label="访客分析页面分区">
+          <button type="button" id="visitors-tab-overview" class="active" role="tab" aria-selected="true" aria-controls="analytics-overview" tabindex="0">数据概览</button>
+          <button type="button" id="visitors-tab-records" role="tab" aria-selected="false" aria-controls="visitors-records" tabindex="-1">访客记录</button>
+        </div>
+        <a class="visitors-advanced-link" href="/admin/visitors/advanced"><i class="ti ti-chart-dots-3" aria-hidden="true"></i> 高级分析</a>
+      </div>
 
-      <section id="analytics-overview" class="analytics-card analytics-traffic-card">
+      <div id="analytics-overview" class="analytics-overview-panel" role="tabpanel" aria-labelledby="visitors-tab-overview">
+      <section class="analytics-card analytics-traffic-card">
         <header class="analytics-card-header">
           <div>
             <h2>流量趋势</h2>
             <p>最近 7 天页面访问量与独立访客</p>
           </div>
           <div class="analytics-legend" aria-label="图例">
-            <span><i class="analytics-legend-primary"></i>PV</span>
-            <span><i class="analytics-legend-secondary"></i>UV</span>
+            <span><i class="analytics-legend-primary"></i> 页面浏览（PV）</span>
+            <span><i class="analytics-legend-secondary"></i> 独立访客（UV）</span>
           </div>
         </header>
         <div class="analytics-card-content analytics-chart-frame analytics-chart-frame--large">
@@ -51,22 +57,22 @@
       %>
       <div class="visitors-metrics-grid">
         <article class="analytics-metric-card">
-          <header><span>今日 PV</span><i class="ti ti-chart-line"></i></header>
+          <header><span>今日浏览</span><span class="analytics-metric-icon"><i class="ti ti-chart-line"></i></span></header>
           <strong><%= Number(overview.todayPV || 0).toLocaleString('zh-CN') %></strong>
-          <p<% if (pvDelta !== null && pvDelta >= 0) { %> class="is-positive"<% } %>><% if (pvDelta === null) { %>昨日无访问记录<% } else { %><%= pvDelta >= 0 ? '+' : '' %><%= pvDelta %>% 较昨日<% } %></p>
+          <p<% if (pvDelta !== null) { %> class="<%= pvDelta >= 0 ? 'is-positive' : 'is-negative' %>"<% } %>><% if (pvDelta === null) { %>昨日无访问记录<% } else { %><%= pvDelta >= 0 ? '+' : '' %><%= pvDelta %>% 较昨日<% } %></p>
         </article>
         <article class="analytics-metric-card">
-          <header><span>今日 UV</span><i class="ti ti-users"></i></header>
+          <header><span>今日访客</span><span class="analytics-metric-icon"><i class="ti ti-users"></i></span></header>
           <strong><%= Number(overview.todayUV || 0).toLocaleString('zh-CN') %></strong>
           <p>今日独立访客</p>
         </article>
         <article class="analytics-metric-card">
-          <header><span>累计 PV</span><i class="ti ti-activity"></i></header>
+          <header><span>累计浏览</span><span class="analytics-metric-icon"><i class="ti ti-activity"></i></span></header>
           <strong><%= Number(overview.totalPV || 0).toLocaleString('zh-CN') %></strong>
           <p>全部页面访问次数</p>
         </article>
         <article class="analytics-metric-card">
-          <header><span>累计 UV</span><i class="ti ti-user-scan"></i></header>
+          <header><span>累计访客</span><span class="analytics-metric-icon"><i class="ti ti-user-scan"></i></span></header>
           <strong><%= Number(overview.totalUV || 0).toLocaleString('zh-CN') %></strong>
           <p>全部独立访客</p>
         </article>
@@ -85,6 +91,7 @@
           </header>
           <div class="analytics-card-content analytics-chart-frame"><% if (regionRows && regionRows.length) { %><canvas id="regionChart"></canvas><% } else { %><div class="analytics-chart-empty"><i class="ti ti-map-pin"></i><span>暂无地域分布数据</span></div><% } %></div>
         </section>
+      </div>
       </div>
 
       <%
@@ -130,7 +137,7 @@
             + '&deviceType=' + encodeURIComponent(filters.deviceType || '')
             + '&sortBy=' + (sortBy || 'tracked_at')
             + '&sortDir=' + (sortDir || 'desc');
-          return u + '#visitors-table';
+          return u + '&section=records';
         }
         function sortUrl(col) {
           var newDir = (sortBy === col && sortDir === 'asc') ? 'desc' : 'asc';
@@ -146,12 +153,14 @@
         var activeFilterCount = ['startTime', 'endTime', 'ip', 'fingerprint', 'city', 'deviceType']
           .filter(function(key) { return Boolean(filters[key]); }).length;
       %>
+      <div id="visitors-records" class="visitors-records-panel" role="tabpanel" aria-labelledby="visitors-tab-records" hidden>
       <section class="analytics-card visitors-filter-section">
         <header class="analytics-card-header visitors-filter-header">
           <div><h2>筛选条件</h2><p>按时间、身份或设备缩小访客记录范围</p></div>
           <% if (activeFilterCount > 0) { %><span class="visitors-filter-count"><%= activeFilterCount %> 项已启用</span><% } %>
         </header>
         <form method="GET" action="/admin/visitors" class="visitors-filter-grid" data-admin-pjax-form>
+          <input type="hidden" name="section" value="records">
           <input type="hidden" name="view" value="<%= view || 'detail' %>">
           <input type="hidden" name="sortBy" value="<%= sortBy || 'tracked_at' %>">
           <input type="hidden" name="sortDir" value="<%= sortDir || 'desc' %>">
@@ -169,8 +178,8 @@
             </select>
           </label>
           <div class="visitors-filter-actions">
-            <a href="/admin/visitors?view=<%= view || 'detail' %>#visitors-table" class="btn-link">重置</a>
-            <button type="submit" class="btn visitors-filter-btn"><i class="ti ti-filter"></i> 应用筛选</button>
+            <a href="/admin/visitors?view=<%= view || 'detail' %>&section=records" class="btn-link">重置</a>
+            <button type="submit" class="btn-primary visitors-filter-btn"><i class="ti ti-filter"></i> 应用筛选</button>
           </div>
         </form>
       </section>
@@ -178,12 +187,12 @@
       <section id="table" class="analytics-card visitors-table-section">
         <header class="analytics-card-header visitors-table-header">
           <div>
-            <h2><% if (view === 'sessions') { %>会话记录<% } else { %>访客明细<% } %></h2>
-            <p><% if (view === 'sessions') { %>按访问会话合并页面路径与停留时间<% } else { %>查看每一次访问的设备、位置和行为信息<% } %></p>
+            <h2><% if (view === 'sessions') { %>访客会话<% } else { %>原始访问明细<% } %></h2>
+            <p><% if (view === 'sessions') { %>每行代表一次完整会话，聚合设备、路径和参与度<% } else { %>用于排障的逐次访问原始记录<% } %></p>
           </div>
           <div class="view-toggle">
-            <a class="btn-link<%= view !== 'sessions' ? ' view-toggle-active' : '' %>" href="<%= buildPageUrl(1).replace('view=sessions', 'view=detail') %>">明细</a>
             <a class="btn-link<%= view === 'sessions' ? ' view-toggle-active' : '' %>" href="<%= buildPageUrl(1).replace('view=detail', 'view=sessions') %>">会话</a>
+            <a class="btn-link<%= view !== 'sessions' ? ' view-toggle-active' : '' %>" href="<%= buildPageUrl(1).replace('view=sessions', 'view=detail') %>">原始明细</a>
             <a class="btn-link view-toggle-danger" href="/admin/visitors/blacklist">黑名单</a>
           </div>
         </header>
@@ -194,28 +203,31 @@
             <table class="admin-table visitors-table">
               <thead>
                 <tr>
-                  <th>会话 ID</th>
-                  <th>指纹</th>
-                  <th>开始时间</th>
-                  <th>结束时间</th>
-                  <th>页面数</th>
-                  <th>总停留</th>
-                  <th>访问路径</th>
+                  <th>会话</th>
+                  <th>访客环境</th>
+                  <th>访问旅程</th>
+                  <th>参与度</th>
+                  <th>状态</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
                 <% if (!sessionsPage || sessionsPage.rows.length === 0) { %>
-                  <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:2rem">暂无会话数据</td></tr>
+                  <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem">暂无公开站点会话</td></tr>
                 <% } else { %>
                   <% sessionsPage.rows.forEach(function(row) { %>
-                    <tr>
-                      <td>#<%= row.id %></td>
-                      <td class="cell-fingerprint"><%= (row.fingerprint_id || '').slice(0, 12) %>…</td>
-                      <td style="white-space:nowrap"><%= fmtTime(row.start_time) %></td>
-                      <td style="white-space:nowrap"><%= fmtTime(row.end_time) %></td>
-                      <td><%= row.page_count %></td>
-                      <td><%= fmtStay(row.total_duration) %></td>
-                      <td class="cell-path"><%= (row.paths || '—').replace(/,/g, ' → ') %></td>
+                    <%
+                      var publicDuration = Number(row.public_total_duration || 0);
+                      var quality = row.is_bot ? 'bot' : (publicDuration >= 30000 || Number(row.avg_scroll || 0) >= 75 ? 'engaged' : (publicDuration > 0 && publicDuration < 5000 ? 'quick' : 'normal'));
+                      var qualityLabel = quality === 'bot' ? '机器人' : (quality === 'engaged' ? '高参与' : (quality === 'quick' ? '快速离开' : '普通'));
+                    %>
+                    <tr class="visitor-session-row visitor-session-row--<%= quality %>">
+                      <td class="visitor-session-identity"><strong>#<%= row.id %> <% if (row.is_returning) { %><span class="visitor-returning">回访</span><% } else { %><span class="visitor-new">新访客</span><% } %></strong><small><%= fmtTime(row.public_start_time || row.start_time) %></small><button type="button" class="visitor-copy" data-copy-value="<%= row.fingerprint_id || '' %>" title="复制完整指纹"><%= (row.fingerprint_id || '无指纹').slice(0, 12) %><%= row.fingerprint_id && row.fingerprint_id.length > 12 ? '…' : '' %></button></td>
+                      <td class="visitor-session-device"><strong><i class="ti <%= row.device_type === '手机' ? 'ti-device-mobile' : 'ti-device-desktop' %>"></i> <%= row.device_type || '未知设备' %></strong><small><%= [row.os_name, row.browser_name].filter(Boolean).join(' · ') || '环境未知' %></small><small><%= row.city || '未知地域' %> · <%= maskIp(row.ip) %></small></td>
+                      <td class="visitor-session-journey"><strong><%= row.entry_path || '/' %></strong><span><i class="ti ti-arrow-right"></i></span><strong><%= row.exit_path || row.entry_path || '/' %></strong><small><%= row.public_page_count || 0 %> 个页面</small></td>
+                      <td class="visitor-session-engagement"><strong><%= fmtStay(publicDuration) %></strong><small>平均滚动 <%= row.avg_scroll ? Number(row.avg_scroll).toFixed(0) + '%' : '—' %></small></td>
+                      <td><span class="visitor-quality visitor-quality--<%= quality %>"><%= qualityLabel %></span></td>
+                      <td class="visitor-session-actions"><button type="button" class="btn-secondary btn-sm" data-visitor-quick data-session="<%= row.id %>" data-time="<%= fmtTime(row.public_start_time || row.start_time) %>" data-device="<%= [row.device_type, row.os_name, row.browser_name].filter(Boolean).join(' · ') %>" data-location="<%= row.city || '未知地域' %>" data-ip="<%= maskIp(row.ip) %>" data-entry="<%= row.entry_path || '/' %>" data-exit="<%= row.exit_path || row.entry_path || '/' %>" data-pages="<%= row.public_page_count || 0 %>" data-duration="<%= fmtStay(publicDuration) %>" data-scroll="<%= row.avg_scroll ? Number(row.avg_scroll).toFixed(0) + '%' : '—' %>" data-quality="<%= qualityLabel %>" data-detail="/admin/visitor/<%= row.latest_visitor_id %>">快速查看</button></td>
                     </tr>
                   <% }); %>
                 <% } %>
@@ -303,8 +315,22 @@
           <% } %>
         <% } %>
       </section>
+      </div>
     </div>
     <script id="visitor-chart-data" type="application/json"><%- JSON.stringify({ trendRows: trendRows || [], regionRows: regionRows || [], topPages: topPages || [] }).replace(/</g, '\\u003c') %></script>
+  <button class="visitor-quick-backdrop" type="button" data-visitor-quick-close hidden aria-label="关闭快速详情"></button>
+  <aside class="visitor-quick-drawer" data-visitor-quick-drawer aria-hidden="true" aria-labelledby="visitor-quick-title">
+    <header><div><span class="admin-eyebrow">访客会话</span><h2 id="visitor-quick-title">快速详情</h2></div><button type="button" class="admin-icon-button" data-visitor-quick-close aria-label="关闭"><i class="ti ti-x"></i></button></header>
+    <div class="visitor-quick-summary"><strong data-visitor-quick-quality>—</strong><span data-visitor-quick-time>—</span></div>
+    <dl>
+      <div><dt>设备环境</dt><dd data-visitor-quick-device>—</dd></div>
+      <div><dt>地域 / IP</dt><dd><span data-visitor-quick-location>—</span> · <span data-visitor-quick-ip>—</span></dd></div>
+      <div><dt>访问旅程</dt><dd><span data-visitor-quick-entry>—</span> → <span data-visitor-quick-exit>—</span></dd></div>
+      <div><dt>页面 / 停留</dt><dd><span data-visitor-quick-pages>—</span> 页 · <span data-visitor-quick-duration>—</span></dd></div>
+      <div><dt>平均滚动</dt><dd data-visitor-quick-scroll>—</dd></div>
+    </dl>
+    <a class="btn-primary" data-visitor-quick-detail href="/admin/visitors">查看完整详情</a>
+  </aside>
   </main>
   <script src="<%= asset('/js/toast.js') %>"></script>
   <script src="<%= asset('/js/admin.js') %>"></script>

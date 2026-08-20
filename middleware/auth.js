@@ -16,4 +16,16 @@ function requireAdmin(req, res, next) {
   return res.redirect('/admin/login');
 }
 
-module.exports = { requireAdmin };
+function isRecentlyAuthenticated(req, maxAgeMs = 30 * 60 * 1000) {
+  const authenticatedAt = Number(req.session?.security?.authenticatedAt || 0);
+  return authenticatedAt > 0 && Date.now() - authenticatedAt <= maxAgeMs;
+}
+
+function requireRecentAuth(req, res, next) {
+  if (isRecentlyAuthenticated(req)) return next();
+  const wantsJson = String(req.get?.('accept') || '').includes('application/json') || req.xhr;
+  if (wantsJson) return res.status(403).json({ error: '需要重新验证管理员身份', code: 'REAUTH_REQUIRED' });
+  return res.redirect('/admin/security?err=reauth');
+}
+
+module.exports = { requireAdmin, requireRecentAuth, isRecentlyAuthenticated };

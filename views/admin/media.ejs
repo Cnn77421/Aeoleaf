@@ -23,15 +23,17 @@
       <button type="submit" class="btn-primary"><i class="ti ti-upload"></i> 上传</button>
     </form>
 
-    <div class="media-summary"><strong><%= media.length %></strong> 张图片 · <strong><%= media.filter(item => item.usedBy.length).length %></strong> 张正在使用</div>
+    <div class="admin-data-toolbar media-toolbar"><label class="admin-toolbar-search"><i class="ti ti-search"></i><input type="search" placeholder="按文件名筛选…" data-admin-list-search></label><select class="admin-toolbar-select" data-admin-list-status data-filter-key="folder"><option value="">全部分类</option><option value="posts">文章封面</option><option value="works">作品图片</option><option value="general">通用图片</option></select><select class="admin-toolbar-select" data-admin-list-status data-filter-key="usage"><option value="">全部引用状态</option><option value="used">正在使用</option><option value="unused">未引用</option></select></div>
+    <div class="media-summary"><strong><%= media.length %></strong> 张图片 · <strong><%= media.filter(item => item.usedBy.length).length %></strong> 张正在使用 · <strong><%= media.filter(item => item.duplicate).length %></strong> 张内容重复</div>
     <div class="media-grid">
       <% if (!media.length) { %><p class="empty-state">暂无已上传图片</p><% } %>
       <% media.forEach(item => { %>
-        <article class="media-card">
+        <article class="media-card" data-admin-filter-row data-search="<%= item.name.toLowerCase() %>" data-folder="<%= item.folder %>" data-usage="<%= item.usedBy.length ? 'used' : 'unused' %>">
           <a href="<%= item.url %>" target="_blank" rel="noopener" class="media-preview"><img src="<%= item.url %>" alt=""></a>
           <div class="media-card-body">
             <strong title="<%= item.name %>"><%= item.name %></strong>
-            <div class="media-meta"><span><%= item.folder %></span><span><%= item.size < 1024 * 1024 ? Math.max(1, Math.round(item.size / 1024)) + ' KB' : (item.size / 1024 / 1024).toFixed(1) + ' MB' %></span></div>
+            <div class="media-meta"><span><%= item.folder %> · <%= item.format %></span><span><%= item.width && item.height ? item.width + '×' + item.height + ' · ' : '' %><%= item.size < 1024 * 1024 ? Math.max(1, Math.round(item.size / 1024)) + ' KB' : (item.size / 1024 / 1024).toFixed(1) + ' MB' %></span></div>
+            <% if (item.duplicate || item.needsOptimization) { %><div class="media-flags"><% if (item.duplicate) { %><span><i class="ti ti-copy-check"></i> 内容重复</span><% } %><% if (item.needsOptimization) { %><span><i class="ti ti-gauge"></i> 建议优化</span><% } %></div><% } %>
             <div class="media-url-row">
               <input type="text" value="<%= item.url %>" readonly aria-label="图片地址">
               <button type="button" class="btn-sm media-copy" data-url="<%= item.url %>"><i class="ti ti-copy"></i> 复制</button>
@@ -45,10 +47,12 @@
                 <button type="submit" class="btn-sm btn-danger"><i class="ti ti-trash"></i> 移入回收站</button>
               </form>
             <% } %>
+            <form method="POST" action="/admin/media/optimize" data-admin-async-form><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="url" value="<%= item.url %>"><button type="submit" class="btn-sm"><i class="ti ti-wand"></i> 生成 WebP 副本</button></form>
           </div>
         </article>
       <% }); %>
     </div>
+    <p class="empty-state admin-filter-empty" data-admin-filter-empty hidden>没有符合筛选条件的图片</p>
   </main>
   <script src="<%= asset('/js/toast.js') %>"></script>
   <script src="<%= asset('/js/admin.js') %>"></script>

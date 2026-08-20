@@ -64,9 +64,18 @@ function initDB() {
       cover_image TEXT DEFAULT '',
       tags TEXT DEFAULT '[]',
       status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'published')),
+      scheduled_at TEXT NOT NULL DEFAULT '',
+      unpublish_at TEXT NOT NULL DEFAULT '',
+      published_at TEXT NOT NULL DEFAULT '',
+      seo_title TEXT NOT NULL DEFAULT '',
+      seo_description TEXT NOT NULL DEFAULT '',
+      canonical_url TEXT NOT NULL DEFAULT '',
+      og_image TEXT NOT NULL DEFAULT '',
+      noindex INTEGER NOT NULL DEFAULT 0 CHECK(noindex IN (0, 1)),
       views INTEGER NOT NULL DEFAULT 0,
       deleted_at TEXT NOT NULL DEFAULT '',
       deleted_slug TEXT NOT NULL DEFAULT '',
+      content_revision INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -90,6 +99,7 @@ function initDB() {
       sort_order INTEGER NOT NULL DEFAULT 0,
       deleted_at TEXT NOT NULL DEFAULT '',
       deleted_slug TEXT NOT NULL DEFAULT '',
+      content_revision INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -105,16 +115,40 @@ function initDB() {
     CREATE TABLE IF NOT EXISTS admin_sessions (
       sid TEXT PRIMARY KEY,
       data TEXT NOT NULL,
-      expires_at INTEGER NOT NULL
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT 0,
+      last_seen_at INTEGER NOT NULL DEFAULT 0,
+      ip TEXT NOT NULL DEFAULT '',
+      user_agent TEXT NOT NULL DEFAULT ''
     );
 
     CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions(expires_at);
+
+    CREATE TABLE IF NOT EXISTS admin_login_attempts (
+      ip TEXT PRIMARY KEY,
+      failures INTEGER NOT NULL DEFAULT 0,
+      locked_until INTEGER NOT NULL DEFAULT 0,
+      last_failure_at INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS admin_passkeys (
+      id TEXT PRIMARY KEY,
+      public_key BLOB NOT NULL,
+      counter INTEGER NOT NULL DEFAULT 0,
+      transports TEXT NOT NULL DEFAULT '[]',
+      device_type TEXT NOT NULL DEFAULT '',
+      backed_up INTEGER NOT NULL DEFAULT 0,
+      name TEXT NOT NULL DEFAULT '通行密钥',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      last_used_at TEXT NOT NULL DEFAULT ''
+    );
 
     CREATE TABLE IF NOT EXISTS content_versions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       entity_type TEXT NOT NULL CHECK(entity_type IN ('post', 'work')),
       entity_id INTEGER NOT NULL,
       source TEXT NOT NULL DEFAULT 'save',
+      actor_id TEXT NOT NULL DEFAULT '',
       snapshot_json TEXT NOT NULL,
       content_hash TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
@@ -141,6 +175,31 @@ function initDB() {
     CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(id DESC);
     CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
     CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_type, entity_id);
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      severity TEXT NOT NULL DEFAULT 'info' CHECK(severity IN ('info', 'success', 'warning', 'error')),
+      title TEXT NOT NULL,
+      message TEXT NOT NULL DEFAULT '',
+      action_url TEXT NOT NULL DEFAULT '',
+      source_action TEXT NOT NULL DEFAULT '',
+      source_id TEXT NOT NULL DEFAULT '',
+      read_at TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(read_at, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_notifications_severity ON notifications(severity, id DESC);
+
+    CREATE TABLE IF NOT EXISTS health_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      status TEXT NOT NULL CHECK(status IN ('ok', 'warning', 'error')),
+      ok_count INTEGER NOT NULL DEFAULT 0,
+      warning_count INTEGER NOT NULL DEFAULT 0,
+      error_count INTEGER NOT NULL DEFAULT 0,
+      details_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_health_snapshots_created ON health_snapshots(id DESC);
 
     CREATE TABLE IF NOT EXISTS backup_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -230,6 +289,8 @@ function initDB() {
       ('backup_schedule_enabled', '0'),
       ('backup_interval_hours', '24'),
       ('backup_retention_count', '10'),
+      ('seo_default_description', ''),
+      ('seo_default_og_image', ''),
       ('social_links', '[]');
   `);
 
@@ -254,6 +315,23 @@ function initDB() {
   try { rawDb.exec("ALTER TABLE works ADD COLUMN deleted_slug TEXT NOT NULL DEFAULT ''"); } catch (e) {}
   rawDb.exec('CREATE INDEX IF NOT EXISTS idx_posts_deleted_at ON posts(deleted_at)');
   rawDb.exec('CREATE INDEX IF NOT EXISTS idx_works_deleted_at ON works(deleted_at)');
+  try { rawDb.exec('ALTER TABLE admin_sessions ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE admin_sessions ADD COLUMN last_seen_at INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE admin_sessions ADD COLUMN ip TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE admin_sessions ADD COLUMN user_agent TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE content_versions ADD COLUMN actor_id TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE posts ADD COLUMN content_revision INTEGER NOT NULL DEFAULT 1'); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE posts ADD COLUMN scheduled_at TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE posts ADD COLUMN unpublish_at TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE posts ADD COLUMN published_at TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE posts ADD COLUMN seo_title TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE posts ADD COLUMN seo_description TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE posts ADD COLUMN canonical_url TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec("ALTER TABLE posts ADD COLUMN og_image TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE posts ADD COLUMN noindex INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
+  rawDb.exec('CREATE INDEX IF NOT EXISTS idx_posts_scheduled_at ON posts(scheduled_at)');
+  rawDb.exec('CREATE INDEX IF NOT EXISTS idx_posts_unpublish_at ON posts(unpublish_at)');
+  try { rawDb.exec('ALTER TABLE works ADD COLUMN content_revision INTEGER NOT NULL DEFAULT 1'); } catch (e) {}
 
   // Visitor table incremental columns (ALTER only, keep backward compatible)
   try { rawDb.exec('ALTER TABLE visitors ADD COLUMN request_id TEXT DEFAULT \'\''); } catch (e) {}
@@ -398,7 +476,7 @@ const dbWrapper = {
   }
 };
 function buildVisitorFilter({ startTime, endTime, ip, city, deviceType, fingerprint }) {
-  let where = ' WHERE 1=1';
+  let where = " WHERE path NOT LIKE '/admin/%' AND ip NOT IN ('::1', '127.0.0.1', '::ffff:127.0.0.1')";
   const params = [];
 
   if (startTime) {
@@ -434,11 +512,12 @@ function getVisitorOverview() {
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const ydayStart = dayStart - 24 * 60 * 60 * 1000;
 
-  const todayPV = dbWrapper.prepare('SELECT COUNT(*) as cnt FROM visitors WHERE tracked_at >= ?').get(dayStart)?.cnt || 0;
-  const todayUV = dbWrapper.prepare('SELECT COUNT(DISTINCT fingerprint_id) as cnt FROM visitors WHERE tracked_at >= ?').get(dayStart)?.cnt || 0;
-  const yesterdayPV = dbWrapper.prepare('SELECT COUNT(*) as cnt FROM visitors WHERE tracked_at >= ? AND tracked_at < ?').get(ydayStart, dayStart)?.cnt || 0;
-  const totalPV = dbWrapper.prepare('SELECT COUNT(*) as cnt FROM visitors').get()?.cnt || 0;
-  const totalUV = dbWrapper.prepare('SELECT COUNT(DISTINCT fingerprint_id) as cnt FROM visitors').get()?.cnt || 0;
+  const publicFilter = "path NOT LIKE '/admin/%' AND ip NOT IN ('::1', '127.0.0.1', '::ffff:127.0.0.1')";
+  const todayPV = dbWrapper.prepare(`SELECT COUNT(*) as cnt FROM visitors WHERE ${publicFilter} AND tracked_at >= ?`).get(dayStart)?.cnt || 0;
+  const todayUV = dbWrapper.prepare(`SELECT COUNT(DISTINCT fingerprint_id) as cnt FROM visitors WHERE ${publicFilter} AND tracked_at >= ?`).get(dayStart)?.cnt || 0;
+  const yesterdayPV = dbWrapper.prepare(`SELECT COUNT(*) as cnt FROM visitors WHERE ${publicFilter} AND tracked_at >= ? AND tracked_at < ?`).get(ydayStart, dayStart)?.cnt || 0;
+  const totalPV = dbWrapper.prepare(`SELECT COUNT(*) as cnt FROM visitors WHERE ${publicFilter}`).get()?.cnt || 0;
+  const totalUV = dbWrapper.prepare(`SELECT COUNT(DISTINCT fingerprint_id) as cnt FROM visitors WHERE ${publicFilter}`).get()?.cnt || 0;
 
   return { todayPV, todayUV, yesterdayPV, totalPV, totalUV };
 }
@@ -451,7 +530,7 @@ function getVisitorTrend(days = 7) {
       COUNT(*) as pv,
       COUNT(DISTINCT fingerprint_id) as uv
     FROM visitors
-    WHERE tracked_at >= ?
+    WHERE path NOT LIKE '/admin/%' AND ip NOT IN ('::1', '127.0.0.1', '::ffff:127.0.0.1') AND tracked_at >= ?
     GROUP BY d
     ORDER BY d ASC
   `).all(from);
@@ -470,6 +549,7 @@ function getRegionDistribution(limit = 20) {
       COUNT(*) as pv,
       COUNT(DISTINCT fingerprint_id) as uv
     FROM visitors
+    WHERE path NOT LIKE '/admin/%' AND ip NOT IN ('::1', '127.0.0.1', '::ffff:127.0.0.1')
     GROUP BY region
     ORDER BY pv DESC
     LIMIT ?
@@ -480,6 +560,7 @@ function getTopPages(limit = 10) {
   return dbWrapper.prepare(`
     SELECT path, COUNT(*) as pv, COUNT(DISTINCT fingerprint_id) as uv
     FROM visitors
+    WHERE path NOT LIKE '/admin/%' AND ip NOT IN ('::1', '127.0.0.1', '::ffff:127.0.0.1')
     GROUP BY path
     ORDER BY pv DESC
     LIMIT ?
@@ -543,7 +624,7 @@ function getVisitorsByFingerprint(fingerprintId, limit = 500) {
   const cap = Math.max(1, Math.min(1000, Number(limit) || 500));
   return dbWrapper.prepare(`
     SELECT * FROM visitors
-    WHERE fingerprint_id = ?
+    WHERE fingerprint_id = ? AND path NOT LIKE '/admin/%' AND ip NOT IN ('::1', '127.0.0.1', '::ffff:127.0.0.1')
     ORDER BY tracked_at ASC
     LIMIT ?
   `).all(fp, cap);
@@ -554,7 +635,7 @@ function getSessionsPage(filters, page = 1, _limit = 20) {
   const safeLimit = 20;
   const offset = (safePage - 1) * safeLimit;
 
-  let where = ' WHERE 1=1';
+  let where = " WHERE EXISTS (SELECT 1 FROM visitors public_visit WHERE public_visit.visitor_session_id = vs.id AND public_visit.path NOT LIKE '/admin/%' AND public_visit.ip NOT IN ('::1', '127.0.0.1', '::ffff:127.0.0.1'))";
   const params = [];
 
   if (filters && filters.fingerprint) {
@@ -570,10 +651,48 @@ function getSessionsPage(filters, page = 1, _limit = 20) {
     params.push(filters.endTime);
   }
 
+  const visitConditions = [];
+  if (filters && filters.ip) {
+    visitConditions.push('session_visit.ip LIKE ?');
+    params.push(`%${filters.ip}%`);
+  }
+  if (filters && filters.city) {
+    visitConditions.push('session_visit.city LIKE ?');
+    params.push(`%${filters.city}%`);
+  }
+  if (filters && filters.deviceType) {
+    visitConditions.push('session_visit.device_type = ?');
+    params.push(filters.deviceType);
+  }
+  if (visitConditions.length) {
+    where += ` AND EXISTS (SELECT 1 FROM visitors session_visit WHERE session_visit.visitor_session_id = vs.id AND session_visit.path NOT LIKE '/admin/%' AND ${visitConditions.join(' AND ')})`;
+  }
+
   const total = dbWrapper.prepare(`SELECT COUNT(*) as cnt FROM visitor_sessions vs${where}`).get(...params)?.cnt || 0;
   const rows = dbWrapper.prepare(`
     SELECT vs.*,
-      (SELECT GROUP_CONCAT(DISTINCT path) FROM visitors WHERE visitor_session_id = vs.id) as paths
+      (SELECT COUNT(*) FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%') as public_page_count,
+      (SELECT MIN(tracked_at) FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%') as public_start_time,
+      (SELECT MAX(CASE WHEN page_leave_at > 0 THEN page_leave_at ELSE tracked_at END) FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%') as public_end_time,
+      (SELECT COALESCE(SUM(stay_duration_ms), 0) FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%') as public_total_duration,
+      (SELECT GROUP_CONCAT(DISTINCT path) FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%') as paths,
+      (SELECT path FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at ASC, id ASC LIMIT 1) as entry_path,
+      (SELECT path FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as exit_path,
+      (SELECT id FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as latest_visitor_id,
+      (SELECT ip FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as ip,
+      (SELECT device_type FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as device_type,
+      (SELECT os_name FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as os_name,
+      (SELECT browser_name FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as browser_name,
+      (SELECT city FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as city,
+      (SELECT ROUND(AVG(NULLIF(max_scroll_depth, 0)), 1) FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%') as avg_scroll,
+      (SELECT MAX(COALESCE(is_bot, 0)) FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%') as is_bot
+      ,CASE WHEN EXISTS (
+        SELECT 1 FROM visitors previous_visit
+        WHERE previous_visit.fingerprint_id = vs.fingerprint_id
+          AND previous_visit.path NOT LIKE '/admin/%'
+          AND previous_visit.ip NOT IN ('::1', '127.0.0.1', '::ffff:127.0.0.1')
+          AND previous_visit.tracked_at < (SELECT MIN(current_visit.tracked_at) FROM visitors current_visit WHERE current_visit.visitor_session_id = vs.id AND current_visit.path NOT LIKE '/admin/%')
+      ) THEN 1 ELSE 0 END as is_returning
     FROM visitor_sessions vs
     ${where}
     ORDER BY vs.start_time DESC
