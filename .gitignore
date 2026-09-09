@@ -1,5 +1,6 @@
 node_modules/
 .env
+data/*.mmdb
 database/aeoleaf.db
 database/*.db
 database/*.db-wal
@@ -15,3 +16,15 @@ FETCH_HEAD
 .vs/
 .claude/
 新建 文本文档.txt
+
+# Local editor settings and collaboration notes
+/.vscode/
+/AGENTS.md
+/TODO.md
+
+# Server panel files and certificate challenges
+/.well-known/acme-challenge/
+/.user.ini
+/.htaccess
+/index.html
+/404.html
