@@ -47,12 +47,13 @@
   <script type="application/ld+json"><%- JSON.stringify(_articleJsonLd) %></script>
 </head>
 <body class="journal-post-page">
+  <%- include('partials/public-header') %>
+  <main id="main" class="site-main journal-main">
   <% if (typeof isPreview !== 'undefined' && isPreview) { %>
   <aside class="preview-banner" role="status"><strong>预览模式</strong><span>此页面尚未公开，链接将在 1 小时后失效。</span></aside>
   <% } %>
   <div class="reading-progress" role="progressbar" aria-label="阅读进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="reading-progress__bar"></span></div>
-  <%- include('partials/public-header') %>
-  <main id="main" class="site-main journal-main">
+
     <div class="journal-post-shell">
       <article class="post-detail journal-article" id="article-top" data-post-article>
         <div class="journal-article__hero<%= post.cover_image ? '' : ' journal-article__hero--placeholder' %>">
@@ -74,7 +75,7 @@
         <div class="journal-article__inner">
           <% if (post.excerpt) { %><p class="journal-article__lead"><%= post.excerpt %></p><% } %>
           <div class="prose journal-prose"><%- post.html %></div>
-          <footer class="journal-article__footer"><a href="/blog">← 返回文章列表</a><span>感谢阅读这一叶。</span></footer>
+          <footer class="journal-article__footer"><a href="/blog">← 返回文章列表</a><span>海棠依旧。</span></footer>
         </div>
       </article>
 
@@ -97,6 +98,10 @@
   <%- include('partials/public-footer') %>
   <script>
   (function () {
+    var previousCleanup = window.aeoleafPostCleanup;
+    if (previousCleanup) previousCleanup();
+    var tocDetails = document.querySelector('.post-toc__details');
+    if (tocDetails) tocDetails.open = window.matchMedia('(min-width: 1024px)').matches;
     var bar = document.querySelector('.reading-progress');
     var fill = bar && bar.querySelector('.reading-progress__bar');
     var article = document.querySelector('[data-post-article]');
@@ -186,6 +191,10 @@
     }
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll, { passive: true });
+    window.aeoleafPostCleanup = function () {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
     update();
   })();
   </script>

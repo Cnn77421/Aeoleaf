@@ -15,11 +15,9 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { initDB, db, saveDBSync } = require('../config/db');
 
 const MESSAGES = [
-  { name: 'Wyl',  message: '生日快乐！愿你新的一岁，写的字越来越多，熬的夜越来越少。', created_at: '2026-05-21 08:42:13' },
   { name: 'Jo',   message: '第一次逛到这个小站，排版和配色都好舒服，会常来的。',       created_at: '2026-05-12 22:05:48' },
-  { name: 'Mira', message: '祝风叶生日快乐呀，新的一岁也要做喜欢的事、见喜欢的人。',   created_at: '2026-05-21 00:07:36' },
   { name: 'El',   message: '从你的作品里学到了好多，谢谢你愿意把这些都分享出来。',     created_at: '2026-05-06 17:23:09' },
-  { name: 'Tao',  message: '大一就能独立做出这样完整的网站，真的很厉害，继续加油！🎂', created_at: '2026-05-20 23:51:02' }
+  { name: 'Tao',  message: '大一就能独立做出这样完整的网站，真的很厉害，继续加油！', created_at: '2026-05-20 23:51:02' }
 ];
 
 async function main() {

@@ -6,83 +6,54 @@
   description: 'Aeoleaf 风叶：' + subtitle + ' — 个人博客与作品集，记录设计与技术笔记。',
   canonicalPath: '/', ogType: 'website', twitterCard: 'summary_large_image', extraCss: ['/css/home.css']
 }) %>
-  <% if (heroImage) { %><link rel="preload" as="image" href="<%= heroImage %>" fetchpriority="high"><% } %>
+<% if (heroImage) { %><link rel="preload" as="image" href="<%= heroImage %>" fetchpriority="high"><% } %>
 </head>
-<body class="home-page reference-home">
-  <%- include('partials/public-header') %>
-  <div class="ref-home-backdrop" data-home-backdrop aria-hidden="true">
+<body class="home-page home-v2">
+<%- include('partials/public-header') %>
+<main id="main" class="site-main home-shell">
+  <section class="home-intro<%= heroImage ? ' home-intro--image' : '' %>" aria-labelledby="home-title">
+    <div class="home-intro__copy">
+      <p class="home-eyebrow">AEOLEAF / 写作 · 设计 · 生活</p>
+      <h1 id="home-title"><%= title %></h1>
+      <p class="home-intro__subtitle"><%= subtitle %></p>
+      <p class="home-intro__description"><%= aboutSummary || '记录设计与技术笔记，整理做过的作品，也留下一处与来访者交流的空间。' %></p>
+      <div class="home-actions"><a class="btn-v2 btn-v2--primary" href="/blog">阅读文章 <span aria-hidden="true">↗</span></a><a class="btn-v2" href="/works">浏览作品</a></div>
+    </div>
     <% if (heroImage) { %>
-    <picture class="ref-home-backdrop__picture">
-      <% if (heroImageMobile) { %><source media="(max-width: 700px)" srcset="<%= heroImageMobile %>"><% } %>
-      <img class="ref-home-backdrop__image" src="<%= heroImage %>" alt="" width="1920" height="1080" fetchpriority="high" decoding="async" style="--hero-position-desktop:<%= heroPosition %>;--hero-position-mobile:<%= heroPositionMobile %>">
+    <picture class="home-intro__image">
+      <% if (heroImageMobile) { %><source media="(max-width: 767.98px)" srcset="<%= heroImageMobile %>"><% } %>
+      <img src="<%= heroImage %>" alt="" width="960" height="640" fetchpriority="high" decoding="async" style="--hero-position-desktop:<%= heroPosition %>;--hero-position-mobile:<%= heroPositionMobile %>">
     </picture>
     <% } %>
-    <div class="ref-home-backdrop__veil"></div>
-    <div class="ref-home-backdrop__wash"></div>
+  </section>
+  <div class="home-content">
+    <div class="home-feed">
+      <section aria-labelledby="home-writing">
+        <header class="home-section-heading"><div><p class="home-eyebrow">JOURNAL</p><h2 id="home-writing">最新文章</h2></div><a href="/blog">全部文章 <span aria-hidden="true">→</span></a></header>
+        <% if (recentPosts.length) { %><div class="home-posts"><% recentPosts.forEach(function (item) { %>
+          <%- include('partials/content-card', { item: item, href: '/blog/' + item.slug, kind: '文章' }) %>
+        <% }); %></div><% } else { %><div class="empty-state"><h3>文字正在酝酿</h3><p>新的文章会出现在这里，欢迎以后再来。</p></div><% } %>
+      </section>
+      <section aria-labelledby="home-works">
+        <header class="home-section-heading"><div><p class="home-eyebrow">SELECTED WORK</p><h2 id="home-works">精选作品</h2></div><a href="/works">全部作品 <span aria-hidden="true">→</span></a></header>
+        <% if (featuredWorks.length) { %><div class="home-works"><% featuredWorks.forEach(function (item) { %>
+          <%- include('partials/content-card', { item: item, href: '/works/' + item.slug, kind: '作品' }) %>
+        <% }); %></div><% } else { %><div class="empty-state"><h3>作品持续整理中</h3><p>更多探索与实践，敬请期待。</p></div><% } %>
+      </section>
+    </div>
+    <aside class="home-profile" aria-label="个人信息">
+      <% if (aboutImage) { %><img class="home-profile__avatar" src="<%= aboutImage %>" alt="" width="64" height="64" loading="lazy"><% } %>
+      <p class="home-eyebrow">ABOUT</p><h2><%= title %></h2>
+      <p>这里收集文字、作品，以及生活里的细小发现。</p>
+      <dl class="home-stats"><div><dt>文章</dt><dd><%= statsData.postsCount %></dd></div><div><dt>作品</dt><dd><%= statsData.worksCount %></dd></div><div><dt>访问</dt><dd><%= statsData.totalPV %></dd></div></dl>
+      <nav class="home-profile__links" aria-label="了解与联系"><a href="/about">更多关于我 <span>↗</span></a><a href="/guestbook">留下一句问候 <span>↗</span></a><a href="/rss.xml">订阅 RSS <span>↗</span></a>
+        <% if (contactEmail) { %><a href="mailto:<%= contactEmail %>">发送邮件 <span>↗</span></a><% } %>
+        <% socialLinks.forEach(function (link) { %><a href="<%= link.url %>" target="_blank" rel="noopener noreferrer"><%= link.label %> <span>↗</span></a><% }); %>
+      </nav>
+      <% if (contactQq) { %><p class="home-profile__qq">QQ · <%= contactQq %></p><% } %>
+    </aside>
   </div>
-
-  <main id="main" class="site-main site-main--no-pad">
-    <section class="ref-hero" aria-labelledby="ref-hero-title">
-      <div class="ref-hero__content">
-        <p class="ref-hero__kicker">Stories · Works · Life</p>
-        <h1 id="ref-hero-title" class="ref-hero__title"><%= title %></h1>
-        <p class="ref-hero__subtitle"><%= subtitle %> · 写作、作品与生活里的细小发现</p>
-        <div class="ref-hero__socials" aria-label="站点快捷入口">
-          <a href="/blog" aria-label="阅读博客">文</a><a href="/works" aria-label="浏览作品">作</a>
-          <a href="/guestbook" aria-label="前往留言板">言</a><a href="/rss.xml" aria-label="RSS 订阅">RSS</a>
-        </div>
-      </div>
-      <a class="ref-hero__scroll" href="#home-content" aria-label="向下浏览内容"><span>向下浏览</span><i aria-hidden="true"></i></a>
-    </section>
-
-    <section id="home-content" class="ref-home-shell">
-      <aside class="ref-sidebar" aria-label="站点简介">
-        <div class="ref-sidebar__card ref-sidebar__profile">
-          <img class="ref-sidebar__avatar" src="<%= aboutImage || '/images/logo.png' %>" alt="<%= title %>" width="88" height="88" loading="lazy">
-          <h2><%= title %></h2><p class="ref-sidebar__role">Author · Creator</p>
-          <p class="ref-sidebar__bio"><%= aboutSummary || '在这里记录设计、技术与生活。愿每一次表达，都像风中的叶子一样自由。' %></p>
-          <dl class="ref-sidebar__stats">
-            <div><dt>文章</dt><dd><%= statsData.postsCount %></dd></div>
-            <div><dt>作品</dt><dd><%= statsData.worksCount %></dd></div>
-            <div><dt>访问</dt><dd><%= statsData.totalPV %></dd></div>
-          </dl>
-        </div>
-        <nav class="ref-sidebar__card ref-sidebar__menu" aria-label="探索更多">
-          <p class="ref-sidebar__label">探索</p>
-          <a href="/about"><span>进一步了解我</span><b aria-hidden="true">→</b></a>
-          <a href="/works"><span>最近完成的作品</span><b aria-hidden="true">→</b></a>
-          <a href="/guestbook"><span>在留言板相遇</span><b aria-hidden="true">→</b></a>
-        </nav>
-        <% if (featuredWorks && featuredWorks.length) { %>
-        <div class="ref-sidebar__card ref-sidebar__works"><p class="ref-sidebar__label">精选作品</p>
-          <% featuredWorks.forEach(function (work) { %>
-          <a href="/works/<%= work.slug %>"><span><%= work.title %></span><% if (work.year) { %><small><%= work.year %></small><% } %></a>
-          <% }); %>
-        </div>
-        <% } %>
-      </aside>
-
-      <div class="ref-feed">
-        <header class="ref-feed__header"><div><span class="ref-feed__eyebrow">Latest writing</span><h2>最近更新</h2></div><a href="/blog">查看全部文章 <span aria-hidden="true">→</span></a></header>
-        <div class="ref-post-list">
-          <% var _homePosts = []; if (featuredPost) _homePosts.push(featuredPost); (recentPosts || []).forEach(function (post) { if (!_homePosts.some(function (item) { return item.id === post.id; })) _homePosts.push(post); }); %>
-          <% if (_homePosts.length) { _homePosts.forEach(function (post, index) { %>
-          <article class="ref-post-card<%= index === 0 ? ' ref-post-card--lead' : '' %>">
-            <% if (post.cover_image) { %><a class="ref-post-card__media" href="/blog/<%= post.slug %>" tabindex="-1" aria-hidden="true"><img src="<%= post.cover_image %>" alt="" width="1200" height="675" loading="<%= index === 0 ? 'eager' : 'lazy' %>" decoding="async"></a><% } %>
-            <div class="ref-post-card__body">
-              <div class="ref-post-card__meta"><time datetime="<%= post.created_at %>"><%= new Date(post.created_at).toLocaleDateString('zh-CN') %></time><% if (post.tags && post.tags.length) { %><span class="ref-post-card__tag"><%= post.tags[0] %></span><% } %></div>
-              <h3><a href="/blog/<%= post.slug %>"><%= post.title %></a></h3>
-              <% if (post.excerpt) { %><p><%= post.excerpt.length > 180 ? post.excerpt.slice(0, 180) + '…' : post.excerpt %></p><% } %>
-              <a class="ref-post-card__more" href="/blog/<%= post.slug %>">阅读全文 <span aria-hidden="true">→</span></a>
-            </div>
-          </article>
-          <% }); } else { %>
-          <div class="ref-post-empty"><span>🍃</span><h3>新的一叶，还没落下</h3><p>发布第一篇文章后，它会出现在这里。</p></div>
-          <% } %>
-        </div>
-      </div>
-    </section>
-  </main>
-  <%- include('partials/public-footer') %>
+</main>
+<%- include('partials/public-footer', { contactEmail: contactEmail, contactQq: contactQq, socialLinks: socialLinks }) %>
 </body>
 </html>

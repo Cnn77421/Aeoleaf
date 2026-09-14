@@ -1,0 +1,13 @@
+<article class="content-card">
+  <% if (item.cover_image) { %>
+  <a class="content-card__cover" href="<%= href %>" tabindex="-1" aria-hidden="true"><img src="<%= item.cover_image %>" alt="" width="800" height="500" loading="lazy" decoding="async"></a>
+  <% } else if (kind === '作品') { %>
+  <div class="content-card__cover content-card__cover--placeholder" aria-hidden="true"><%= item.title.trim().charAt(0) %></div>
+  <% } %>
+  <div class="content-card__body">
+    <p class="content-card__meta"><%= kind %><% if (item.created_at) { %> · <time datetime="<%= item.created_at %>"><%= new Date(item.created_at).toLocaleDateString('zh-CN') %></time><% } %></p>
+    <h3><a href="<%= href %>"><%= item.title %></a></h3>
+    <% if (item.excerpt || item.description) { %><p class="content-card__description"><%= item.excerpt || item.description %></p><% } %>
+    <% if (item.tags && item.tags.length) { %><div class="content-card__tags"><% item.tags.slice(0, 3).forEach(function (tag) { %><span class="tag-v2"><%= tag %></span><% }); %></div><% } %>
+  </div>
+</article>

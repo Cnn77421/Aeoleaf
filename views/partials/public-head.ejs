@@ -30,28 +30,12 @@
 %>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script>
-    // Pre-paint guards to prevent "每次刷新布局不一样" flashes:
-    //   1. Apply stored theme BEFORE first paint so dark users never see light.
-    //   2. Mark <html> with .js-ready so CSS can safely hide/animate sections.
-    //      Without this class, reveal-sections and hero animations stay in
-    //      their final (visible) state — robust when JS is slow or disabled.
-    (function () {
-      // Light is the hard default. Only an explicit prior user choice
-      // (localStorage) switches to dark; we no longer follow the OS so the
-      // first-visit look is consistent.
-      var stored = null;
-      try { stored = localStorage.getItem('theme'); } catch (_e) { /* ignore */ }
-      var chosen = (stored === 'dark') ? 'dark' : 'light';
-      document.documentElement.setAttribute('data-theme', chosen);
-      document.documentElement.classList.add('js-ready');
-    })();
-  </script>
+  <%- include('theme-init') %>
   <title><%= _title %></title>
   <meta name="description" content="<%= _desc %>">
   <meta name="author" content="aeoleaf">
   <meta name="theme-color" content="#FAFAFA" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0A0A0B" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
   <meta name="color-scheme" content="light dark">
   <% if (_noIndex) { %><meta name="robots" content="noindex"><% } %>
   <link rel="canonical" href="<%= _canonicalUrl %>">
@@ -74,21 +58,16 @@
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="alternate" type="application/rss+xml" title="aeoleaf RSS Feed" href="/rss.xml">
 
-  <!-- Fonts: Fraunces (display / C2 portfolio) + Noto Serif SC + Inter + Noto Sans SC + JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet">
-
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<%= asset('/css/main.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/bento.css') %>">
+  <link rel="stylesheet" href="<%= asset('/css/public-system.css') %>">
   <% _extraCss.forEach(function (href) { %>
   <link rel="stylesheet" href="<%= asset(href) %>">
   <% }); %>
-  <link rel="stylesheet" href="<%= asset('/css/editorial.css') %>">
-  <!-- North Star tokens + Bento — loaded last so they win the cascade over
-       main.css and any page-scoped CSS above. -->
-  <link rel="stylesheet" href="<%= asset('/css/tokens.css') %>">
-  <link rel="stylesheet" href="<%= asset('/css/bento.css') %>">
-  <% if (typeof isBirthday !== 'undefined' && isBirthday) { %>
-  <link rel="stylesheet" href="<%= asset('/css/birthday.css') %>">
-  <% } %>
+  <link rel="stylesheet" href="<%= asset('/css/motion.css') %>">
+  <script src="<%= asset('/js/motion.js') %>"></script>
   <%- _extraHead %>

@@ -126,6 +126,9 @@
           if (parts.length === 4) return parts[0] + '.' + parts[1] + '.xx.' + parts[3];
           return ip.replace(/:.+:/, ':xx:');
         }
+        function regionLabel(row) {
+          return row.city || row.province || row.country || '未知地域';
+        }
         function buildPageUrl(p, extraParams) {
           var u = '?page=' + p
             + '&view=' + (view || 'detail')
@@ -168,7 +171,7 @@
           <label class="visitors-field">结束时间<input type="datetime-local" name="endTime" value="<%= msToDatetimeLocal(filters.endTime) %>" class="input"></label>
           <label class="visitors-field">IP<input type="text" name="ip" value="<%= filters.ip || '' %>" class="input"></label>
           <label class="visitors-field">指纹（模糊）<input type="text" name="fingerprint" value="<%= filters.fingerprint || '' %>" class="input" placeholder="fp_"></label>
-          <label class="visitors-field">城市<input type="text" name="city" value="<%= filters.city || '' %>" class="input"></label>
+          <label class="visitors-field">地域<input type="text" name="city" value="<%= filters.city || '' %>" class="input" placeholder="国家 / 省份 / 城市"></label>
           <label class="visitors-field">设备类型
             <select name="deviceType" class="input">
               <option value="">全部</option>
@@ -200,15 +203,15 @@
         <div id="visitors-table"></div>
         <% if (view === 'sessions') { %>
           <div class="visitors-table-wrap">
-            <table class="admin-table visitors-table">
+            <table class="admin-table visitors-table visitor-sessions-table">
               <thead>
                 <tr>
                   <th>会话</th>
-                  <th>访客环境</th>
-                  <th>访问旅程</th>
-                  <th>参与度</th>
+                  <th>设备与位置</th>
+                  <th>访问路径</th>
+                  <th>参与表现</th>
                   <th>状态</th>
-                  <th>操作</th>
+                  <th><span class="visually-hidden">查看</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -222,12 +225,35 @@
                       var qualityLabel = quality === 'bot' ? '机器人' : (quality === 'engaged' ? '高参与' : (quality === 'quick' ? '快速离开' : '普通'));
                     %>
                     <tr class="visitor-session-row visitor-session-row--<%= quality %>">
-                      <td class="visitor-session-identity"><strong>#<%= row.id %> <% if (row.is_returning) { %><span class="visitor-returning">回访</span><% } else { %><span class="visitor-new">新访客</span><% } %></strong><small><%= fmtTime(row.public_start_time || row.start_time) %></small><button type="button" class="visitor-copy" data-copy-value="<%= row.fingerprint_id || '' %>" title="复制完整指纹"><%= (row.fingerprint_id || '无指纹').slice(0, 12) %><%= row.fingerprint_id && row.fingerprint_id.length > 12 ? '…' : '' %></button></td>
-                      <td class="visitor-session-device"><strong><i class="ti <%= row.device_type === '手机' ? 'ti-device-mobile' : 'ti-device-desktop' %>"></i> <%= row.device_type || '未知设备' %></strong><small><%= [row.os_name, row.browser_name].filter(Boolean).join(' · ') || '环境未知' %></small><small><%= row.city || '未知地域' %> · <%= maskIp(row.ip) %></small></td>
-                      <td class="visitor-session-journey"><strong><%= row.entry_path || '/' %></strong><span><i class="ti ti-arrow-right"></i></span><strong><%= row.exit_path || row.entry_path || '/' %></strong><small><%= row.public_page_count || 0 %> 个页面</small></td>
-                      <td class="visitor-session-engagement"><strong><%= fmtStay(publicDuration) %></strong><small>平均滚动 <%= row.avg_scroll ? Number(row.avg_scroll).toFixed(0) + '%' : '—' %></small></td>
-                      <td><span class="visitor-quality visitor-quality--<%= quality %>"><%= qualityLabel %></span></td>
-                      <td class="visitor-session-actions"><button type="button" class="btn-secondary btn-sm" data-visitor-quick data-session="<%= row.id %>" data-time="<%= fmtTime(row.public_start_time || row.start_time) %>" data-device="<%= [row.device_type, row.os_name, row.browser_name].filter(Boolean).join(' · ') %>" data-location="<%= row.city || '未知地域' %>" data-ip="<%= maskIp(row.ip) %>" data-entry="<%= row.entry_path || '/' %>" data-exit="<%= row.exit_path || row.entry_path || '/' %>" data-pages="<%= row.public_page_count || 0 %>" data-duration="<%= fmtStay(publicDuration) %>" data-scroll="<%= row.avg_scroll ? Number(row.avg_scroll).toFixed(0) + '%' : '—' %>" data-quality="<%= qualityLabel %>" data-detail="/admin/visitor/<%= row.latest_visitor_id %>">快速查看</button></td>
+                      <td class="visitor-session-identity">
+                        <strong>#<%= row.id %></strong>
+                        <small><%= fmtTime(row.public_start_time || row.start_time) %></small>
+                        <button type="button" class="visitor-copy" data-copy-value="<%= row.fingerprint_id || '' %>" title="复制完整指纹"><%= (row.fingerprint_id || '无指纹').slice(0, 10) %><%= row.fingerprint_id && row.fingerprint_id.length > 10 ? '…' : '' %></button>
+                      </td>
+                      <td class="visitor-session-device">
+                        <strong><span class="visitor-device-icon"><i class="ti <%= row.device_type === '手机' ? 'ti-device-mobile' : 'ti-device-desktop' %>"></i></span><%= row.device_type || '未知设备' %></strong>
+                        <small><%= [row.os_name, row.browser_name].filter(Boolean).join(' · ') || '环境未知' %></small>
+                        <small title="IP 推测地域<%= row.geo_provider ? '（' + row.geo_provider + '）' : '' %>"><%= regionLabel(row) %> · <%= maskIp(row.ip) %></small>
+                      </td>
+                      <td class="visitor-session-journey">
+                        <div class="visitor-session-route" title="<%= row.entry_path || '/' %> → <%= row.exit_path || row.entry_path || '/' %>">
+                          <span><i class="ti ti-login-2" aria-hidden="true"></i><strong><%= row.entry_path || '/' %></strong></span>
+                          <i class="ti ti-arrow-right visitor-session-route-arrow" aria-hidden="true"></i>
+                          <span><i class="ti ti-logout-2" aria-hidden="true"></i><strong><%= row.exit_path || row.entry_path || '/' %></strong></span>
+                        </div>
+                        <small><i class="ti ti-files" aria-hidden="true"></i><%= row.public_page_count || 0 %> 次页面浏览</small>
+                      </td>
+                      <td class="visitor-session-engagement">
+                        <strong><i class="ti ti-clock" aria-hidden="true"></i><%= fmtStay(publicDuration) %></strong>
+                        <small><i class="ti ti-arrow-down" aria-hidden="true"></i>平均滚动 <%= row.avg_scroll ? Number(row.avg_scroll).toFixed(0) + '%' : '—' %></small>
+                      </td>
+                      <td class="visitor-session-status">
+                        <div class="visitor-session-status-inner">
+                          <% if (row.is_returning) { %><span class="visitor-returning">回访</span><% } else { %><span class="visitor-new">新访客</span><% } %>
+                          <span class="visitor-quality visitor-quality--<%= quality %>"><%= qualityLabel %></span>
+                        </div>
+                      </td>
+                      <td class="visitor-session-actions"><button type="button" class="visitor-session-open" data-visitor-quick data-session="<%= row.id %>" data-time="<%= fmtTime(row.public_start_time || row.start_time) %>" data-device="<%= [row.device_type, row.os_name, row.browser_name].filter(Boolean).join(' · ') %>" data-location="<%= regionLabel(row) %>" data-ip="<%= maskIp(row.ip) %>" data-entry="<%= row.entry_path || '/' %>" data-exit="<%= row.exit_path || row.entry_path || '/' %>" data-pages="<%= row.public_page_count || 0 %>" data-duration="<%= fmtStay(publicDuration) %>" data-scroll="<%= row.avg_scroll ? Number(row.avg_scroll).toFixed(0) + '%' : '—' %>" data-quality="<%= qualityLabel %>" data-detail="/admin/visitor/<%= row.latest_visitor_id %>" aria-label="快速查看会话 #<%= row.id %>" title="快速查看"><i class="ti ti-chevron-right" aria-hidden="true"></i></button></td>
                     </tr>
                   <% }); %>
                 <% } %>
@@ -319,7 +345,7 @@
     </div>
     <script id="visitor-chart-data" type="application/json"><%- JSON.stringify({ trendRows: trendRows || [], regionRows: regionRows || [], topPages: topPages || [] }).replace(/</g, '\\u003c') %></script>
   <button class="visitor-quick-backdrop" type="button" data-visitor-quick-close hidden aria-label="关闭快速详情"></button>
-  <aside class="visitor-quick-drawer" data-visitor-quick-drawer aria-hidden="true" aria-labelledby="visitor-quick-title">
+  <aside class="visitor-quick-drawer" data-visitor-quick-drawer role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="visitor-quick-title">
     <header><div><span class="admin-eyebrow">访客会话</span><h2 id="visitor-quick-title">快速详情</h2></div><button type="button" class="admin-icon-button" data-visitor-quick-close aria-label="关闭"><i class="ti ti-x"></i></button></header>
     <div class="visitor-quick-summary"><strong data-visitor-quick-quality>—</strong><span data-visitor-quick-time>—</span></div>
     <dl>

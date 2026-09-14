@@ -304,14 +304,15 @@ function clearCurrentDraft() {
 function toggleAdminTheme() {
   const root = document.documentElement;
   const nextTheme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-  root.setAttribute('data-theme', nextTheme);
-  try { localStorage.setItem('theme', nextTheme); } catch (_error) { /* storage can be disabled */ }
+  window.aeoleafTheme.set(nextTheme);
+}
+document.addEventListener('aeoleaf:theme', function () {
   if (document.getElementById('visitor-chart-data')) {
     (window.__adminCharts || []).forEach(function (chart) { chart.destroy(); });
     window.__adminCharts = [];
     initVisitorCharts();
   }
-}
+});
 
 document.addEventListener('click', function (event) {
   if (event.target.closest('[data-admin-theme-toggle]')) toggleAdminTheme();
@@ -324,6 +325,7 @@ document.addEventListener('click', function (event) {
   const backdrop = document.querySelector('.audit-drawer-backdrop');
   if (close && drawer) {
     drawer.classList.remove('is-open'); drawer.setAttribute('aria-hidden', 'true');
+    if (drawer._returnFocus && drawer._returnFocus.isConnected) drawer._returnFocus.focus();
     if (backdrop) backdrop.hidden = true;
     return;
   }
@@ -339,7 +341,9 @@ document.addEventListener('click', function (event) {
   let summary = trigger.dataset.summary || '{}';
   try { summary = JSON.stringify(JSON.parse(summary), null, 2); } catch (_error) {}
   set('[data-audit-summary]', summary);
+  drawer._returnFocus = trigger;
   drawer.classList.add('is-open'); drawer.setAttribute('aria-hidden', 'false');
+  drawer.querySelector('[data-audit-close]').focus();
   if (backdrop) backdrop.hidden = false;
 });
 
@@ -367,15 +371,48 @@ document.addEventListener('keydown', function (event) {
 });
 
 function toggleAdminSidebar() {
-  if (window.matchMedia('(max-width: 991.98px)').matches) {
+  if (window.matchMedia('(max-width: 767.98px)').matches) {
     var mobileMenu = document.getElementById('admin-menu');
     if (mobileMenu) mobileMenu.classList.toggle('show');
+    var drawerTrigger = document.querySelector('[data-admin-sidebar-toggle]');
+    if (drawerTrigger) drawerTrigger.setAttribute('aria-expanded', String(!!(mobileMenu && mobileMenu.classList.contains('show'))));
+    if (mobileMenu && mobileMenu.classList.contains('show')) {
+      var firstLink = mobileMenu.querySelector('a');
+      if (firstLink) requestAnimationFrame(function () { firstLink.focus(); });
+    }
     document.body.classList.toggle('admin-drawer-open', !!(mobileMenu && mobileMenu.classList.contains('show')));
     return;
   }
   document.body.classList.toggle('admin-sidebar-collapsed');
+  var shellTrigger = document.querySelector('[data-admin-sidebar-toggle]');
+  if (shellTrigger) shellTrigger.setAttribute('aria-expanded', String(!document.body.classList.contains('admin-sidebar-collapsed')));
   try { localStorage.setItem('adminSidebarCollapsed', document.body.classList.contains('admin-sidebar-collapsed') ? '1' : '0'); } catch (_error) { /* storage can be disabled */ }
 }
+
+function closeAdminDrawer() {
+  var menu = document.getElementById('admin-menu');
+  if (menu) menu.classList.remove('show');
+  document.body.classList.remove('admin-drawer-open');
+  var trigger = document.querySelector('[data-admin-sidebar-toggle]');
+  if (trigger) { trigger.setAttribute('aria-expanded', 'false'); trigger.focus(); }
+}
+
+// Keep keyboard navigation inside the active shell overlay.
+document.addEventListener('keydown', function (event) {
+  var command = document.querySelector('[data-admin-command]');
+  var drawerOpen = document.body.classList.contains('admin-drawer-open');
+  var detail = document.querySelector('.audit-drawer.is-open, .visitor-quick-drawer.is-open');
+  var panel = command && !command.hidden ? command.querySelector('.admin-command-dialog') : (drawerOpen ? document.querySelector('.admin-sidebar') : detail);
+  if (!panel) return;
+  if (event.key === 'Escape' && detail && detail.matches('.audit-drawer')) { detail.querySelector('[data-audit-close]').click(); return; }
+  if (event.key === 'Escape' && drawerOpen) { closeAdminDrawer(); return; }
+  if (event.key !== 'Tab') return;
+  var items = Array.from(panel.querySelectorAll('a[href], button, input, [tabindex="0"]')).filter(function (el) { return !el.disabled && el.getClientRects().length && !el.closest('[hidden]'); });
+  if (!items.length) return;
+  var first = items[0], last = items[items.length - 1];
+  if (event.shiftKey && (document.activeElement === first || !panel.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && (document.activeElement === last || !panel.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+});
 
 function openAdminCommand() {
   var command = document.querySelector('[data-admin-command]');
@@ -402,13 +439,9 @@ function closeAdminCommand() {
 document.addEventListener('click', function (event) {
   if (event.target.closest('[data-admin-sidebar-toggle]')) toggleAdminSidebar();
   if (event.target.closest('[data-admin-command-open]')) openAdminCommand();
-  if (event.target.closest('[data-admin-command-close]')) closeAdminCommand();
-  if (event.target.closest('[data-admin-drawer-close]')) {
-    var drawerMenu = document.getElementById('admin-menu');
-    if (drawerMenu) drawerMenu.classList.remove('show');
-    document.body.classList.remove('admin-drawer-open');
-  }
-  if (window.matchMedia('(max-width: 991.98px)').matches && event.target.closest('.admin-nav a')) {
+  if (event.target.closest('[data-admin-command-close], [data-admin-command-item]')) closeAdminCommand();
+  if (event.target.closest('[data-admin-drawer-close]')) closeAdminDrawer();
+  if (window.matchMedia('(max-width: 767.98px)').matches && event.target.closest('.admin-nav a')) {
     var mobileMenu = document.getElementById('admin-menu');
     if (mobileMenu) mobileMenu.classList.remove('show');
     document.body.classList.remove('admin-drawer-open');
@@ -460,7 +493,7 @@ document.addEventListener('submit', function (event) {
 });
 
 try {
-  if (localStorage.getItem('adminSidebarCollapsed') === '1' && !window.matchMedia('(max-width: 991.98px)').matches) {
+  if ((localStorage.getItem('adminSidebarCollapsed') === '1' || (localStorage.getItem('adminSidebarCollapsed') === null && window.matchMedia('(max-width: 1023.98px)').matches)) && !window.matchMedia('(max-width: 767.98px)').matches) {
     document.body.classList.add('admin-sidebar-collapsed');
   }
 } catch (_error) { /* storage can be disabled */ }
@@ -701,8 +734,10 @@ function closeVisitorQuickDrawer() {
   const drawer = document.querySelector('[data-visitor-quick-drawer]');
   const backdrop = document.querySelector('.visitor-quick-backdrop');
   if (!drawer) return;
+  var wasOpen = drawer.classList.contains('is-open');
   drawer.classList.remove('is-open');
   drawer.setAttribute('aria-hidden', 'true');
+  if (wasOpen && drawer._returnFocus && drawer._returnFocus.isConnected) drawer._returnFocus.focus();
   if (backdrop) backdrop.hidden = true;
 }
 
@@ -745,8 +780,10 @@ document.addEventListener('click', async function (event) {
   });
   const detail = drawer.querySelector('[data-visitor-quick-detail]');
   if (detail) detail.href = trigger.dataset.detail || '/admin/visitors';
+  drawer._returnFocus = trigger;
   drawer.classList.add('is-open');
   drawer.setAttribute('aria-hidden', 'false');
+  drawer.querySelector('[data-visitor-quick-close]').focus();
   if (backdrop) backdrop.hidden = false;
 }
 );
@@ -991,11 +1028,24 @@ async function deleteWork(id) {
   }
 }
 
+function setContentSubmitting(form, pending) {
+  form.dataset.submitting = pending ? 'true' : 'false';
+  document.querySelectorAll('button[type="submit"]').forEach(function (button) {
+    if (button.form !== form) return;
+    button.disabled = pending;
+    button.classList.toggle('btn-loading', pending);
+    button.classList.toggle('is-loading', pending);
+    if (pending) button.setAttribute('aria-busy', 'true');
+    else button.removeAttribute('aria-busy');
+  });
+}
+
 // Post / work forms: delegate so bindings survive admin PJAX (main innerHTML swap).
 document.addEventListener('submit', async function (e) {
   const postForm = e.target;
   if (!postForm || postForm.id !== 'post-form') return;
   e.preventDefault();
+  if (postForm.dataset.submitting === 'true') return;
   const submitBtn = postForm.querySelector('button[type="submit"]');
   if (!submitBtn) return;
   submitBtn.classList.add('btn-loading');
@@ -1013,6 +1063,7 @@ document.addEventListener('submit', async function (e) {
   const url = pid != null ? '/api/posts/' + pid : '/api/posts';
   const method = pid != null ? 'PUT' : 'POST';
 
+  setContentSubmitting(postForm, true);
   try {
     var res;
     if (coverFile) {
@@ -1044,6 +1095,8 @@ document.addEventListener('submit', async function (e) {
   } catch (err) {
     Toast.error('Error: ' + err.message);
     submitBtn.classList.remove('btn-loading');
+  } finally {
+    setContentSubmitting(postForm, false);
   }
 });
 
@@ -1051,6 +1104,7 @@ document.addEventListener('submit', async function (e) {
   const workForm = e.target;
   if (!workForm || workForm.id !== 'work-form') return;
   e.preventDefault();
+  if (workForm.dataset.submitting === 'true') return;
   const submitBtn = workForm.querySelector('button[type="submit"]');
   if (!submitBtn) return;
   submitBtn.classList.add('btn-loading');
@@ -1069,6 +1123,7 @@ document.addEventListener('submit', async function (e) {
   const url = wid != null ? '/api/works/' + wid : '/api/works';
   const method = wid != null ? 'PUT' : 'POST';
 
+  setContentSubmitting(workForm, true);
   try {
     var res;
     if (coverFile) {
@@ -1101,6 +1156,8 @@ document.addEventListener('submit', async function (e) {
   } catch (err) {
     Toast.error('Error: ' + err.message);
     submitBtn.classList.remove('btn-loading');
+  } finally {
+    setContentSubmitting(workForm, false);
   }
 });
 
@@ -1409,3 +1466,25 @@ async function persistWorkOrder(container) {
 }
 
 initAdminPage();
+
+// Reflect the restored sidebar state, including the tablet default.
+function syncAdminViewport() {
+  document.querySelectorAll('.admin-nav a').forEach(function (link) {
+    var title = link.querySelector('.nav-link-title');
+    if (title) { link.setAttribute('aria-label', title.textContent.trim()); link.title = title.textContent.trim(); }
+  });
+  var mobile = window.matchMedia('(max-width: 767.98px)').matches;
+  var saved = null;
+  try { saved = localStorage.getItem('adminSidebarCollapsed'); } catch (_error) { /* storage optional */ }
+  document.body.classList.toggle('admin-sidebar-collapsed', !mobile && (saved === '1' || (saved === null && window.innerWidth < 1024)));
+  if (!mobile) {
+    document.body.classList.remove('admin-drawer-open');
+    var menu = document.getElementById('admin-menu');
+    if (menu) menu.classList.remove('show');
+  }
+  var trigger = document.querySelector('[data-admin-sidebar-toggle]');
+  if (trigger) trigger.setAttribute('aria-expanded', String(mobile ? document.body.classList.contains('admin-drawer-open') : !document.body.classList.contains('admin-sidebar-collapsed')));
+}
+window.matchMedia('(max-width: 767.98px)').addEventListener('change', syncAdminViewport);
+window.matchMedia('(max-width: 1023.98px)').addEventListener('change', syncAdminViewport);
+syncAdminViewport();

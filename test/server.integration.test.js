@@ -329,7 +329,7 @@ test('server routes, auth, CRUD, upload rejection, feeds, and tracking work toge
   const replyMessage = await request(base, `/admin/guestbook/${guestbook.json.id}/reply`, {
     method: 'POST',
     headers: { ...authHeaders, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ admin_reply: '感谢你的留言' })
+    body: new URLSearchParams({ admin_reply: '谢谢留言~请等待站长审核发布' })
   });
   assert.equal(replyMessage.response.status, 302);
   await request(base, `/admin/guestbook/${guestbook.json.id}/status`, {
@@ -338,7 +338,7 @@ test('server routes, auth, CRUD, upload rejection, feeds, and tracking work toge
     body: new URLSearchParams({ status: 'approved' })
   });
   const publicMessagesAfterReply = await request(base, '/api/guestbook', { write: false });
-  assert.equal(publicMessagesAfterReply.json.find((message) => message.id === guestbook.json.id).admin_reply, '感谢你的留言');
+    assert.equal(publicMessagesAfterReply.json.find((message) => message.id === guestbook.json.id).admin_reply, '谢谢留言~请等待站长审核发布');
   const auditPage = await request(base, '/admin/guestbook/audit', { headers: authHeaders, write: false });
   assert.equal(auditPage.response.status, 200);
   assert.match(auditPage.text, /批量删除/);

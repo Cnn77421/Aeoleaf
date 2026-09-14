@@ -160,7 +160,7 @@ a.card-v2:hover .card-v2__cta::after { transform: translateX(4px); }
 
 /* ===== Button v2 ===== */
 .btn-v2 {
-  --btn-h: 40px;
+  --btn-h: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -184,7 +184,7 @@ a.card-v2:hover .card-v2__cta::after { transform: translateX(4px); }
 }
 .btn-v2--primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-foreground);
 }
 .btn-v2--primary:hover { background: var(--accent-hover); }
 .btn-v2--primary:active { background: var(--accent-pressed); transform: translateY(1px); }

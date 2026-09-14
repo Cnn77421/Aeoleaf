@@ -3,19 +3,22 @@
   var MAIN_SEL = 'main.site-main';
   var DURATION = 180;
   var _busy = false;
+  var _pendingPop = null;
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  history.replaceState(Object.assign({}, history.state, { scroll: scrollY }), '', location.href);
   var _loadedScripts = {};
 
   // Page-specific stylesheets that should be swapped on each PJAX navigation.
   var PAGE_SPECIFIC_CSS = [
     '/css/home.css', '/css/blog-v2.css',
-    '/css/works-v2.css', '/css/about-v2.css'
+    '/css/works-v2.css', '/css/about-v2.css', '/css/work-detail-v2.css',
+    '/css/public-pages.css', '/css/guestbook.css'
   ];
 
-  // Unified cascade anchor — tokens.css / bento.css MUST remain last in the
-  // cascade. Page-specific CSS is inserted before these.
+  // Match the EJS shell: page styles follow public-system; motion stays last.
   var CASCADE_ANCHOR_SEL =
-    'link[rel="stylesheet"][href*="/css/tokens.css"], ' +
-    'link[rel="stylesheet"][href*="/css/bento.css"]';
+    'link[rel="stylesheet"][href*="/css/motion.css"], ' +
+    'link[rel="stylesheet"][href*="/css/motion.min.css"]';
 
   function prefersReducedMotion() {
     return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -70,7 +73,7 @@
 
   // Normalize href for comparison (strip query strings / version hashes).
   function normalizeHref(href) {
-    return (href || '').split('?')[0];
+    return (href || '').split('?')[0].replace(/\.min\.(css|js)$/, '.$1');
   }
 
   // Snapshot optional attributes from a <script> tag so loadScript can
@@ -130,9 +133,7 @@
       link.onload = function () { resolve(); };
       link.onerror = function () { resolve(); };
 
-      // CRITICAL — cascade anchor.
-      // tokens.css and bento.css are the "override layer" and MUST remain
-      // last in the cascade. Insert page-specific CSS before them.
+      // Keep the same stylesheet order as a full EJS navigation.
       var anchor = document.querySelector(CASCADE_ANCHOR_SEL);
       if (anchor) {
         document.head.insertBefore(link, anchor);
@@ -362,8 +363,8 @@
     }
   }
 
-  async function pjaxNavigate(url, pushState) {
-    if (_busy) return;
+  async function pjaxNavigate(url, pushState, link, restoreScroll) {
+    if (_busy) { if (pushState === false) _pendingPop = { url: url, scroll: restoreScroll }; return; }
     _busy = true;
 
     var mainEl = document.querySelector(MAIN_SEL);
@@ -376,17 +377,21 @@
       return;
     }
 
-    mainEl.classList.add('pjax-out');
+    if (pushState !== false) history.replaceState(Object.assign({}, history.state, { scroll: scrollY }), '', location.href);
+    var motion = window.aeoleafMotion;
+    if (!motion) mainEl.classList.add('pjax-out');
     pjaxProgressStart();
 
     try {
-      var resp = await fetch(url);
+      var departure = motion ? motion.begin(link) : Promise.resolve();
+      var resp = await fetch(url, { signal: AbortSignal.timeout(12000) });
       pjaxProgressMid();
       if (!resp.ok) throw new Error(resp.status);
       var html = await resp.text();
       var doc = new DOMParser().parseFromString(html, 'text/html');
       var newMain = doc.querySelector(MAIN_SEL);
       if (!newMain) throw new Error('no main');
+      await departure;
 
       // CRITICAL: Sync all stylesheets from the target page.
       // Remove page-specific CSS that the new page won't need,
@@ -396,7 +401,7 @@
       // Remove old page-specific stylesheets.
       var currentLinks = Array.from(document.querySelectorAll('head link[rel="stylesheet"]'));
       currentLinks.forEach(function (link) {
-        var href = link.getAttribute('href') || '';
+        var href = normalizeHref(link.getAttribute('href'));
         var isPageSpecific = PAGE_SPECIFIC_CSS.some(function (pattern) {
           return href.indexOf(pattern) !== -1;
         });
@@ -455,6 +460,7 @@
         document.body.insertBefore(incomingBackdrop.cloneNode(true), mainEl);
       }
 
+      if (window.aeoleafPostCleanup) { window.aeoleafPostCleanup(); window.aeoleafPostCleanup = null; }
       mainEl.innerHTML = newMain.innerHTML;
       mainEl.className = newMain.className;
 
@@ -520,13 +526,16 @@
       if (newTitle) document.title = newTitle.textContent;
 
       if (pushState !== false) {
-        history.pushState({ pjax: true }, '', url);
+        if (!_pendingPop) history.pushState({ pjax: true, scroll: 0 }, '', url);
       }
 
       updateNav(url);
 
       mainEl.classList.remove('pjax-out');
-      mainEl.classList.add('pjax-in');
+      if (!motion) mainEl.classList.add('pjax-in');
+
+      window.scrollTo({ top: pushState === false ? (restoreScroll || 0) : 0, behavior: 'instant' });
+      if (motion) await motion.enter(mainEl);
 
       // Clean up the pjax-in class on animation end, with a safety-net
       // timeout in case no animation is defined (otherwise the class
@@ -551,9 +560,9 @@
         });
       }
 
-      window.scrollTo({ top: 0, behavior: 'instant' });
       pjaxProgressEnd();
     } catch (e) {
+      if (motion) motion.cleanup();
       document.body.classList.remove('pjax-loading');
       var pel = document.getElementById('pjax-progress');
       if (pel) {
@@ -564,6 +573,10 @@
       return;
     } finally {
       _busy = false;
+      if (_pendingPop) {
+        var pending = _pendingPop; _pendingPop = null;
+        pjaxNavigate(pending.url, false, null, pending.scroll);
+      }
     }
   }
 
@@ -574,11 +587,11 @@
     var a = e.target.closest('a');
     if (!shouldIntercept(a)) return;
     e.preventDefault();
-    pjaxNavigate(a.href);
+    pjaxNavigate(a.href, true, a);
   });
 
-  window.addEventListener('popstate', function () {
-    pjaxNavigate(location.href, false);
+  window.addEventListener('popstate', function (event) {
+    pjaxNavigate(location.href, false, null, event.state && event.state.scroll);
   });
 
   // For first page load: wait until window.load AND yield two animation frames
@@ -593,83 +606,11 @@
   }, { once: true });
 })();
 
-// Theme toggle
+// Both shells use the same pre-paint theme controller.
 const themeToggle = document.getElementById('theme-toggle');
-const html = document.documentElement;
-
-const savedTheme = localStorage.getItem('theme') || 'light';
-html.setAttribute('data-theme', savedTheme);
-
-if (themeToggle) {
-  const prefersReducedMotion = window.matchMedia
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let themeTransitionActive = false;
-
-  const applyTheme = (theme) => {
-    html.setAttribute('data-theme', theme);
-    try {
-      localStorage.setItem('theme', theme);
-    } catch (_error) {
-      // The visual toggle still works when storage is blocked or unavailable.
-    }
-  };
-
-  themeToggle.addEventListener('click', () => {
-    if (themeTransitionActive) return;
-
-    const current = html.getAttribute('data-theme');
-    const next = current === 'dark' ? 'light' : 'dark';
-
-    if (!document.startViewTransition || !html.animate || prefersReducedMotion) {
-      applyTheme(next);
-      return;
-    }
-
-    const rect = themeToggle.getBoundingClientRect();
-    const originX = rect.left + rect.width / 2;
-    const originY = rect.top + rect.height / 2;
-    const radius = Math.hypot(
-      Math.max(originX, window.innerWidth - originX),
-      Math.max(originY, window.innerHeight - originY)
-    );
-
-    themeTransitionActive = true;
-    html.classList.add('theme-transition');
-
-    let transition;
-    try {
-      transition = document.startViewTransition(() => applyTheme(next));
-    } catch (_error) {
-      themeTransitionActive = false;
-      html.classList.remove('theme-transition');
-      applyTheme(next);
-      return;
-    }
-
-    transition.ready.then(() => {
-      html.animate(
-        {
-          clipPath: [
-            `circle(0px at ${originX}px ${originY}px)`,
-            `circle(${radius}px at ${originX}px ${originY}px)`
-          ]
-        },
-        {
-          duration: 600,
-          easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-          pseudoElement: '::view-transition-new(root)'
-        }
-      );
-    }).catch(() => {
-      // The theme has already changed; unsupported animation details can fall back cleanly.
-    });
-
-    transition.finished.finally(() => {
-      themeTransitionActive = false;
-      html.classList.remove('theme-transition');
-    });
-  });
-}
+if (themeToggle) themeToggle.addEventListener('click', function () {
+  window.aeoleafTheme.set(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+});
 
 // Scroll header effect — kick in after the hero area so the style change is deliberate.
 // Uses rAF to coalesce scroll reads into a single paint frame.
@@ -774,11 +715,24 @@ if (navToggle && navLinks) {
     navLinks.classList.toggle('active', open);
     navOverlay.classList.toggle('active', open);
     navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    document.body.classList.toggle('nav-open', open);
+    if (open) requestAnimationFrame(function () { navLinks.querySelector('a').focus(); });
   }
 
   navToggle.addEventListener('click', () => {
     setNavOpen(!navLinks.classList.contains('active'));
   });
+
+  document.addEventListener('keydown', function (event) {
+    if (!navLinks.classList.contains('active')) return;
+    if (event.key === 'Escape') { setNavOpen(false); navToggle.focus(); return; }
+    if (event.key !== 'Tab') return;
+    var items = Array.from(navLinks.querySelectorAll('a[href]')).filter(function (el) { return el.getClientRects().length; }).concat(navToggle);
+    var first = items[0], last = items[items.length - 1];
+    if (event.shiftKey && (document.activeElement === first || !items.includes(document.activeElement))) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (document.activeElement === last || !items.includes(document.activeElement))) { event.preventDefault(); first.focus(); }
+  });
+  window.matchMedia('(min-width: 768px)').addEventListener('change', function (event) { if (event.matches) setNavOpen(false); });
 
   navOverlay.addEventListener('click', () => {
     setNavOpen(false);

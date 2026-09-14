@@ -18,15 +18,15 @@
 
     <form class="media-upload" method="POST" action="/admin/media/upload" enctype="multipart/form-data" data-admin-async-form>
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <div><strong>上传新图片</strong><small>JPG、PNG、WebP、GIF、AVIF 等，最大 8MB</small></div>
+      <div class="media-upload-copy"><i class="ti ti-cloud-upload" aria-hidden="true"></i><div><strong>上传新图片</strong><small>JPG、PNG、WebP、GIF、AVIF 等，最大 8MB</small></div></div>
       <input type="file" name="image" accept="image/*" required aria-label="选择图片">
       <button type="submit" class="btn-primary"><i class="ti ti-upload"></i> 上传</button>
     </form>
 
-    <div class="admin-data-toolbar media-toolbar"><label class="admin-toolbar-search"><i class="ti ti-search"></i><input type="search" placeholder="按文件名筛选…" data-admin-list-search></label><select class="admin-toolbar-select" data-admin-list-status data-filter-key="folder"><option value="">全部分类</option><option value="posts">文章封面</option><option value="works">作品图片</option><option value="general">通用图片</option></select><select class="admin-toolbar-select" data-admin-list-status data-filter-key="usage"><option value="">全部引用状态</option><option value="used">正在使用</option><option value="unused">未引用</option></select></div>
+    <div class="admin-data-toolbar media-toolbar"><label class="admin-toolbar-search"><i class="ti ti-search"></i><input type="search" aria-label="按文件名筛选" placeholder="按文件名筛选…" data-admin-list-search></label><select class="admin-toolbar-select" data-admin-list-status data-filter-key="folder" aria-label="图片分类"><option value="">全部分类</option><option value="posts">文章封面</option><option value="works">作品图片</option><option value="general">通用图片</option></select><select class="admin-toolbar-select" data-admin-list-status data-filter-key="usage" aria-label="引用状态"><option value="">全部引用状态</option><option value="used">正在使用</option><option value="unused">未引用</option></select></div>
     <div class="media-summary"><strong><%= media.length %></strong> 张图片 · <strong><%= media.filter(item => item.usedBy.length).length %></strong> 张正在使用 · <strong><%= media.filter(item => item.duplicate).length %></strong> 张内容重复</div>
     <div class="media-grid">
-      <% if (!media.length) { %><p class="empty-state">暂无已上传图片</p><% } %>
+      <% if (!media.length) { %><div class="admin-card"><%- include('partials/empty-state', { icon: 'ti-photo', heading: '暂无已上传图片', description: '上传第一张图片，用于文章封面或作品展示。' }) %></div><% } %>
       <% media.forEach(item => { %>
         <article class="media-card" data-admin-filter-row data-search="<%= item.name.toLowerCase() %>" data-folder="<%= item.folder %>" data-usage="<%= item.usedBy.length ? 'used' : 'unused' %>">
           <a href="<%= item.url %>" target="_blank" rel="noopener" class="media-preview"><img src="<%= item.url %>" alt=""></a>

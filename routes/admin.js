@@ -1139,7 +1139,8 @@ function renderVisitorsExportCsv(req, res, next) {
     const rows = getVisitorsByFilter(filters, 10000);
     const headers = [
       'id', 'tracked_at', 'ip', 'full_url', 'path', 'referer', 'device_type', 'os_name', 'browser_name',
-      'country', 'province', 'city', 'isp', 'network_type', 'stay_duration_ms', 'max_scroll_depth',
+      'country', 'province', 'city', 'isp', 'geo_provider', 'geo_accuracy_km', 'geo_updated_at',
+      'network_type', 'stay_duration_ms', 'max_scroll_depth',
       'fingerprint_id', 'request_id', 'utm_source', 'utm_medium', 'utm_campaign', 'search_keyword', 'is_bot'
     ];
 
