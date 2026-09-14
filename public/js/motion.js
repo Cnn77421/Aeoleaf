@@ -136,7 +136,7 @@
       animations.add(animation);
       return animation.finished.then(function () {
         // Keep scene endpoints while the staggered content reveal finishes.
-        if (el.classList.contains('motion-clone') || el.classList.contains('motion-scene')) animation.commitStyles();
+        if (el.classList.contains('motion-clone') || el.classList.contains('motion-scene') || el.closest('.motion-loader')) animation.commitStyles();
       }).catch(function () {}).finally(function () { animation.cancel(); animations.delete(animation); });
     }
     // GSAP power3.inOut is a piecewise quartic, not a cubic-bezier curve.
@@ -235,11 +235,18 @@
     function startLoader() {
       if (!first || reduced.matches) { root.classList.remove('motion-pending'); return; }
       var el = element('div', 'motion-loader');
-      el.innerHTML = '<span class="motion-loader__brand">aeoleaf / 风叶</span><div class="motion-loader__center"><span>让灵感慢慢生长</span><strong>0<span>%</span></strong></div><div class="motion-loader__track"><i></i></div><span class="motion-loader__status" role="status">正在准备页面</span>';
+      el.innerHTML = '<div class="motion-loader__center" aria-hidden="true"><div class="motion-loader__letters">' + 'LOADING'.split('').map(function (letter) { return '<span>' + letter + '</span>'; }).join('') + '</div><svg class="motion-loader__ring" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11"/><circle class="motion-loader__value" cx="12" cy="12" r="11"/></svg></div>';
       el.setAttribute('role', 'progressbar'); el.setAttribute('aria-label', '页面准备进度');
       el.setAttribute('aria-valuemin', '0'); el.setAttribute('aria-valuemax', '100'); el.setAttribute('aria-valuenow', '0');
       loader = { el: el, start: performance.now(), value: 0, settled: 0, total: 1, exiting: false, cancel: new AbortController() };
       var state = loader;
+      state.letters = Array.from(el.querySelectorAll('.motion-loader__letters span'));
+      state.ring = el.querySelector('.motion-loader__ring');
+      state.valueRing = el.querySelector('.motion-loader__value');
+      state.letters.forEach(function (letter, index) {
+        animate(letter, [{ opacity: 0, transform: 'translateY(.4em)', filter: 'blur(10px)' }, { opacity: 1, transform: 'translateY(0)', filter: 'blur(0px)' }], 1400, 'cubic-bezier(.165,.84,.44,1)', index * 70);
+      });
+      animate(state.ring, [{ opacity: 0 }, { opacity: 1 }], 1200, easeOut, 500);
       lock(document.querySelector('main.site-main'));
       root.classList.remove('motion-pending');
       var images = Array.from(document.images).filter(function (img) { return img.loading !== 'lazy' || img.getBoundingClientRect().top < innerHeight; });
@@ -252,7 +259,7 @@
       });
       (document.fonts ? document.fonts.ready : Promise.resolve()).then(settled, settled);
       state.timeout = setTimeout(function () {
-        if (loader === state) { state.settled = state.total; state.el.querySelector('.motion-loader__status').textContent = '页面已就绪，剩余资源继续加载'; wake(); }
+        if (loader === state) { state.settled = state.total; wake(); }
       }, 6000);
       wake();
     }
@@ -264,20 +271,21 @@
       var timeRatio = Math.max(0, Math.min(1, (now - state.start) / 1600));
       var target = Math.min(ratio === 1 ? 100 : 94 * ratio + 4 * timeRatio, 100 * (1 - Math.pow(1 - timeRatio, 2)));
       state.value += (Math.max(state.value, target) - state.value) * (1 - Math.exp(-7 * dt));
-      if (ratio === 1 && timeRatio === 1 && state.value > 99.5) state.value = 100;
+      if (ratio === 1 && now - state.start >= 1820 && state.value > 99.5) state.value = 100;
       var integer = Math.floor(state.value);
-      state.el.querySelector('strong').firstChild.textContent = integer;
       state.el.setAttribute('aria-valuenow', integer);
-      state.el.querySelector('i').style.transform = 'scaleX(' + state.value / 100 + ')';
+      state.valueRing.style.strokeDashoffset = 69.115038 * (1 - state.value / 100);
       if (integer === 100) {
         state.exiting = true;
         try { sessionStorage.setItem('aeoleaf-intro', '1'); } catch (_) {}
         var main = document.querySelector('main.site-main');
-        Promise.all([
-          animate(state.el.querySelector('.motion-loader__center'), [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(-24px)' }], 750, easeInOut, 180),
-          animate(state.el, [{ clipPath: 'inset(0 0 0 0)' }, { clipPath: 'inset(0 0 100% 0)' }], 1000, easeInOut, 450),
-          reveal(main, 600)
-        ]).then(function () { if (loader === state) finishLoader(); });
+        Promise.all(state.letters.map(function (letter, index) {
+          return animate(letter, [{ opacity: 1, transform: 'translateY(0)', filter: 'blur(0px)' }, { opacity: 0, transform: 'translateY(-.4em)', filter: 'blur(8px)' }], 1500, 'cubic-bezier(.645,.045,.355,1)', index * 60);
+        }).concat([
+          animate(state.ring, [{ opacity: 1 }, { opacity: 0 }], 700, easeOut),
+          animate(state.el, [{ opacity: 1 }, { opacity: 0 }], 1600, 'cubic-bezier(.645,.045,.355,1)', 900),
+          reveal(main, 1100)
+        ])).then(function () { if (loader === state) finishLoader(); });
         return false;
       }
       return true;

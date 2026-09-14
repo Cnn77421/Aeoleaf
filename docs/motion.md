@@ -18,7 +18,7 @@
 
 沿用 Express/EJS/PJAX，不引入 React、GSAP、Three.js 或 Lenis。鼠标弹簧沿用已核对的参数；hover 插值按帧时间折算 0.03。Web Animations 使用采样的分段四次曲线匹配 power3.inOut，导航遮罩 800ms→替换内容→1000ms，内容交叠揭示。图片克隆从卡片实际矩形扩大，再收敛到详情图片矩形；无有效图片或手机使用遮罩。
 
-数字 Loader 是需求指定的独立实现：首屏图片 decode 和 fonts.ready 按项计数，加 1600ms 最小节奏及指数平滑，6000ms 超时放行；数字单调 0→100，sessionStorage 避免同一会话重复。不是参考站的真实下载字节计数。按最新要求移除首页 WebGL 路径染色拖尾，保留光标惯性和图片 hover；未复刻完整压力求解或 Lab 的 Three.js 场景；滚动保留浏览器原生行为，仅平滑进度反馈。
+Loader 按最新要求改为参考站的黑底白字 LOADING + 24px 圆环，去掉品牌、说明、大数字和横条。字母 24px、左右各 5px，入场 blur 10px→0 / y .4em→0，1400ms、逐字间隔 70ms；退场 blur 0→8px / y 0→-.4em，1500ms、逐字间隔 60ms；背景延迟 900ms 后淡出 1600ms。最后一个字母入场完成（1820ms）后才允许退场。进度仅用于圆环和无障碍属性：首屏图片 decode 和 fonts.ready 按项计数，加 1600ms 最小节奏及指数平滑，6000ms 超时放行；内部进度单调 0→100，sessionStorage 避免同一会话重复。不是参考站的真实下载字节计数。按最新要求移除首页 WebGL 路径染色拖尾，保留光标惯性和图片 hover；未复刻完整压力求解或 Lab 的 Three.js 场景；滚动保留浏览器原生行为，仅平滑进度反馈。
 
 motion 只有一个按需 RAF，静止休眠，隐藏页暂停；动画统一取消并释放 clone/overlay，恢复 inert 和滚动锁。PJAX 等待退场和样式后替换内容，网络错误清理后回退整页导航。返回恢复列表滚动位置，切换期间的 popstate 排队处理。动态 reduced-motion 立即清理动画；手机关闭鼠标反馈。
 
@@ -26,7 +26,7 @@ motion 只有一个按需 RAF，静止休眠，隐藏页暂停；动画统一取
 
 `QA_MOTION_ONLY=1 QA_BROWSER_CHANNEL=msedge node scripts/frontend-v2-qa.js`：在临时应用、数据库和上传目录运行 `motion-browser-checks.js`。Playwright 为可选测试依赖，未加入应用运行依赖。Windows 可用环境变量 NODE_PATH 指向本机已安装 Playwright 的包目录。
 
-报告在 `motion-qa/report.json`：1440px / 390px、首次 Loader、慢速/快速移动及停止、hover、图片切换、详情、返回、连续三轮进出、快速滚动、深色主题、切换中启用 reduced-motion、重复访问以及单 RAF 检查。帧间隔仅代表当前自动化环境，不等同于真实手机 GPU 性能承诺。
+报告在 `motion-qa/report.json`：1440px / 390px、首次 Loader（仅 LOADING 文案、黑底与圆环）、慢速/快速移动及停止、hover、图片切换、详情、返回、连续三轮进出、快速滚动、深色主题、切换中启用 reduced-motion、重复访问以及单 RAF 检查。帧间隔仅代表当前自动化环境，不等同于真实手机 GPU 性能承诺。
 
 `frontend-regression/report.json`：272 个页面/尺寸/主题组合，文章、作品、搜索、后台登录和编辑发布、上传、留言审核等回归。所有写操作仅操作临时测试数据。
 
