@@ -1,377 +1,52 @@
-/* Aeoleaf · Design Tokens (North Star · Phase 1a)
- *
- * Loaded AFTER public/css/main.css so these declarations win via cascade.
- * We deliberately keep the legacy variable names used across main.css /
- * blog.css / works.css / editorial.css (--bg, --text, --accent, --surface,
- * --border, --text-muted, --secondary, --accent-secondary, --accent-tertiary,
- * --gradient-primary, --gradient-surface, --shadow-*) so the whole site
- * re-skins without a file-by-file rewrite.
- *
- * New tokens (prefixed to avoid collisions): --bg-elev-*, --accent-alt-*,
- * --focus-ring, --radius-card, --radius-pill, --ring-*, --motion-*.
- */
-
-/* ==========================================================================
- *  Global responsive safety net (added to fix mobile overflow / 错位).
- *  Loaded last, so these win the cascade. Prevents:
- *   - 横向滚动: any over-wide child pushing the page sideways on phones.
- *   - 图片/视频/iframe 溢出: media without an explicit max-width.
- *   - flex/grid 子项无法收缩 (min-width:auto 默认值导致的溢出)。
- * ========================================================================== */
-html {
-  -webkit-text-size-adjust: 100%; /* iOS: dont auto-inflate text on rotate */
-}
-body {
-  /* `clip` stops sideways scroll WITHOUT creating a scroll container, so it
-     does not break `position: sticky` descendants (e.g. the post TOC). The
-     `hidden` line is a fallback for browsers without overflow:clip support. */
-  overflow-x: hidden;
-  overflow-x: clip;
-  max-width: 100%;
-}
-img,
-svg,
-video,
-canvas,
-iframe {
-  max-width: 100%;
-}
-img,
-video {
-  height: auto;                 /* keep aspect ratio when width shrinks */
-}
-/* Let fl/grid children shrink below their content size so long words,
-   code, and URLs cannot force horizontal overflow. */
-.bento > *,
-.bento-grid > *,
-main :where(.grid, .flex, [class*="__grid"], [class*="-grid"]) > * {
-  min-width: 0;
-}
-/* Break overly long unbroken strings (long URLs, hashes) inside prose. */
-.prose,
-.post-content,
-.guestbook-message {
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-
-/* ===== Theme-agnostic tokens (shared by light AND dark) =====
-   These don't change between themes, so they must live OUTSIDE the
-   per-theme blocks. They were previously defined only inside the dark
-   block, which left them undefined in light mode — causing elements to
-   snap between rounded and square corners (and lose transitions) when
-   toggling themes. Defined once here, both themes inherit them. */
+/* Aeoleaf 2.0: one palette and geometry source for public and admin pages. */
 :root {
-  /* Radii */
-  --radius:       8px;
-  --radius-lg:    12px;
-  --radius-card:  12px;
-  --radius-pill:  999px;
-
-  /* Motion */
-  --ease-out:       cubic-bezier(0.2, 0.6, 0.2, 1);
-  --ease-in:        cubic-bezier(0.5, 0, 1, 0.5);
-  --ease-emphasis:  cubic-bezier(0.16, 1, 0.3, 1);
-  --dur-1: 120ms;
-  --dur-2: 220ms;
-  --dur-3: 420ms;
-  --transition: var(--dur-2) var(--ease-out);
-
-  /* Card radius is theme-agnostic too (shadows below stay per-theme). */
-  --card-radius: var(--radius-card);
+  color-scheme: light;
+  --bg: #fafafa; --surface: #fff; --bg-elev-1: #fff; --bg-elev-2: #f5f5f5; --popover: #fff;
+  --text: #171717; --text-muted: #595959; --text-subtle: #666; --text-disabled: #a3a3a3;
+  --border: #e5e5e5; --border-strong: #8c8c8c;
+  --accent: #262626; --accent-foreground: #fff; --accent-hover: #404040; --accent-pressed: #171717; --accent-soft: #f0f0f0; --accent-ring: #737373;
+  --status-on-fill: #fff; --success: #15803d; --warning: #9a3412; --danger: #b91c1c; --info: #1d4ed8;
+  --success-bg: #f0fdf4; --warning-bg: #fff7ed; --danger-bg: #fef2f2; --info-bg: #eff6ff;
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / .05), 0 1px 2px -1px rgb(0 0 0 / .05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / .06), 0 2px 4px -2px rgb(0 0 0 / .06);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / .08), 0 4px 6px -4px rgb(0 0 0 / .08);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / .1);
+  --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: var(--font-sans); --font-serif: var(--font-sans); --font-journal: var(--font-sans);
+  --font-mono: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px;
+  --space-8: 32px; --space-10: 40px; --space-12: 48px; --space-14: 56px; --space-16: 64px;
+  --radius: 6px; --radius-lg: 8px; --radius-card: 8px; --radius-pill: 4px; --radius-full: 9999px;
+  --card-radius: var(--radius-card); --card-pad: 20px; --card-shadow: var(--shadow-sm); --card-shadow-hover: var(--shadow-md); --card-hover-lift: -2px;
+  --dur-1: 150ms; --dur-2: 250ms; --dur-3: 400ms;
+  --ease-out: cubic-bezier(.4, 0, .2, 1); --ease-in: var(--ease-out); --ease-emphasis: var(--ease-out);
+  --transition: var(--dur-2) var(--ease-out); --focus-ring: 0 0 0 2px var(--accent-ring);
+  --container-max: 1440px; --content-max: 1200px; --nav-height: 56px;
+  --fs-xs: 12px; --fs-sm: 13px; --fs-base: 14px; --fs-lg: 16px; --fs-xl: 20px; --fs-2xl: 24px; --fs-3xl: 30px; --fs-display: clamp(30px, 4vw, 42px);
+  --section-gap: 64px; --section-gap-tight: 40px; --reading-max: 720px; --prose-max: 800px; --editorial-max: 1200px;
+  --text-strong: var(--text); --secondary: var(--text-muted); --accent-secondary: var(--text-muted); --accent-tertiary: var(--accent);
+  --accent-alt-rose: var(--accent); --accent-alt-sky: var(--accent); --accent-alt-lime: var(--accent);
+  --rule: var(--border); --rule-strong: var(--border-strong);
+  --gradient-primary: linear-gradient(var(--accent), var(--accent)); --gradient-surface: linear-gradient(transparent, var(--surface)); --gradient-aurora: none;
 }
-
-/* ===== Dark (opt-in via data-theme="dark") ===== */
 :root[data-theme="dark"] {
   color-scheme: dark;
-
-  /* Surfaces — near-black → elevated panels. Matches Linear/Vercel dark base. */
-  --bg:           #0A0A0B;
-  --bg-elev-1:    #101012;
-  --bg-elev-2:    #17171A;
-  --surface:      #111113;
-  --border:       #222227;
-  --border-strong:#2E2E34;
-
-  /* Text */
-  --text:         #F5F5F7;
-  --text-muted:   #A1A1AA;
-  --text-subtle:  #71717A;
-  --secondary:    #A1A1AA;
-
-  /* Primary interaction — violet */
-  --accent:           #7C5CFF;
-  --accent-hover:     #9479FF;
-  --accent-pressed:   #6443FF;
-  --accent-soft:      rgba(124, 92, 255, 0.14);
-  --accent-ring:      rgba(124, 92, 255, 0.45);
-
-  /* Secondary accents — used to tint Bento cells */
-  /* Secondary accents — unified to the violet line (Linear-style restraint).
-     Names kept for back-compatibility; values are now violet tints/shades. */
-  --accent-secondary: #9479FF;  /* violet light  */
-  --accent-tertiary:  #6443FF;  /* violet deep   */
-  --accent-alt-rose:  #8B6CFF;  /* violet soft   */
-  --accent-alt-sky:   #6E8BFF;  /* violet-blue   */
-  --accent-alt-lime:  #A78BFA;  /* violet pale   */
-
-  /* Feedback */
-  --success: #45D483;
-  --warning: #FFB84D;
-  --danger:  #FF5D73;
-
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #7C5CFF 0%, #9479FF 100%);
-  --gradient-surface: linear-gradient(180deg, rgba(17,17,19,0) 0%, rgba(17,17,19,1) 100%);
-  --gradient-aurora:  radial-gradient(60% 80% at 10% 0%, rgba(124,92,255,0.16) 0%, transparent 60%),
-                      radial-gradient(50% 60% at 90% 10%, rgba(124,92,255,0.08) 0%, transparent 60%);
-
-  /* Shadows — darker / tighter than light mode */
-  --shadow-sm: 0 1px 0 rgba(255,255,255,0.04) inset,
-               0 1px 2px rgba(0,0,0,0.45);
-  --shadow-md: 0 1px 0 rgba(255,255,255,0.04) inset,
-               0 6px 20px rgba(0,0,0,0.45);
-  --shadow-lg: 0 1px 0 rgba(255,255,255,0.05) inset,
-               0 20px 50px rgba(0,0,0,0.55);
-  --shadow-xl: 0 40px 80px rgba(0,0,0,0.65);
-
-  /* Focus ring (a11y) */
-  --focus-ring: 0 0 0 3px var(--accent-ring);
-
-  /* Typography */
-  --font-sans:    'Inter', 'Noto Sans SC', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
-  --font-serif:   var(--font-display);
-  --font-journal: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
-  --font-mono:    'JetBrains Mono', 'Noto Sans Mono', 'Consolas', monospace;
-
-  /* Radii */
-  --radius:       8px;
-  --radius-lg:    12px;
-  --radius-card:  12px;
-  --radius-pill:  999px;
-
-  /* Motion */
-  --ease-out:       cubic-bezier(0.2, 0.6, 0.2, 1);
-  --ease-in:        cubic-bezier(0.5, 0, 1, 0.5);
-  --ease-emphasis:  cubic-bezier(0.16, 1, 0.3, 1);
-  --dur-1: 120ms;
-  --dur-2: 220ms;
-  --dur-3: 420ms;
-  --transition: var(--dur-2) var(--ease-out);
-
-  /* Card — Linear-style: hairline border does the work, shadow stays faint. */
-  --card-radius: var(--radius-card);
-  --card-shadow: 0 1px 2px rgba(0,0,0,0.30);
-  --card-shadow-hover: 0 4px 16px -6px rgba(0,0,0,0.45);
+  --bg: #121212; --surface: #1a1a1a; --bg-elev-1: #1a1a1a; --bg-elev-2: #262626; --popover: #1f1f1f;
+  --text: #f2f2f2; --text-muted: #a3a3a3; --text-subtle: #999; --text-disabled: #525252;
+  --border: #2e2e2e; --border-strong: #737373;
+  --accent: #f2f2f2; --accent-foreground: #121212; --accent-hover: #d9d9d9; --accent-pressed: #bfbfbf; --accent-soft: #262626; --accent-ring: #a3a3a3;
+  --status-on-fill: #121212; --success: #86efac; --warning: #fdba74; --danger: #fca5a5; --info: #93c5fd;
+  --success-bg: #052e16; --warning-bg: #431407; --danger-bg: #450a0a; --info-bg: #172554;
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / .22); --shadow-md: 0 4px 6px rgb(0 0 0 / .25); --shadow-lg: 0 10px 15px rgb(0 0 0 / .3); --shadow-xl: 0 20px 25px rgb(0 0 0 / .35);
 }
-
-/* ===== Light (default) ===== */
-:root,
-[data-theme="light"] {
-  color-scheme: light;
-
-  --bg:            #FAFAFA;
-  --bg-elev-1:     #FFFFFF;
-  --bg-elev-2:     #F4F4F5;
-  --surface:       #FFFFFF;
-  --border:        #E4E4E7;
-  --border-strong: #D4D4D8;
-
-  --text:          #09090B;
-  --text-muted:    #52525B;
-  --text-subtle:   #71717A;
-  --secondary:     #52525B;
-
-  --accent:           #6D4BFF;
-  --accent-hover:     #5A38F0;
-  --accent-pressed:   #4A27DA;
-  --accent-soft:      rgba(109, 75, 255, 0.10);
-  --accent-ring:      rgba(109, 75, 255, 0.35);
-
-  /* Unified to the violet line (Linear-style restraint). */
-  --accent-secondary: #5A38F0;
-  --accent-tertiary:  #4A27DA;
-  --accent-alt-rose:  #6D4BFF;
-  --accent-alt-sky:   #5B6CF0;
-  --accent-alt-lime:  #7C5CFF;
-
-  --success: #15A15A;
-  --warning: #D08715;
-  --danger:  #E03A55;
-
-  --gradient-primary: linear-gradient(135deg, #6D4BFF 0%, #5A38F0 100%);
-  --gradient-surface: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 100%);
-  --gradient-aurora:  radial-gradient(60% 80% at 10% 0%, rgba(109,75,255,0.06) 0%, transparent 60%),
-                      radial-gradient(50% 60% at 90% 10%, rgba(109,75,255,0.04) 0%, transparent 60%);
-
-  --shadow-sm: 0 1px 2px rgba(15, 15, 20, 0.06);
-  --shadow-md: 0 6px 16px rgba(15, 15, 20, 0.08);
-  --shadow-lg: 0 20px 40px rgba(15, 15, 20, 0.12);
-  --shadow-xl: 0 40px 80px rgba(15, 15, 20, 0.16);
-
-  /* Card — Linear-style hairline + faint shadow (light). */
-  --card-radius: var(--radius-card);
-  --card-shadow: 0 1px 2px rgba(15,15,20,0.05);
-  --card-shadow-hover: 0 6px 20px -8px rgba(15,15,20,0.12);
-
-  /* Fonts (light/default) — sans display for the Linear look. */
-  --font-sans:    'Inter', 'Noto Sans SC', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
-  --font-serif:   var(--font-display);
-  --font-journal: var(--font-display);
-  --font-mono:    'JetBrains Mono', 'Noto Sans Mono', 'Consolas', monospace;
-}
-
-/* ==========================================================================
- *  Re-skin legacy hardcoded backgrounds in main.css
- *  (these bypass the variable system and would otherwise look broken under
- *   the new palette). Each rule below patches exactly one hardcoded surface.
- * ========================================================================== */
-
-body {
-  background: var(--bg);
-  color: var(--text);
-}
-
-/* Global ambient gradient — subtle, one layer, never on /admin. */
-body:not(.admin-body):not(.admin-page)::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: var(--gradient-aurora);
-  opacity: 0.9;
-}
-
-/* Fixed top nav glass */
-.site-header,
-[data-theme="dark"] .site-header,
-[data-theme="light"] .site-header {
-  background: color-mix(in oklab, var(--bg) 72%, transparent);
-  border-bottom: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
-}
-.site-header.scrolled,
-[data-theme="dark"] .site-header.scrolled,
-[data-theme="light"] .site-header.scrolled {
-  background: color-mix(in oklab, var(--bg) 92%, transparent);
-  border-bottom-color: var(--border);
-  box-shadow: 0 4px 20px -10px rgba(0,0,0,0.35);
-}
-
-/* Link default color */
-a { color: var(--text); }
-a:hover { color: var(--accent); }
-
-/* Selection */
-::selection {
-  background: var(--accent-soft);
-  color: var(--text);
-}
-
-/* ==========================================================================
- *  Legacy gradient-text overrides
- *  main.css still ships the old "autumnal" baked-in gradients clipped onto
- *  text (hero accent word, homepage stat numbers). These rules win the
- *  cascade because tokens.css is loaded AFTER main.css and the selectors
- *  match 1:1. Do not remove unless the corresponding rules in main.css are
- *  also deleted.
- * ========================================================================== */
-
-/* Hero accent word — now a single North Star violet wash.
-   Italic kept: it anchors the brand break in the wordmark. */
-.hero-title__accent,
-[data-theme="dark"] .hero-title__accent,
-[data-theme="light"] .hero-title__accent {
-  background: linear-gradient(120deg,
-    var(--accent) 0%,
-    color-mix(in oklab, var(--accent) 70%, var(--accent-secondary)) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-style: italic;
-}
-
-/* Homepage stat numbers — use the canonical primary gradient so dark & light
-   both inherit from tokens instead of the baked-in dusty pink. */
-.hp-stats__number,
-[data-theme="dark"] .hp-stats__number,
-[data-theme="light"] .hp-stats__number {
-  background: var(--gradient-primary);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Respect reduced-motion everywhere */
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 80px; }
+body { max-width: 100%; background: var(--bg); color: var(--text); }
+img, svg, video, canvas, iframe { max-width: 100%; }
+img, video { height: auto; }
+main :where(.grid, .flex, [class*="__grid"], [class*="-grid"]) > * { min-width: 0; }
+.prose, .post-content, .guestbook-message { overflow-wrap: anywhere; }
+::selection { background: var(--accent); color: var(--accent-foreground); }
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* ==========================================================================
- *  Footer — flat Linear style, replaces editorial wave + gradient
- * ========================================================================== */
-
-.site-footer {
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  margin-top: var(--space-16);
-  padding: var(--space-10) var(--space-4) var(--space-8);
-}
-
-.footer-wave { display: none; }
-
-.footer-brand {
-  font-family: var(--font-sans);
-  font-size: 0.9rem !important;
-  font-weight: 600 !important;
-  letter-spacing: 0 !important;
-}
-
-.footer-brand__mark { display: none; }
-
-.footer-tagline {
-  font-family: var(--font-sans);
-  font-style: normal;
-  font-size: 0.82rem !important;
-  color: var(--text-muted);
-  line-height: 1.6 !important;
-}
-
-.footer-heading {
-  font-size: 0.7rem !important;
-  letter-spacing: 0.12em !important;
-  color: var(--text-muted) !important;
-  opacity: 1 !important;
-}
-
-.footer-section a:hover { color: var(--text); }
-
-.footer-bottom {
-  border-top-color: var(--border);
-  font-size: 0.75rem;
-}
-
-/* Back-to-top button */
-#back-to-top {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  border-radius: 50%;
-  font-size: 1rem;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.18);
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-
-#back-to-top:hover {
-  background: var(--surface);
-  color: var(--text);
-  border-color: var(--text-muted);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.22);
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }

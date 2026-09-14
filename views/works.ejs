@@ -45,19 +45,19 @@
     </nav>
     <% } %>
 
-    <!-- BENTO GRID ==================================================== -->
+    <!-- WORKS GRID ==================================================== -->
     <section class="works-bento">
       <% if (works.length === 0) { %>
         <div class="works-empty-v2">
           <h3>尚未有公开作品</h3>
-          <p>第一片叶还在长。先去后台 <code>/admin/works</code> 新建一件。</p>
+          <p>作品正在整理中，欢迎先阅读文章或留下问候。</p>
         </div>
       <% } else { %>
       <div class="bento-grid" id="works-grid">
         <%
           var _toneRing = ['rose', 'sky', 'lime', 'violet', 'mint', 'amber'];
           works.forEach(function (work, i) {
-            var isFeat   = !!work.spanFeature;
+            var isFeat = false;
             var hasCover = !!work.cover_image;
             var mono     = (work.title || '·').trim().charAt(0).toUpperCase();
             var tone     = _toneRing[i % _toneRing.length];
@@ -74,7 +74,7 @@
            aria-labelledby="<%= workLabel %>">
 
           <% if (Number(work.featured) === 1 && !isFeat) { %>
-          <span class="work-card__badge-v2" aria-label="精选作品">Featured</span>
+          <span class="work-card__badge-v2" aria-label="精选作品">精选</span>
           <% } %>
 
           <% if (hasCover) { %>

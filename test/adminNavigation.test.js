@@ -72,13 +72,13 @@ test('admin pages load the supplied design-system alignment layer last', () => {
   const designSystem = fs.readFileSync(path.join(projectRoot, 'public', 'css', 'admin-design-system.css'), 'utf8');
 
   assert.ok(styles.indexOf('/css/admin-design-system.css') > styles.indexOf('/css/admin-v2.css'));
-  assert.match(designSystem, /--admin-ds-background:\s*hsl\(0 0% 100%\)/);
+  assert.match(designSystem, /--admin-ds-background:\s*var\(--bg\)/);
   assert.match(designSystem, /grid-template-columns:\s*240px minmax\(0, 1fr\)/);
   assert.match(designSystem, /grid-template-rows:\s*56px auto/);
-  assert.match(designSystem, /--admin-ds-success:\s*#15803d/);
-  assert.match(designSystem, /--admin-ds-warning:\s*#c2410c/);
-  assert.match(designSystem, /--admin-ds-danger:\s*#dc2626/);
-  assert.match(designSystem, /--admin-ds-info:\s*#1d4ed8/);
+  assert.match(designSystem, /--admin-ds-success:\s*var\(--success\)/);
+  assert.match(designSystem, /--admin-ds-warning:\s*var\(--warning\)/);
+  assert.match(designSystem, /--admin-ds-danger:\s*var\(--danger\)/);
+  assert.match(designSystem, /--admin-ds-info:\s*var\(--info\)/);
   assert.match(designSystem, /:disabled/);
   assert.match(designSystem, /prefers-reduced-motion:\s*reduce/);
 });

@@ -11,10 +11,13 @@
     "dev": "nodemon server.js",
     "lint": "eslint .",
     "test": "node --test",
+    "geo:update": "node scripts/update-geolite.js",
+    "geo:rebuild": "node scripts/rebuild-visitor-geo.js",
     "minify": "node scripts/minify.js",
     "minify:check": "node scripts/minify.js --check"
   },
   "dependencies": {
+    "@maxmind/geoip2-node": "^7.1.0",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.2",
     "compression": "^1.8.1",

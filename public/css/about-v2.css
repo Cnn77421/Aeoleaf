@@ -8,12 +8,7 @@
 }
 
 /* ── Entrance animation ─────────────────────────────────────────────────── */
-.ab-reveal {
-  opacity: 0;
-  transform: translateY(18px);
-  transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
-}
+.ab-reveal { opacity: 1; transform: none; }
 
 .ab-reveal.is-visible {
   opacity: 1;
@@ -219,7 +214,7 @@
   transition: opacity 0.2s;
 }
 
-.ab-contact__item:hover { opacity: 0.6; }
+.ab-contact__item:hover { color: var(--accent); text-decoration: underline; }
 
 .ab-contact__key {
   font-size: 0.72rem;

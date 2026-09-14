@@ -1,14 +1,18 @@
 const router = require('express').Router();
-const IP2Region = require('ip2region').default;
 const { db } = require('../../config/db');
 const { rateLimit } = require('../../middleware/rateLimit');
+const {
+  emptyGeo,
+  isPrivateOrLocalIp,
+  normalizeIp,
+  resolveGeoByIp
+} = require('../../lib/geoIp');
 
 const trackLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 180,
   message: 'Too many tracking requests'
 });
-const ip2Region = new IP2Region();
 
 function setCors(req, res) {
   const origin = req.headers.origin;
@@ -64,37 +68,6 @@ function parseUserAgent(ua) {
   return { deviceType, osName, osVersion, browserName, browserVersion };
 }
 
-function normalizeIp(ip) {
-  if (!ip) return '';
-  let s = String(ip).trim();
-  if (s.startsWith('::ffff:')) s = s.slice(7);
-  return s;
-}
-
-function isPrivateOrLocalIp(ip) {
-  const s = normalizeIp(ip);
-  if (!s) return true;
-  if (s === '127.0.0.1' || s === '::1' || s === '0.0.0.0') return true;
-  if (s.startsWith('10.')) return true;
-  if (s.startsWith('192.168.')) return true;
-  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(s)) return true;
-  if (/^f[cd][0-9a-f]{2}:/i.test(s)) return true;
-  return false;
-}
-
-function resolveGeoByIp(ip) {
-  const s = normalizeIp(ip);
-  if (!s) return { country: '', province: '', city: '', isp: '' };
-  try {
-    const r = ip2Region.search(s);
-    if (!r) return { country: '', province: '', city: '', isp: '' };
-    return { country: r.country || '', province: r.province || '', city: r.city || '', isp: r.isp || '' };
-  } catch (e) {
-    console.error('[track] ip2region error for', s, e.message);
-    return { country: '', province: '', city: '', isp: '' };
-  }
-}
-
 function resolveVisitorIp(req) {
   return normalizeIp(req.ip || req.socket?.remoteAddress || '');
 }
@@ -131,40 +104,13 @@ function getOrCreateVisitorSession(fingerprintId, trackedAt, eventType, stayDura
   return latest.id;
 }
 
-// One-time backfill: resolve geo for existing rows with public IP but empty country
-let backfillDone = false;
-function backfillGeo() {
-  if (backfillDone) return;
-  backfillDone = true;
-  try {
-    const rows = db.prepare(`
-      SELECT id, ip FROM visitors WHERE ip != '' AND (country IS NULL OR country = '') LIMIT 200
-    `).all();
-    let filled = 0;
-    for (const row of rows) {
-      const ip = normalizeIp(row.ip);
-      if (!ip || isPrivateOrLocalIp(ip)) continue;
-      const geo = resolveGeoByIp(ip);
-      if (geo.country) {
-        db.prepare('UPDATE visitors SET country = ?, province = ?, city = ?, isp = ? WHERE id = ?')
-          .run(geo.country, geo.province, geo.city, geo.isp, row.id);
-        filled++;
-      }
-    }
-    if (filled > 0) console.log(`[track] backfilled geo for ${filled} rows`);
-  } catch (e) {
-    console.error('[track] backfill error:', e.message);
-  }
-}
-
 router.options('/', (req, res) => {
   if (!setCors(req, res)) return res.status(403).end();
   return res.status(204).end();
 });
 
-router.post('/', trackLimiter, (req, res) => {
+router.post('/', trackLimiter, async (req, res) => {
   if (!setCors(req, res)) return res.status(403).json({ error: 'Origin not allowed' });
-  backfillGeo();
   try {
     const now = Date.now();
     const body = req.body || {};
@@ -200,7 +146,7 @@ router.post('/', trackLimiter, (req, res) => {
     const ua = req.headers['user-agent'] || '';
     const parsed = parseUserAgent(ua);
     const ip = resolveVisitorIp(req);
-    const geo = !isPrivateOrLocalIp(ip) ? resolveGeoByIp(ip) : { country: '', province: '', city: '', isp: '' };
+    const geo = !isPrivateOrLocalIp(ip) ? await resolveGeoByIp(ip) : emptyGeo();
     const networkType = readNetworkType(body);
     const trackedAt = Number(body.trackedAt) || now;
     const path = body.path || '/';
@@ -223,12 +169,13 @@ router.post('/', trackLimiter, (req, res) => {
       INSERT INTO visitors (
         fingerprint_id, session_id, ip, tracked_at, full_url, path, query_string, referer, user_agent,
         device_type, os_name, os_version, browser_name, browser_version,
-        country, province, city, isp, screen_resolution, viewport_size, device_pixel_ratio,
+        country, province, city, isp, geo_provider, geo_accuracy_km, geo_updated_at,
+        screen_resolution, viewport_size, device_pixel_ratio,
         language, timezone, cookie_enabled, incognito, network_type, downlink, rtt, device_memory, cpu_cores,
         canvas_fp, webgl_fp, page_enter_at, page_leave_at, stay_duration_ms, max_scroll_depth, visit_path_json,
         request_id, event_type, user_agent_raw, http_status, request_method,
         utm_source, utm_medium, utm_campaign, search_keyword, is_bot, visitor_session_id, page_view_id
-      ) VALUES (${new Array(49).fill('?').join(',')})
+      ) VALUES (${new Array(52).fill('?').join(',')})
     `).run(
       fingerprintId,
       String(body.sessionId || ''),
@@ -248,6 +195,9 @@ router.post('/', trackLimiter, (req, res) => {
       geo.province,
       geo.city,
       geo.isp,
+      geo.geoProvider,
+      geo.geoAccuracyKm,
+      geo.geoUpdatedAt,
       String(body.screenResolution || ''),
       String(body.viewportSize || ''),
       Number(body.devicePixelRatio || 1),

@@ -86,7 +86,9 @@
       <div class="recent-section visitor-detail-card">
         <h2>地域与网络</h2>
         <div class="detail-grid">
-          <div><strong>地域:</strong> <%= [visitor.country, visitor.province, visitor.city].filter(Boolean).join(' / ') || '—' %></div>
+          <div><strong>IP 推测地域:</strong> <%= [visitor.country, visitor.province, visitor.city].filter(Boolean).join(' / ') || '—' %></div>
+          <div><strong>定位数据源:</strong> <%= visitor.geo_provider || '—' %></div>
+          <div><strong>精度半径:</strong> <%= visitor.geo_accuracy_km ? '约 ' + visitor.geo_accuracy_km + ' km' : '—' %></div>
           <div><strong>运营商:</strong> <%= visitor.isp || '—' %></div>
           <div><strong>网络类型:</strong> <%= (visitor.network_type && String(visitor.network_type).trim()) ? visitor.network_type : '—' %></div>
           <div><strong>下行带宽:</strong> <%= visitor.downlink ? visitor.downlink + ' Mbps' : '—' %></div>

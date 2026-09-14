@@ -287,6 +287,39 @@ pm2 restart aeoleaf --update-env
 
 ## 五、日志和编码
 
+### 访客 IP 地域库
+
+访客地域以 MaxMind GeoLite2 City 为主数据源，`ip2region` 仅在 MaxMind 缺少省市结果时降级使用。IP 地域是网络出口的推测范围，不是访客精确地址。
+
+生产 `.env` 需要：
+
+```env
+MAXMIND_ACCOUNT_ID=<account-id>
+MAXMIND_LICENSE_KEY=<license-key>
+MAXMIND_DB_PATH=/www/wwwroot/aeoleaf/data/GeoLite2-City.mmdb
+```
+
+License Key 按密码管理，禁止输出到日志、聊天或截图。首次部署时，在应用停止和数据库备份完成后执行：
+
+```bash
+chmod 600 .env
+npm run geo:update
+npm run geo:rebuild
+pm2 restart aeoleaf --update-env
+```
+
+`geo:update` 会下载、解压、验证并原子替换 MMDB 文件；应用会监视数据库更新，日常更新无需重启。`geo:rebuild` 用于重新解析所有历史公网 IP，仅在首次接入或需要全量重算时执行。
+
+自动更新前先执行 `command -v npm` 确认 npm 的绝对路径，再执行 `mkdir -p logs` 并用 `crontab -e` 添加（下例的 `/usr/bin/npm` 需与实际输出一致）：
+
+```cron
+17 12 * * 3,6 cd /www/wwwroot/aeoleaf && /usr/bin/npm run geo:update >> /www/wwwroot/aeoleaf/logs/geo-update.log 2>&1
+```
+
+每周三和周六更新，可避开 MaxMind 每周二、周五的发布时间窗口。用 `tail -n 30 logs/geo-update.log` 检查更新结果。
+
+应用日志出现 `[geo] MaxMind GeoLite2 City loaded`表示主库已加载；出现 `using ip2region fallback` 表示 MMDB 路径不存在，需要先执行 `npm run geo:update`。
+
 查看日志：
 
 ```bash

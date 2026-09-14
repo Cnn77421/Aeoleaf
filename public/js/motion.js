@@ -1,0 +1,308 @@
+/* Aeoleaf motion: independent implementation; reference measurements in docs/motion.md. */
+(function () {
+  'use strict';
+  if (window.aeoleafMotion) return;
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var fine = window.matchMedia('(hover: hover) and (pointer: fine)');
+  var root = document.documentElement;
+  var first = false;
+  try { first = !sessionStorage.getItem('aeoleaf-intro'); } catch (_) { first = true; }
+  if (first && !reduced.matches) root.classList.add('motion-pending');
+  var bootTimeout = setTimeout(function () { root.classList.remove('motion-pending'); }, 9000);
+
+  function boot() {
+    clearTimeout(bootTimeout);
+    var frame = 0, previous = 0, scene = null, loader = null, active = null;
+    var bounds = null, image = null, hoverX = 0, hoverY = 0, energy = 0;
+    var lastMove = 0, lastX = 0, lastY = 0, hasPointer = false, interactive = false;
+    var x = spring(0), y = spring(0), angle = spring(0), scale = spring(1);
+    var pageHeight = 1, scrollValue = 0, scrollTarget = 0;
+    var animations = new Set();
+    var cursor = element('div', 'motion-cursor');
+    cursor.setAttribute('aria-hidden', 'true');
+    var progress = element('div', 'motion-progress');
+    progress.setAttribute('role', 'progressbar');
+    progress.setAttribute('aria-label', '页面滚动进度');
+    progress.setAttribute('aria-valuemin', '0');
+    progress.setAttribute('aria-valuemax', '100');
+    progress.innerHTML = '<svg viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="25"/><circle class="motion-progress__value" cx="30" cy="30" r="25"/></svg><span>0%</span>';
+    var ring = progress.querySelector('.motion-progress__value');
+    var resizeObserver = new ResizeObserver(measure);
+    resizeObserver.observe(document.body);
+
+    function element(tag, className) {
+      var el = document.createElement(tag);
+      el.className = className;
+      document.body.appendChild(el);
+      return el;
+    }
+    function spring(value) { return { value: value, target: value, velocity: 0 }; }
+    function integrate(state, dt, stiffness, damping) {
+      // Bounded substeps keep the spring stable after frame stalls / tab resume.
+      for (var remaining = Math.min(dt, .064); remaining > 0;) {
+        var step = Math.min(.008, remaining);
+        state.velocity += ((state.target - state.value) * stiffness - damping * state.velocity) * step;
+        state.value += state.velocity * step;
+        remaining -= step;
+      }
+      var moving = Math.abs(state.target - state.value) > .001 || Math.abs(state.velocity) > .001;
+      if (!moving) { state.value = state.target; state.velocity = 0; }
+      return moving;
+    }
+    function wake() {
+      if (!frame && !document.hidden) frame = requestAnimationFrame(tick);
+    }
+    function measure() {
+      pageHeight = Math.max(0, root.scrollHeight - innerHeight);
+      scrollTarget = pageHeight ? Math.max(0, Math.min(1, scrollY / pageHeight)) : 0;
+      bounds = active && active.isConnected ? active.getBoundingClientRect() : null;
+      wake();
+    }
+    function resetHover() {
+      if (image) { image.style.removeProperty('transform'); image.style.removeProperty('will-change'); }
+      if (active) active.classList.remove('motion-hover');
+      active = image = bounds = null;
+      hoverX = hoverY = 0;
+    }
+    function pointer(event) {
+      if (event.pointerType === 'touch' || !fine.matches || reduced.matches || scene || loader) return;
+      var now = performance.now();
+      var elapsed = Math.max(1, now - lastMove);
+      var dx = hasPointer ? event.clientX - lastX : 0;
+      var dy = hasPointer ? event.clientY - lastY : 0;
+      var speed = Math.hypot(dx, dy) / elapsed;
+      if (!hasPointer) { x.value = event.clientX; y.value = event.clientY; }
+      hasPointer = true;
+      x.target = lastX = event.clientX; y.target = lastY = event.clientY; lastMove = now;
+      interactive = !!event.target.closest('a,button,input,textarea,select,[role="button"]');
+      scale.target = interactive ? 1.4 : speed > .1 ? .95 : 1;
+      if (speed > .1) {
+        var heading = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+        angle.target += ((heading - angle.target + 540) % 360 + 360) % 360 - 180;
+      }
+      energy = Math.min(1, energy + speed * .12);
+      cursor.classList.add('is-visible');
+      root.classList.add('motion-pointer');
+      cursor.classList.toggle('is-interactive', interactive);
+      var target = event.target.closest('.work-card, .home-works .content-card, .home-intro');
+      if (target !== active) {
+        resetHover();
+        if (target) {
+          active = target; bounds = target.getBoundingClientRect();
+          image = target.querySelector('.work-card__cover-v2 img, .content-card__cover img, .home-intro__image img');
+          active.classList.add('motion-hover');
+          if (image) image.style.willChange = 'transform';
+        }
+      }
+      wake();
+    }
+    function tick(now) {
+      frame = 0;
+      var dt = previous ? Math.min(.064, (now - previous) / 1000) : 1 / 60;
+      previous = now;
+      var running = false;
+      if (fine.matches && !reduced.matches && hasPointer) {
+        if (now - lastMove > 150 && !interactive) scale.target = 1;
+        running = integrate(x, dt, 650, 45) || running;
+        running = integrate(y, dt, 650, 45) || running;
+        running = integrate(angle, dt, 300, 60) || running;
+        running = integrate(scale, dt, 500, 35) || running;
+        cursor.style.transform = 'translate3d(' + x.value + 'px,' + y.value + 'px,0) translate(-50%,-50%) rotate(' + angle.value + 'deg) scale(' + scale.value + ')';
+        energy *= Math.exp(-7 * dt);
+        if (image && bounds) {
+          var tx = Math.max(-1, Math.min(1, (x.value - bounds.left) / bounds.width * 2 - 1));
+          var ty = Math.max(-1, Math.min(1, (y.value - bounds.top) / bounds.height * 2 - 1));
+          var blend = 1 - Math.pow(.97, dt * 60);
+          hoverX += (tx * 8 - hoverX) * blend; hoverY += (ty * 8 - hoverY) * blend;
+          image.style.transform = 'translate3d(' + hoverX + 'px,' + hoverY + 'px,0) scale(' + (1.04 + energy * .018) + ') skewX(' + (energy * tx * 1.5) + 'deg)';
+          running = running || energy > .001 || Math.abs(tx * 8 - hoverX) > .01 || Math.abs(ty * 8 - hoverY) > .01;
+        }
+        if (now - lastMove < 180) running = true;
+      }
+      scrollValue += (scrollTarget - scrollValue) * (reduced.matches ? 1 : 1 - Math.exp(-30 * dt));
+      if (Math.abs(scrollTarget - scrollValue) < .0001) scrollValue = scrollTarget;
+      else running = true;
+      var percent = Math.round(scrollValue * 100);
+      progress.setAttribute('aria-valuenow', percent);
+      progress.querySelector('span').textContent = percent + '%';
+      ring.style.strokeDashoffset = (Math.PI * 50 * (1 - scrollValue)).toFixed(3);
+      progress.classList.toggle('is-visible', scrollY > 100 && pageHeight > 0 && scrollTarget < 1);
+      if (loader) running = updateLoader(now, dt) || running;
+      if (running) wake(); else previous = 0;
+    }
+    function animate(el, frames, duration, easing, delay) {
+      if (!el || reduced.matches) return Promise.resolve();
+      var animation = el.animate(frames, { duration: duration, easing: easing || 'linear', delay: delay || 0, fill: 'both' });
+      animations.add(animation);
+      return animation.finished.then(function () {
+        // Keep scene endpoints while the staggered content reveal finishes.
+        if (el.classList.contains('motion-clone') || el.classList.contains('motion-scene')) animation.commitStyles();
+      }).catch(function () {}).finally(function () { animation.cancel(); animations.delete(animation); });
+    }
+    // GSAP power3.inOut is a piecewise quartic, not a cubic-bezier curve.
+    var easeInOut = 'linear(' + Array.from({ length: 101 }, function (_, i) {
+      var t = i / 100;
+      return (t < .5 ? 8 * Math.pow(t, 4) : 1 - 8 * Math.pow(1 - t, 4)).toFixed(6);
+    }).join(',') + ')';
+    var easeOut = 'cubic-bezier(.215,.61,.355,1)';
+    function reveal(main, delay) {
+      return Promise.all(Array.from(main.children).filter(function (el) { return el.tagName !== 'SCRIPT'; }).map(function (el, index) {
+        return animate(el, [{ opacity: 0, transform: 'translateY(18px)' }, { opacity: 1, transform: 'none' }], 800, easeOut, (delay || 0) + Math.min(index, 6) * 50);
+      }));
+    }
+    function lock(main) {
+      root.classList.add('motion-locked');
+      if (main) { main.dataset.motionInert = main.inert ? 'true' : 'false'; main.inert = true; }
+    }
+    function unlock(main) {
+      root.classList.remove('motion-locked');
+      if (main && main.hasAttribute('data-motion-inert')) {
+        main.inert = main.dataset.motionInert === 'true'; delete main.dataset.motionInert;
+      }
+    }
+    function cleanup() {
+      animations.forEach(function (a) { a.cancel(); }); animations.clear();
+      if (scene) { scene.layer.remove(); if (scene.clone) scene.clone.remove(); scene = null; }
+      unlock(document.querySelector('main.site-main'));
+      resetHover();
+      measure();
+    }
+    function begin(link) {
+      cleanup(); finishLoader();
+      if (reduced.matches) return Promise.resolve();
+      var main = document.querySelector('main.site-main');
+      var card = link && link.closest('.work-card, .home-works .content-card');
+      var cover = card && card.querySelector('.work-card__cover-v2, .content-card__cover');
+      var source = cover && cover.querySelector('img');
+      var rect = fine.matches && innerWidth > 767 && source && source.complete && source.naturalWidth && cover.getBoundingClientRect();
+      var layer = element('div', 'motion-scene');
+      layer.setAttribute('aria-hidden', 'true');
+      scene = { layer: layer, clone: null };
+      lock(main); cursor.classList.remove('is-visible');
+      var tasks = [animate(main, [{ opacity: 1 }, { opacity: 0 }], 800, 'cubic-bezier(.55,.085,.68,.53)')];
+      if (rect && rect.width && rect.height) {
+        var clone = element('div', 'motion-clone');
+        clone.setAttribute('aria-hidden', 'true');
+        if (source && source.complete && source.naturalWidth) {
+          var copy = document.createElement('img');
+          copy.src = source.currentSrc || source.src; copy.alt = '';
+          copy.style.objectPosition = getComputedStyle(source).objectPosition;
+          clone.appendChild(copy);
+        }
+        scene.clone = clone;
+        scene.layer.style.opacity = '1';
+        tasks.push(animate(layer, [{ opacity: 0 }, { opacity: 1 }], 800, easeInOut));
+        tasks.push(animate(clone, [imageRect(rect), imageRect({ left: 0, top: 0, width: innerWidth, height: innerHeight })], 800, easeInOut));
+      } else {
+        tasks.push(animate(layer, [{ transform: 'scale(1,0)', transformOrigin: 'center top' }, { transform: 'scale(1.5,1)', transformOrigin: 'center top' }], 800, easeInOut));
+      }
+      return Promise.all(tasks);
+    }
+    function imageRect(rect) {
+      // Animate the image box itself: clipping a fullscreen texture changes its
+      // crop on the very first frame and is not a shared-image expansion.
+      return { left: rect.left + 'px', top: rect.top + 'px', width: rect.width + 'px', height: rect.height + 'px', borderRadius: rect.width === innerWidth ? '0px' : '6px' };
+    }
+    async function enter(main) {
+      if (!scene || reduced.matches) { cleanup(); return; }
+      var current = scene;
+      var hero = main.querySelector('.wd-hero');
+      var tasks = [];
+      if (current.clone && hero) {
+        var img = current.clone.querySelector('img');
+        var destination = hero.querySelector('img');
+        if (img && destination) {
+          await Promise.race([destination.decode().catch(function () {}), new Promise(function (resolve) { setTimeout(resolve, 1800); })]);
+        }
+        if (scene !== current || reduced.matches) return;
+        var rect = (destination || hero).getBoundingClientRect();
+        tasks.push(animate(current.clone, [imageRect({ left: 0, top: 0, width: innerWidth, height: innerHeight }), imageRect(rect)], 1000, easeInOut));
+        tasks.push(animate(current.layer, [{ opacity: 1 }, { opacity: 0 }], 1000, easeInOut));
+      } else {
+        tasks.push(animate(current.layer, [{ transform: 'scale(1.5,1)', transformOrigin: 'center bottom' }, { transform: 'scale(1,0)', transformOrigin: 'center bottom' }], 1000, easeInOut));
+      }
+      tasks.push(reveal(main, 600));
+      await Promise.all(tasks);
+      if (scene === current) cleanup();
+    }
+    function finishLoader() {
+      root.classList.remove('motion-pending');
+      if (!loader) return;
+      loader.cancel.abort(); clearTimeout(loader.timeout);
+      loader.el.remove(); loader = null;
+      unlock(document.querySelector('main.site-main'));
+    }
+    function startLoader() {
+      if (!first || reduced.matches) { root.classList.remove('motion-pending'); return; }
+      var el = element('div', 'motion-loader');
+      el.innerHTML = '<span class="motion-loader__brand">aeoleaf / 风叶</span><div class="motion-loader__center"><span>让灵感慢慢生长</span><strong>0<span>%</span></strong></div><div class="motion-loader__track"><i></i></div><span class="motion-loader__status" role="status">正在准备页面</span>';
+      el.setAttribute('role', 'progressbar'); el.setAttribute('aria-label', '页面准备进度');
+      el.setAttribute('aria-valuemin', '0'); el.setAttribute('aria-valuemax', '100'); el.setAttribute('aria-valuenow', '0');
+      loader = { el: el, start: performance.now(), value: 0, settled: 0, total: 1, exiting: false, cancel: new AbortController() };
+      var state = loader;
+      lock(document.querySelector('main.site-main'));
+      root.classList.remove('motion-pending');
+      var images = Array.from(document.images).filter(function (img) { return img.loading !== 'lazy' || img.getBoundingClientRect().top < innerHeight; });
+      state.total = images.length + 1;
+      function settled() { if (loader === state) { state.settled++; wake(); } }
+      images.forEach(function (img) {
+        var done = function () { img.decode().catch(function () {}).then(settled); };
+        if (img.complete) done();
+        else { img.addEventListener('load', done, { once: true, signal: state.cancel.signal }); img.addEventListener('error', settled, { once: true, signal: state.cancel.signal }); }
+      });
+      (document.fonts ? document.fonts.ready : Promise.resolve()).then(settled, settled);
+      state.timeout = setTimeout(function () {
+        if (loader === state) { state.settled = state.total; state.el.querySelector('.motion-loader__status').textContent = '页面已就绪，剩余资源继续加载'; wake(); }
+      }, 6000);
+      wake();
+    }
+    function updateLoader(now, dt) {
+      if (loader.exiting) return false;
+      var state = loader;
+      var ratio = state.settled / state.total;
+      // A queued RAF timestamp can predate boot in the same rendering frame.
+      var timeRatio = Math.max(0, Math.min(1, (now - state.start) / 1600));
+      var target = Math.min(ratio === 1 ? 100 : 94 * ratio + 4 * timeRatio, 100 * (1 - Math.pow(1 - timeRatio, 2)));
+      state.value += (Math.max(state.value, target) - state.value) * (1 - Math.exp(-7 * dt));
+      if (ratio === 1 && timeRatio === 1 && state.value > 99.5) state.value = 100;
+      var integer = Math.floor(state.value);
+      state.el.querySelector('strong').firstChild.textContent = integer;
+      state.el.setAttribute('aria-valuenow', integer);
+      state.el.querySelector('i').style.transform = 'scaleX(' + state.value / 100 + ')';
+      if (integer === 100) {
+        state.exiting = true;
+        try { sessionStorage.setItem('aeoleaf-intro', '1'); } catch (_) {}
+        var main = document.querySelector('main.site-main');
+        Promise.all([
+          animate(state.el.querySelector('.motion-loader__center'), [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(-24px)' }], 750, easeInOut, 180),
+          animate(state.el, [{ clipPath: 'inset(0 0 0 0)' }, { clipPath: 'inset(0 0 100% 0)' }], 1000, easeInOut, 450),
+          reveal(main, 600)
+        ]).then(function () { if (loader === state) finishLoader(); });
+        return false;
+      }
+      return true;
+    }
+
+    function preferenceChange() {
+      resetHover(); hasPointer = false; cursor.classList.remove('is-visible');
+      if (reduced.matches) { cleanup(); finishLoader(); }
+      measure();
+    }
+    window.addEventListener('pointermove', pointer, { passive: true });
+    document.addEventListener('pointerout', function (e) { if (!e.relatedTarget) { cursor.classList.remove('is-visible'); root.classList.remove('motion-pointer'); resetHover(); } });
+    window.addEventListener('scroll', measure, { passive: true });
+    window.addEventListener('resize', function () { resetHover(); measure(); }, { passive: true });
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { cancelAnimationFrame(frame); frame = 0; previous = 0; }
+      else { hasPointer = false; measure(); }
+    });
+    window.addEventListener('pagehide', function () { cleanup(); finishLoader(); cancelAnimationFrame(frame); frame = 0; previous = 0; });
+    window.addEventListener('pageshow', measure);
+    reduced.addEventListener('change', preferenceChange); fine.addEventListener('change', preferenceChange);
+    document.addEventListener('pjax:ready', function () { resetHover(); measure(); });
+    window.aeoleafMotion = { begin: begin, enter: enter, cleanup: cleanup };
+    measure(); startLoader();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+  else boot();
+})();

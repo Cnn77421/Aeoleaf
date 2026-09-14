@@ -15,7 +15,7 @@
     <% if (notice) { %><div class="admin-notice" role="status"><%= notice %></div><% } %>
     <% if (trashError) { %><div class="admin-notice admin-notice--error" role="alert"><%= trashError %></div><% } %>
 
-    <form class="admin-filter-bar" method="get" action="/admin/trash">
+    <form class="admin-filter-bar admin-filter-bar--trash" method="get" action="/admin/trash" aria-label="筛选回收站">
       <label><span>类型</span><select name="type">
         <option value="">全部</option>
         <% [['post','文章'],['work','作品'],['guestbook','留言'],['media','媒体']].forEach(function(option) { %>
@@ -25,7 +25,7 @@
       <label><span>关键词</span><input type="search" name="keyword" value="<%= filters.keyword %>" placeholder="标题、留言或路径"></label>
       <label><span>删除起始</span><input type="date" name="date_from" value="<%= filters.dateFrom %>"></label>
       <label><span>删除截止</span><input type="date" name="date_to" value="<%= filters.dateTo %>"></label>
-      <button type="submit" class="btn-secondary">筛选</button>
+      <button type="submit" class="btn-primary"><i class="ti ti-filter" aria-hidden="true"></i> 筛选</button>
     </form>
 
     <form id="trash-bulk-form" class="guestbook-bulk-bar" method="post" action="/admin/trash/bulk">
@@ -61,7 +61,7 @@
               </td>
             </tr>
           <% }); %>
-          <% if (!items.length) { %><tr><td colspan="6" class="text-center text-secondary">回收站为空</td></tr><% } %>
+          <% if (!items.length) { %><tr><td colspan="6"><%- include('partials/empty-state', { icon: 'ti-trash', heading: '回收站为空', description: '已删除的内容会显示在这里，可恢复或彻底删除。' }) %></td></tr><% } %>
           </tbody>
         </table>
       </div>

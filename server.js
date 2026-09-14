@@ -15,6 +15,7 @@ const { createBackup, scheduleDue } = require('./lib/backupService');
 const { runPublishSchedule } = require('./lib/publishScheduler');
 const { logAudit } = require('./lib/auditLog');
 const { runHealthChecks, recordHealthSnapshot } = require('./lib/healthCheck');
+const { initializeGeoIp } = require('./lib/geoIp');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -89,6 +90,7 @@ process.once('SIGTERM', () => { void shutdown(0); });
 
 (async () => {
   await initDB();
+  await initializeGeoIp();
   runTrashCleanup(db);
   trashCleanupTimer = setInterval(() => runTrashCleanup(db), 6 * 60 * 60 * 1000);
   trashCleanupTimer.unref();
@@ -190,8 +192,6 @@ app.use((req, res, next) => {
   req.id = String(req.get('x-request-id') || crypto.randomUUID()).slice(0, 200);
   res.setHeader('X-Request-ID', req.id);
   res.locals.baseUrl = resolveBaseUrl(req);
-  const now = new Date();
-  res.locals.isBirthday = (now.getMonth() === 4 && now.getDate() === 21);
   next();
 });
 

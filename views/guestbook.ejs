@@ -3,7 +3,7 @@
 <head>
 <%- include('partials/public-head', {
   title: title,
-  description: '留言板 — 给风叶留下你的祝福',
+  description: '留言板 — Welcome',
   canonicalPath: '/guestbook',
   twitterCard: 'summary',
   extraCss: ['/css/public-pages.css', '/css/guestbook.css']
@@ -22,7 +22,7 @@
         </nav>
         <div class="gb-intro__eyebrow"><span class="gb-intro__dot"></span>Guestbook</div>
         <h1 class="gb-intro__title">留言板</h1>
-        <p class="gb-intro__desc">写下你想说的话，无论是祝福、回忆还是一句简单的问候。</p>
+        <p class="gb-intro__desc">Write everything you like 畅所欲言</p>
       </header>
 
       <div class="gb-layout">
@@ -37,9 +37,9 @@
             <div class="gb-form__field">
               <label class="gb-form__label">头像 <span class="gb-form__optional">(点击切换风格)</span></label>
               <div class="gb-avatar-picker">
-                <div id="gb-avatar-preview" class="gb-avatar-preview">
-                  <div class="gb-avatar-preview__img"></div>
-                </div>
+                <button type="button" id="gb-avatar-preview" class="gb-avatar-preview" aria-label="切换头像风格">
+                  <span class="gb-avatar-preview__img"></span>
+                </button>
                 <input type="hidden" id="gb-avatar" name="avatar">
                 <span id="gb-avatar-style" class="gb-avatar-style">avataaars</span>
               </div>
@@ -47,11 +47,11 @@
           </div>
           <div class="gb-form__field">
             <label for="gb-message" class="gb-form__label">留言</label>
-            <textarea id="gb-message" name="message" maxlength="500" placeholder="写下你的祝福..." required rows="4" class="gb-form__textarea"></textarea>
+            <textarea id="gb-message" name="message" maxlength="500" placeholder="说点什么吧.." required rows="4" class="gb-form__textarea"></textarea>
           </div>
           <div class="gb-form__actions">
             <span id="gb-char-count" class="gb-form__char-count">0 / 500</span>
-            <button type="submit" id="gb-submit" class="gb-form__submit">送出祝福</button>
+            <button type="submit" id="gb-submit" class="gb-form__submit">发送</button>
           </div>
           <p id="gb-submit-status" class="gb-form__status" role="status" hidden></p>
         </form>
@@ -62,7 +62,7 @@
         <header class="gb-wall__heading">
           <div>
             <span class="gb-wall__eyebrow">Message wall</span>
-            <h2>风里的来信</h2>
+            <h2>最近留言</h2>
           </div>
           <span id="gb-wall-count" class="gb-wall__count" data-count="<%= messages.length %>"><%= messages.length %> 张留言</span>
         </header>
@@ -73,7 +73,7 @@
             </div>
           <% } else { %>
             <% messages.forEach(function(msg) { %>
-              <article class="gb-card" data-id="<%= msg.id %>" tabindex="0">
+              <article class="gb-card" data-id="<%= msg.id %>">
                 <div class="gb-card__photo">
                   <span class="gb-card__quote" aria-hidden="true">“</span>
                   <% if (msg.avatar) { %>
@@ -189,6 +189,7 @@
 
           msgInput.value = '';
           charCount.textContent = '0 / 500';
+          submitStatus.classList.remove('is-error');
           submitStatus.textContent = '留言已提交，审核通过后会显示在留言墙。';
           submitStatus.hidden = false;
           submitBtn.textContent = '已提交审核';
@@ -198,7 +199,9 @@
           }, 1500);
         })
         .catch(function (err) {
-          alert(err.message || '发送失败，请稍后再试');
+          submitStatus.textContent = err.message || '发送失败，请稍后再试';
+          submitStatus.classList.add('is-error');
+          submitStatus.hidden = false;
           submitBtn.textContent = '送出祝福';
           submitBtn.disabled = false;
         });

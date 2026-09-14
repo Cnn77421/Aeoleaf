@@ -231,6 +231,9 @@ function initDB() {
       province TEXT DEFAULT '',
       city TEXT DEFAULT '',
       isp TEXT DEFAULT '',
+      geo_provider TEXT DEFAULT '',
+      geo_accuracy_km INTEGER DEFAULT 0,
+      geo_updated_at INTEGER DEFAULT 0,
       screen_resolution TEXT DEFAULT '',
       viewport_size TEXT DEFAULT '',
       device_pixel_ratio REAL DEFAULT 1,
@@ -349,6 +352,9 @@ function initDB() {
   try { rawDb.exec('ALTER TABLE visitors ADD COLUMN province TEXT DEFAULT \'\''); } catch (e) {}
   try { rawDb.exec('ALTER TABLE visitors ADD COLUMN city TEXT DEFAULT \'\''); } catch (e) {}
   try { rawDb.exec('ALTER TABLE visitors ADD COLUMN isp TEXT DEFAULT \'\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN geo_provider TEXT DEFAULT \'\''); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN geo_accuracy_km INTEGER DEFAULT 0'); } catch (e) {}
+  try { rawDb.exec('ALTER TABLE visitors ADD COLUMN geo_updated_at INTEGER DEFAULT 0'); } catch (e) {}
   try { rawDb.exec('ALTER TABLE visitors ADD COLUMN page_view_id TEXT DEFAULT \'\''); } catch (e) {}
   try { rawDb.exec('ALTER TABLE visitors ADD COLUMN downlink REAL DEFAULT 0'); } catch (e) {}
   try { rawDb.exec('ALTER TABLE visitors ADD COLUMN rtt REAL DEFAULT 0'); } catch (e) {}
@@ -492,8 +498,9 @@ function buildVisitorFilter({ startTime, endTime, ip, city, deviceType, fingerpr
     params.push(`%${ip}%`);
   }
   if (city) {
-    where += ' AND city LIKE ?';
-    params.push(`%${city}%`);
+    where += ' AND (city LIKE ? OR province LIKE ? OR country LIKE ?)';
+    const regionLike = `%${city}%`;
+    params.push(regionLike, regionLike, regionLike);
   }
   if (deviceType) {
     where += ' AND device_type = ?';
@@ -541,9 +548,11 @@ function getRegionDistribution(limit = 20) {
   return dbWrapper.prepare(`
     SELECT
       CASE
-        WHEN country != '' THEN country || ' / ' || province || ' / ' || city
-        WHEN province != '' THEN province || ' / ' || city
-        WHEN city != '' THEN city
+        WHEN city != '' THEN
+          CASE WHEN province != '' THEN province || ' / ' || city ELSE city END
+        WHEN province != '' THEN
+          CASE WHEN country != '' THEN country || ' / ' || province ELSE province END
+        WHEN country != '' THEN country
         ELSE 'Unknown'
       END as region,
       COUNT(*) as pv,
@@ -657,8 +666,9 @@ function getSessionsPage(filters, page = 1, _limit = 20) {
     params.push(`%${filters.ip}%`);
   }
   if (filters && filters.city) {
-    visitConditions.push('session_visit.city LIKE ?');
-    params.push(`%${filters.city}%`);
+    visitConditions.push('(session_visit.city LIKE ? OR session_visit.province LIKE ? OR session_visit.country LIKE ?)');
+    const regionLike = `%${filters.city}%`;
+    params.push(regionLike, regionLike, regionLike);
   }
   if (filters && filters.deviceType) {
     visitConditions.push('session_visit.device_type = ?');
@@ -683,7 +693,11 @@ function getSessionsPage(filters, page = 1, _limit = 20) {
       (SELECT device_type FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as device_type,
       (SELECT os_name FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as os_name,
       (SELECT browser_name FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as browser_name,
+      (SELECT country FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as country,
+      (SELECT province FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as province,
       (SELECT city FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as city,
+      (SELECT geo_provider FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as geo_provider,
+      (SELECT geo_accuracy_km FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%' ORDER BY tracked_at DESC, id DESC LIMIT 1) as geo_accuracy_km,
       (SELECT ROUND(AVG(NULLIF(max_scroll_depth, 0)), 1) FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%') as avg_scroll,
       (SELECT MAX(COALESCE(is_bot, 0)) FROM visitors WHERE visitor_session_id = vs.id AND path NOT LIKE '/admin/%') as is_bot
       ,CASE WHEN EXISTS (

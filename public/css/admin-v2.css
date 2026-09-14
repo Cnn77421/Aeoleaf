@@ -1006,7 +1006,7 @@ html, .admin-body {
 .login-card .btn-primary { width: 100%; }
 .login-card input { border-color: #d6dce5; background: #fff; color: #182433; }
 
-@media (max-width: 991.98px) {
+@media (max-width: 767.98px) {
   .admin-body { display: block; }
   .admin-sidebar.navbar-vertical {
     width: 100%;
@@ -1117,52 +1117,33 @@ html, .admin-body {
  * and the shadcn/ui primitives used by that revision.
  * ========================================================================== */
 :root {
-  --sh-background: oklch(1 0 0);
-  --sh-foreground: oklch(0.129 0.042 264.695);
-  --sh-card: oklch(1 0 0);
-  --sh-card-foreground: oklch(0.129 0.042 264.695);
-  --sh-popover: oklch(1 0 0);
-  --sh-muted: oklch(0.968 0.007 247.896);
-  --sh-muted-foreground: oklch(0.554 0.046 257.417);
-  --sh-secondary: oklch(0.968 0.007 247.896);
-  --sh-secondary-foreground: oklch(0.208 0.042 265.755);
-  --sh-border: oklch(0.929 0.013 255.508);
-  --sh-input: oklch(0.929 0.013 255.508);
-  --sh-primary: oklch(0.208 0.042 265.755);
-  --sh-primary-foreground: oklch(0.984 0.003 247.858);
-  --sh-accent: oklch(0.968 0.007 247.896);
-  --sh-accent-foreground: oklch(0.208 0.042 265.755);
-  --sh-ring: oklch(0.704 0.04 256.788);
-  --sh-sidebar: var(--sh-background);
-  --sh-sidebar-accent: var(--sh-accent);
-  --sh-radius: .625rem;
-  --sh-radius-sm: calc(var(--sh-radius) - 4px);
-  --sh-radius-md: calc(var(--sh-radius) - 2px);
-  --sh-radius-xl: calc(var(--sh-radius) + 4px);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   --admin-sidebar-width: 16rem;
   --admin-sidebar-icon-width: 3rem;
 }
 
-:root[data-theme="dark"] {
-  --sh-background: oklch(0.129 0.042 264.695);
-  --sh-foreground: oklch(0.984 0.003 247.858);
-  --sh-card: oklch(0.14 0.04 259.21);
-  --sh-card-foreground: oklch(0.984 0.003 247.858);
-  --sh-popover: oklch(0.208 0.042 265.755);
-  --sh-muted: oklch(0.279 0.041 260.031);
-  --sh-muted-foreground: oklch(0.704 0.04 256.788);
-  --sh-secondary: oklch(0.279 0.041 260.031);
-  --sh-secondary-foreground: oklch(0.984 0.003 247.858);
-  --sh-border: oklch(1 0 0 / 10%);
-  --sh-input: oklch(1 0 0 / 15%);
-  --sh-primary: oklch(0.929 0.013 255.508);
-  --sh-primary-foreground: oklch(0.208 0.042 265.755);
-  --sh-accent: oklch(0.279 0.041 260.031);
-  --sh-accent-foreground: oklch(0.984 0.003 247.858);
-  --sh-ring: oklch(0.551 0.027 264.364);
-  --sh-sidebar: var(--sh-background);
-  --sh-sidebar-accent: var(--sh-accent);
-}
+
 
 .admin-body {
   --admin-sidebar-width: 16rem;
@@ -1174,7 +1155,7 @@ html, .admin-body {
 }
 .admin-body.admin-sidebar-collapsed { grid-template-columns: var(--admin-sidebar-icon-width) minmax(0, 1fr); }
 .admin-body.admin-sidebar-collapsed .admin-topbar,
-.admin-body.admin-sidebar-collapsed .admin-main { margin-left: .5rem; }
+.admin-body.admin-sidebar-collapsed .admin-main { margin-left: 0; }
 
 .admin-sidebar.navbar-vertical {
   position: sticky;
@@ -1408,7 +1389,7 @@ html, .admin-body {
 .admin-sidebar-collapsed .admin-topbar,
 .admin-sidebar-collapsed .admin-main { margin-left: .5rem; }
 
-@media (min-width: 992px) {
+@media (min-width: 768px) {
   .login-container,
   :root[data-theme="dark"] .login-container { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .login-card { grid-column: 1; grid-row: 1; width: min(24rem, calc(50vw - 4rem)); }
@@ -1418,7 +1399,7 @@ html, .admin-body {
   .login-brand-panel blockquote { color: var(--sh-muted-foreground); }
 }
 
-@media (max-width: 991.98px) {
+@media (max-width: 767.98px) {
   .admin-body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 4rem minmax(calc(100vh - 4rem), auto); }
   .admin-topbar { grid-column: 1; grid-row: 1; margin: 0; border-bottom: 1px solid var(--sh-border); border-radius: 0; }
   .admin-topnav { display: none; }
@@ -1748,50 +1729,50 @@ html, .admin-body {
  * ========================================================================== */
 
 :root {
-  --sh-background: #ffffff;
-  --sh-foreground: #09090b;
-  --sh-card: #ffffff;
-  --sh-card-foreground: #09090b;
-  --sh-popover: #ffffff;
-  --sh-muted: #f4f4f5;
-  --sh-muted-foreground: #71717a;
-  --sh-secondary: #f4f4f5;
-  --sh-secondary-foreground: #18181b;
-  --sh-border: #e4e4e7;
-  --sh-input: #e4e4e7;
-  --sh-primary: #18181b;
-  --sh-primary-foreground: #fafafa;
-  --sh-accent: #f4f4f5;
-  --sh-accent-foreground: #18181b;
-  --sh-destructive: #ef4444;
-  --sh-ring: #a1a1aa;
-  --sh-sidebar: #fafafa;
-  --sh-sidebar-accent: #f0f0f1;
-  --sh-radius: .5rem;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   --admin-canvas: var(--sh-background);
   --admin-panel: var(--sh-card);
 }
 
 :root[data-theme="dark"] {
-  --sh-background: #09090b;
-  --sh-foreground: #fafafa;
-  --sh-card: #09090b;
-  --sh-card-foreground: #fafafa;
-  --sh-popover: #09090b;
-  --sh-muted: #27272a;
-  --sh-muted-foreground: #a1a1aa;
-  --sh-secondary: #27272a;
-  --sh-secondary-foreground: #fafafa;
-  --sh-border: #27272a;
-  --sh-input: #27272a;
-  --sh-primary: #fafafa;
-  --sh-primary-foreground: #18181b;
-  --sh-accent: #27272a;
-  --sh-accent-foreground: #fafafa;
-  --sh-destructive: #7f1d1d;
-  --sh-ring: #71717a;
-  --sh-sidebar: #0c0c0e;
-  --sh-sidebar-accent: #202023;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   --admin-canvas: var(--sh-background);
   --admin-panel: var(--sh-card);
 }
@@ -2515,7 +2496,7 @@ html, .admin-body {
   .quick-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-@media (max-width: 991.98px) {
+@media (max-width: 767.98px) {
   .admin-body { display: block; }
   .admin-sidebar.navbar-vertical {
     position: sticky;
@@ -2599,48 +2580,31 @@ html, .admin-body {
 
 /* Final cascade lock for the source-audited values above. */
 :root {
-  --sh-background: oklch(1 0 0);
-  --sh-foreground: oklch(0.129 0.042 264.695);
-  --sh-card: oklch(1 0 0);
-  --sh-card-foreground: oklch(0.129 0.042 264.695);
-  --sh-popover: oklch(1 0 0);
-  --sh-muted: oklch(0.968 0.007 247.896);
-  --sh-muted-foreground: oklch(0.554 0.046 257.417);
-  --sh-secondary: oklch(0.968 0.007 247.896);
-  --sh-secondary-foreground: oklch(0.208 0.042 265.755);
-  --sh-border: oklch(0.929 0.013 255.508);
-  --sh-input: oklch(0.929 0.013 255.508);
-  --sh-primary: oklch(0.208 0.042 265.755);
-  --sh-primary-foreground: oklch(0.984 0.003 247.858);
-  --sh-accent: oklch(0.968 0.007 247.896);
-  --sh-accent-foreground: oklch(0.208 0.042 265.755);
-  --sh-ring: oklch(0.704 0.04 256.788);
-  --sh-sidebar: var(--sh-background);
-  --sh-sidebar-accent: var(--sh-accent);
-  --sh-radius: .625rem;
-  --sh-radius-md: calc(var(--sh-radius) - 2px);
-  --sh-radius-xl: calc(var(--sh-radius) + 4px);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   --admin-sidebar-width: 16rem;
   --admin-sidebar-icon-width: 3rem;
 }
-:root[data-theme="dark"] {
-  --sh-background: oklch(0.129 0.042 264.695);
-  --sh-foreground: oklch(0.984 0.003 247.858);
-  --sh-card: oklch(0.14 0.04 259.21);
-  --sh-card-foreground: oklch(0.984 0.003 247.858);
-  --sh-popover: oklch(0.208 0.042 265.755);
-  --sh-muted: oklch(0.279 0.041 260.031);
-  --sh-muted-foreground: oklch(0.704 0.04 256.788);
-  --sh-secondary: oklch(0.279 0.041 260.031);
-  --sh-secondary-foreground: oklch(0.984 0.003 247.858);
-  --sh-border: oklch(1 0 0 / 10%);
-  --sh-input: oklch(1 0 0 / 15%);
-  --sh-primary: oklch(0.929 0.013 255.508);
-  --sh-primary-foreground: oklch(0.208 0.042 265.755);
-  --sh-accent: oklch(0.279 0.041 260.031);
-  --sh-accent-foreground: oklch(0.984 0.003 247.858);
-  --sh-ring: oklch(0.551 0.027 264.364);
-}
+
 .admin-body {
   --admin-sidebar-width: 16rem;
   display: grid;
@@ -2762,7 +2726,7 @@ html, .admin-body {
 .visitors-field .input:focus,
 .guestbook-reply-form textarea:focus,
 .login-card input:focus { box-shadow: 0 0 0 3px color-mix(in oklch, var(--sh-ring) 50%, transparent); }
-@media (min-width: 992px) {
+@media (min-width: 768px) {
   .login-container,
   :root[data-theme="dark"] .login-container { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 0; }
   .login-card { grid-column: 1; grid-row: 1; width: min(24rem, calc(50vw - 4rem)); }
@@ -2771,7 +2735,7 @@ html, .admin-body {
   .login-brand-panel p,
   .login-brand-panel blockquote { color: var(--sh-muted-foreground); }
 }
-@media (max-width: 991.98px) {
+@media (max-width: 767.98px) {
   .admin-body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 4rem minmax(calc(100vh - 4rem), auto); }
   .admin-topbar { grid-column: 1; grid-row: 1; margin: 0; border-bottom: 1px solid var(--sh-border); border-radius: 0; }
   .admin-sidebar.navbar-vertical { position: fixed; inset: 0 auto 0 0; z-index: 1060; width: 18rem; min-width: 18rem; height: 100svh; min-height: 100svh; border-right: 1px solid var(--sh-border); transform: translateX(-100%); transition: transform 180ms ease; }
@@ -2792,9 +2756,9 @@ html, .admin-body {
 }
 .admin-body.admin-sidebar-collapsed { grid-template-columns: var(--admin-sidebar-icon-width) minmax(0, 1fr); }
 .admin-body.admin-sidebar-collapsed .admin-topbar,
-.admin-body.admin-sidebar-collapsed .admin-main { margin-left: .5rem; }
+.admin-body.admin-sidebar-collapsed .admin-main { margin-left: 0; }
 .admin-drawer-backdrop { display: none; }
-@media (max-width: 991.98px) {
+@media (max-width: 767.98px) {
   .admin-body.admin-sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
   .admin-body.admin-sidebar-collapsed .admin-topbar,
   .admin-body.admin-sidebar-collapsed .admin-main { margin-left: 0; }
@@ -2889,7 +2853,7 @@ button.btn-primary.is-loading::after {
 }
 @keyframes admin-spin { to { transform: rotate(360deg); } }
 
-@media (max-width: 991.98px) {
+@media (max-width: 767.98px) {
   .admin-sidebar.navbar-vertical { transition-duration: 300ms; }
   .admin-drawer-open .admin-sidebar.navbar-vertical { transition-duration: 500ms; }
   .admin-drawer-backdrop { transition-duration: 300ms; }
@@ -3023,7 +2987,7 @@ button.btn-primary.is-loading::after {
 .admin-body input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: var(--sh-primary); }
 .admin-body input[type="file"] { color: var(--sh-muted-foreground); font-size: .875rem; }
 
-@media (max-width: 991.98px) {
+@media (max-width: 767.98px) {
   .settings-shell { flex-direction: column; gap: 1.5rem; }
   .settings-nav { position: static; width: 100%; flex-basis: auto; flex-direction: row; overflow-x: auto; padding-bottom: .25rem; }
   .settings-nav a { flex: 0 0 auto; }
@@ -3062,7 +3026,7 @@ button.btn-primary.is-loading::after {
 /* Long-page shell correction.
  * Keep the document as the only vertical scroller: the main panel must grow
  * with settings/editor content while the sidebar remains viewport-sticky. */
-@media (min-width: 992px) {
+@media (min-width: 768px) {
   .admin-body {
     grid-template-rows: 4rem auto;
     height: auto;
@@ -3251,7 +3215,7 @@ button.btn-primary.is-loading::after {
 @media (max-width: 1199.98px) {
   .visitors-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-width: 991.98px) {
+@media (max-width: 767.98px) {
   .analytics-card--wide,
   .analytics-card--narrow { grid-column: 1 / -1; }
   .analytics-insights-grid { grid-template-columns: 1fr; }

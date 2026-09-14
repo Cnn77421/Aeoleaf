@@ -1,0 +1,29 @@
+<script>
+  (function () {
+    if (window.aeoleafTheme) return;
+    var system = window.matchMedia('(prefers-color-scheme: dark)');
+    var choice = null;
+    try { choice = localStorage.getItem('theme'); } catch (_error) { /* Storage is optional. */ }
+    if (choice !== 'dark' && choice !== 'light') choice = null;
+    function apply() {
+      document.documentElement.setAttribute('data-theme', choice || (system.matches ? 'dark' : 'light'));
+      document.dispatchEvent(new CustomEvent('aeoleaf:theme'));
+    }
+    window.aeoleafTheme = {
+      set: function (value) {
+        if (value !== 'dark' && value !== 'light') return;
+        choice = value;
+        try { localStorage.setItem('theme', value); } catch (_error) { /* Keep the choice in memory. */ }
+        apply();
+      }
+    };
+    system.addEventListener('change', function () { if (!choice) apply(); });
+    window.addEventListener('storage', function (event) {
+      if (event.key !== 'theme' && event.key !== null) return;
+      choice = event.newValue === 'dark' || event.newValue === 'light' ? event.newValue : null;
+      apply();
+    });
+    apply();
+    document.documentElement.classList.add('js-ready');
+  })();
+</script>
