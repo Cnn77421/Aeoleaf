@@ -4,16 +4,10 @@
       "width": 1440,
       "loaderValues": [
         0,
-        1,
-        8,
-        9,
-        10,
-        13,
-        14,
+        2,
+        3,
+        12,
         15,
-        16,
-        17,
-        18,
         19,
         20,
         21,
@@ -22,8 +16,6 @@
         24,
         25,
         26,
-        27,
-        28,
         29,
         30,
         31,
@@ -36,7 +28,6 @@
         38,
         39,
         40,
-        41,
         42,
         43,
         44,
@@ -56,7 +47,6 @@
         58,
         59,
         60,
-        61,
         62,
         63,
         64,
@@ -64,11 +54,9 @@
         66,
         67,
         68,
-        69,
         70,
         71,
         72,
-        73,
         74,
         75,
         76,
@@ -97,7 +85,7 @@
         99,
         100
       ],
-      "activeFrameP95": 4.399999999999636,
+      "activeFrameP95": 4.200000000000728,
       "maxPending": 1
     },
     {
@@ -205,7 +193,7 @@
         99,
         100
       ],
-      "activeFrameP95": 4.200000000000728,
+      "activeFrameP95": 4.299999999999983,
       "maxPending": 1
     }
   ],
@@ -215,5 +203,5 @@
     "motion 390: loader monotonic 0–100, pointer/hover, scene, detail, back scroll restoration, fast scroll, theme, reduced motion, single RAF"
   ],
   "screenshots": [],
-  "fixtureDirectory": "C:\\Users\\xiner\\AppData\\Local\\Temp\\aeoleaf-v2-qa-Jwr4fe"
+  "fixtureDirectory": "C:\\Users\\xiner\\AppData\\Local\\Temp\\aeoleaf-v2-qa-H5x3Hi"
 }
