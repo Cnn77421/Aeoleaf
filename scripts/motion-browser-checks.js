@@ -45,7 +45,7 @@ module.exports = async function motionChecks(browser, origin, output, report, co
     await page.goto(origin);
     await page.locator('.motion-loader').waitFor();
     assert.equal((await page.locator('.motion-loader').innerText()).replace(/\s/g, ''), 'LOADING');
-    assert.equal(await page.locator('.motion-loader').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(0, 0, 0)');
+    assert.equal(await page.locator('.motion-loader').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(250, 250, 250)');
     await page.waitForTimeout(1000);
     await page.screenshot({ path: path.join(output, `loader-${width}.png`) });
     await settled();
