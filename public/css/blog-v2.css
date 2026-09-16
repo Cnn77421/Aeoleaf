@@ -419,6 +419,12 @@
 .journal-post-page .post-toc__link:hover,
 .journal-post-page .post-toc__link.is-active { padding-left: 8px; border-left-color: var(--accent); color: var(--accent); }
 
+@media (min-width: 1024px) {
+  .journal-post-page .post-toc {
+    max-height: calc(100dvh - var(--nav-height) - 56px);
+  }
+}
+
 @media (max-width: 1023.98px) {
   .journal-post-shell { grid-template-columns: minmax(0, 1fr); width: min(calc(100% - 28px), 820px); margin-left: auto; margin-right: auto; }
   .journal-post-aside { position: static; grid-row: 1; }
