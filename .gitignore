@@ -28,3 +28,7 @@ FETCH_HEAD
 /.htaccess
 /index.html
 /404.html
+
+# Local environment backups
+.env.*
+!.env.example

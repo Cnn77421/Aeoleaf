@@ -8,7 +8,7 @@
  *  Correctness over ratio:
  *   - CSS: char scanner. Strips comments + collapses whitespace, but PRESERVES
  *     string/url internals and, crucially, the descendant combinator space
- *     (`a .b` !== `a.b`). Only strips space around { } ; > ~ + and around
+ *     (`a .b` !== `a.b`). Only strips space around { } ; > ~ and around
  *     ':' / ',' INSIDE declaration blocks (brace-depth aware), so selectors,
  *     var(), color-mix(in oklab, ...), calc(), and @media survive.
  *   - JS: conservative — removes comments + trailing whitespace + blank-line
@@ -43,7 +43,7 @@ function minifyCss(src) {
   out = out
     .replace(/\s*([{};])\s*/g, '$1')
     .replace(/\s*([>~])\s*/g, '$1')
-    .replace(/\s+\+\s+/g, '+')
+    // Preserve spaces around +: CSS math functions require them.
     .replace(/;}/g, '}')
     .replace(/\s*!\s*important/gi, '!important')
     .trim();
