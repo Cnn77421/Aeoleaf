@@ -357,7 +357,7 @@ app.use((err, req, res, _next) => {
   });
 });
 
-  httpServer = app.listen(PORT, () => {
+  httpServer = app.listen(PORT, '127.0.0.1', () => {
     console.log(`aeoleaf running on http://localhost:${PORT}`);
   });
   httpServer.once('error', (err) => {
