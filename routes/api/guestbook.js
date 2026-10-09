@@ -9,6 +9,17 @@ const { logAudit } = require('../../lib/auditLog');
 const window = new JSDOM('').window;
 const DOMPurify = createDOMPurify(window);
 
+// Guestbook entries are free text. Strip interactive/form elements so a
+// submission cannot be repurposed for phishing (e.g. an external
+// <form action>) or UI spoofing if the raw value is ever rendered elsewhere.
+const SANITIZE_OPTIONS = {
+  FORBID_TAGS: [
+    'form', 'input', 'button', 'select', 'option', 'textarea', 'label', 'fieldset', 'legend',
+    'iframe', 'frame', 'frameset', 'object', 'embed', 'link', 'meta', 'base', 'style', 'template'
+  ],
+  FORBID_ATTR: ['action', 'formaction', 'style', 'srcset', 'ping']
+};
+
 const postLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
@@ -30,9 +41,9 @@ router.post('/', postLimiter, (req, res) => {
     return res.status(400).json({ error: '昵称和留言内容不能为空' });
   }
 
-  const cleanName = DOMPurify.sanitize(String(name).trim()).slice(0, 50);
-  const cleanMessage = DOMPurify.sanitize(String(message).trim()).slice(0, 500);
-  const cleanAvatar = avatar ? DOMPurify.sanitize(String(avatar).trim()).slice(0, 200) : '';
+  const cleanName = DOMPurify.sanitize(String(name).trim(), SANITIZE_OPTIONS).slice(0, 50);
+  const cleanMessage = DOMPurify.sanitize(String(message).trim(), SANITIZE_OPTIONS).slice(0, 500);
+  const cleanAvatar = avatar ? DOMPurify.sanitize(String(avatar).trim(), SANITIZE_OPTIONS).slice(0, 200) : '';
 
   if (!cleanName || !cleanMessage) {
     return res.status(400).json({ error: '昵称和留言内容不能为空' });

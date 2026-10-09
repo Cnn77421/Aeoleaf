@@ -29,19 +29,26 @@ function requestOrigin(req) {
   try { return new URL(referer).origin; } catch { return ''; }
 }
 
-function expectedOrigin(req) {
-  const configured = String(process.env.BASE_URL || '').trim();
-  if (configured) {
-    try { return new URL(configured).origin; } catch { /* validated at startup */ }
-  }
-  return `${req.protocol}://${req.get('host')}`;
+// The request Host header is the reliable same-origin anchor: browsers derive
+// it from the request URL and cannot be tricked into sending a foreign host.
+// BASE_URL is deliberately NOT used here — it may name a sibling domain
+// (e.g. the apex while the admin console is served from a subdomain), and
+// trusting it would let that sibling origin forge authenticated requests.
+function requestHost(req) {
+  return String(req.get('host') || '').trim().toLowerCase();
+}
+
+function originHost(origin) {
+  if (!origin) return '';
+  try { return new URL(origin).host.toLowerCase(); } catch { return ''; }
 }
 
 function requireSameOrigin(req, res, next) {
   if (SAFE_METHODS.has(req.method)) return next();
   const actual = requestOrigin(req);
   if (actual) {
-    if (actual === expectedOrigin(req)) return next();
+    const host = originHost(actual);
+    if (host && host === requestHost(req)) return next();
   } else if (req.get('sec-fetch-site') === 'same-origin') {
     // Origin/Referer can be removed by privacy software. Sec-Fetch-Site is a
     // browser-controlled forbidden request header, so it is a safe fallback
@@ -55,7 +62,8 @@ function requireSameOrigin(req, res, next) {
 module.exports = {
   requireSameOrigin,
   requestOrigin,
-  expectedOrigin,
+  requestHost,
+  originHost,
   getCsrfToken,
   hasValidCsrfToken
 };

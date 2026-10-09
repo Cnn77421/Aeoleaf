@@ -318,7 +318,9 @@ app.use((req, _res, next) => {
 });
 
 const { requireSameOrigin } = require('./middleware/sameOrigin');
-const protectedWritePaths = /^\/(admin(?:\/|$)|api\/(?:auth|posts|works)(?:\/|$))/;
+// Express route matching is case-insensitive, so this guard MUST be too —
+// otherwise /API/auth/... reaches the handler without the CSRF check.
+const protectedWritePaths = /^\/(admin(?:\/|$)|api\/(?:auth|posts|works|guestbook|track)(?:\/|$))/i;
 app.use((req, res, next) => {
   if (!protectedWritePaths.test(req.path)) return next();
   return requireSameOrigin(req, res, next);
