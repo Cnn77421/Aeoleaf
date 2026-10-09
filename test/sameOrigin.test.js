@@ -8,7 +8,8 @@ function invoke({
   referer = '',
   fetchSite = '',
   csrfToken = '',
-  sessionToken = ''
+  sessionToken = '',
+  host = 'blog.example.com'
 } = {}) {
   const req = {
     method,
@@ -19,7 +20,7 @@ function invoke({
       return {
         origin,
         referer,
-        host: 'blog.example.com',
+        host,
         'sec-fetch-site': fetchSite
       }[name.toLowerCase()] || '';
     }
@@ -61,4 +62,13 @@ test('allows a valid CSRF token when browser origin metadata is unavailable', ()
 
 test('does not require origin validation for safe methods', () => {
   assert.equal(invoke({ method: 'GET' }).nextCalled, true);
+});
+
+test('anchors same-origin on the request Host, not a sibling domain', () => {
+  // A different host (e.g. the apex while the console runs on a subdomain)
+  // must never be trusted, even when it is the configured BASE_URL.
+  assert.equal(invoke({ host: 'blog.example.com', origin: 'https://example.com' }).statusCode, 403);
+  assert.equal(invoke({ host: 'example.com', origin: 'https://example.com' }).nextCalled, true);
+  // Host comparison is case-insensitive.
+  assert.equal(invoke({ host: 'blog.example.com', origin: 'https://BLOG.example.com' }).nextCalled, true);
 });

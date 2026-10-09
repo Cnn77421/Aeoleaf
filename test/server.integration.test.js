@@ -195,10 +195,16 @@ test('server routes, auth, CRUD, upload rejection, feeds, and tracking work toge
   assert.equal(savedModerationSettings.json.ok, true);
 
   const guestbook = await request(base, '/api/guestbook', {
-    method: 'POST', json: { name: '<b>Alice</b>', message: '<script>x</script>Hello' }
+    method: 'POST',
+    json: {
+      name: '<b>Alice</b>',
+      message: '<script>x</script><form action="https://evil.example"><input name="p"></form>Hello'
+    }
   });
   assert.equal(guestbook.response.status, 201);
   assert.equal(guestbook.json.message.includes('<script>'), false);
+  assert.equal(guestbook.json.message.includes('<form'), false);
+  assert.match(guestbook.json.message, /Hello/);
   assert.equal(guestbook.json.status, 'pending');
   const publicMessagesBeforeApproval = await request(base, '/api/guestbook', { write: false });
   assert.equal(publicMessagesBeforeApproval.json.some((message) => message.id === guestbook.json.id), false);
@@ -424,6 +430,11 @@ test('server routes, auth, CRUD, upload rejection, feeds, and tracking work toge
   });
   assert.equal(destroyed.response.status, 200);
   assert.equal(destroyed.json.completed.length, 2);
+
+  // Express routing is case-insensitive; the CSRF guard must be too, otherwise
+  // /API/... reaches handlers without the same-origin check.
+  const uppercaseLogout = await request(base, '/API/auth/logout', { method: 'POST', write: false });
+  assert.equal(uppercaseLogout.response.status, 403);
 
   assert.equal((await request(base, '/api/auth/logout', {
     method: 'POST', headers: authHeaders

@@ -90,7 +90,28 @@ SESSION_COOKIE_SECURE=true
 TRUST_PROXY=1
 ```
 
-`SESSION_SECRET` 至少 24 个字符，`ADMIN_PASSWORD` 至少 8 个字符。不要将它们输出到聊天、日志或截图中。
+`SESSION_SECRET` 至少 24 个字符，`ADMIN_PASSWORD` 至少 8 个字符。不要将它们输出到聊天、日志或截图中。`ADMIN_PASSWORD` 必须是随机且唯一的：不要复用邮箱用户名、站点域名或常见弱口令（例如 `xiner521c` 这类可从公开信息推断的字符串），建议使用 16 位以上的随机口令或改为仅用通行密钥登录。
+
+`TRUST_PROXY` 必须与真实的反向代理层数一致，否则访客 IP 会被错误解析，限流与登录锁定会失效（要么把所有访客归到同一个 IP，要么被轮换的边缘 IP 稀释）：
+
+- Node 直接对公网提供服务：`TRUST_PROXY=false`
+- Node 位于一层 nginx 之后：`TRUST_PROXY=1`
+- nginx 之后再经过 Cloudflare 代理：`TRUST_PROXY=2`（Cloudflare 边缘 + nginx 两跳）
+
+反向代理必须保留原始 Host 并透传协议头，否则后台写请求的同源校验会失败：
+
+```nginx
+proxy_set_header Host $host;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+```
+
+经 Cloudflare 时，源站必须只接受 Cloudflare 回源。否则任何人都能直接连上源站 IP 并伪造 `X-Forwarded-For`/`CF-Connecting-IP`，从而绕过 WAF、限流和登录锁定：
+
+- 防火墙仅放行 Cloudflare 官方 IP 段（`https://www.cloudflare.com/ips/`），或
+- 改用 Cloudflare Tunnel，或启用 Authenticated Origin Pulls，
+- 并确认解析到源站 IP 的兄弟子域（未走 CDN 的记录）同样受到限制，避免真实 IP 通过证书透明度或 DNS 历史泄露。
 
 后台通行密钥依赖 WebAuthn。生产环境必须使用 HTTPS，且 `BASE_URL` 的域名必须与管理员访问后台时的域名完全一致。注册完成前不要移除 `ADMIN_PASSWORD`，它始终作为恢复入口。
 

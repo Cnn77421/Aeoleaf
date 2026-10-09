@@ -28,6 +28,7 @@ const {
 const { requireAdmin, isRecentlyAuthenticated } = require('../middleware/auth');
 const { rateLimit } = require('../middleware/rateLimit');
 const { getCsrfToken } = require('../middleware/sameOrigin');
+const { escapeCsv } = require('../lib/csv');
 const { uploadGeneral, validateUploadedFiles } = require('../middleware/upload');
 const { restoreQuarantinedUpload, destroyQuarantinedUpload } = require('../lib/safeFs');
 const { logAudit } = require('../lib/auditLog');
@@ -1144,7 +1145,6 @@ function renderVisitorsExportCsv(req, res, next) {
       'fingerprint_id', 'request_id', 'utm_source', 'utm_medium', 'utm_campaign', 'search_keyword', 'is_bot'
     ];
 
-    const escapeCsv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const csv = [headers.join(',')]
       .concat(rows.map((row) => headers.map((h) => escapeCsv(row[h])).join(',')))
       .join('\n');

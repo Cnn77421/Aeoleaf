@@ -16,14 +16,18 @@ const trackLimiter = rateLimit({
 
 function setCors(req, res) {
   const origin = req.headers.origin;
-  const configured = String(process.env.BASE_URL || '').trim();
-  let allowedOrigin = '';
-  try { allowedOrigin = configured ? new URL(configured).origin : ''; } catch { /* validated at startup */ }
-  if (origin && origin !== allowedOrigin) return false;
-  if (origin) res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.vary('Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With');
+  // Anonymous beacon with no Origin (non-browser client): nothing to reflect,
+  // and CSRF is not a concern because tracking carries no credentials. The
+  // app-level same-origin guard still applies to the POST.
+  if (!origin) return true;
+  let host = '';
+  try { host = new URL(origin).host.toLowerCase(); } catch { /* malformed origin */ }
+  const requestHost = String(req.get('host') || '').trim().toLowerCase();
+  if (!host || host !== requestHost) return false;
+  res.setHeader('Access-Control-Allow-Origin', origin);
   return true;
 }
 
