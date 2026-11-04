@@ -1,3 +1,5 @@
+// Runtime databases, sessions and backups must be private to the service user.
+process.umask(0o077);
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -6,6 +8,7 @@ const helmet = require('helmet');
 const path = require('path');
 const crypto = require('crypto');
 const { pathWithoutQuery } = require('./lib/pathWithoutQuery');
+const { denyPrivateFiles } = require('./middleware/privateFiles');
 const { asset } = require('./lib/assetVersion');
 const { validateRuntimeConfig } = require('./lib/runtimeConfig');
 const { SQLiteSessionStore } = require('./lib/sqliteSessionStore');
@@ -251,6 +254,7 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(denyPrivateFiles);
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: true,
   setHeaders: (res, filePath) => {

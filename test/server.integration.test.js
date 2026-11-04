@@ -95,6 +95,24 @@ test('server routes, auth, CRUD, upload rejection, feeds, and tracking work toge
   }
   assert.equal((await request(base, '/definitely-missing', { write: false })).response.status, 404);
 
+  if (process.platform !== 'win32') {
+    for (const suffix of ['', '-wal', '-shm']) {
+      const filename = databasePath + suffix;
+      if (fs.existsSync(filename)) {
+        assert.equal(fs.statSync(filename).mode & 0o077, 0, `${filename} must be private`);
+      }
+    }
+  }
+  const privateFixture = path.join(PROJECT_ROOT, 'public', 'js', `privacy-check-${process.pid}.js.bak`);
+  fs.writeFileSync(privateFixture, 'harmless backup fixture');
+  try {
+    const filename = path.basename(privateFixture);
+    assert.equal((await request(base, `/js/${filename}`, { write: false })).response.status, 404);
+    assert.equal((await request(base, `/js/${filename.replace('.bak', '%2ebak')}`, { write: false })).response.status, 404);
+  } finally {
+    fs.rmSync(privateFixture, { force: true });
+  }
+
   const loginPage = await request(base, '/admin/login', { write: false });
   const loginCookie = loginPage.response.headers.get('set-cookie').split(';')[0];
   const csrfMatch = loginPage.text.match(/name="_csrf" value="([^"]+)"/);

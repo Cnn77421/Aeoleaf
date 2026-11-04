@@ -32,3 +32,17 @@ FETCH_HEAD
 # Local environment backups
 .env.*
 !.env.example
+
+# Runtime credentials and temporary source copies must never be committed.
+*.pem
+*.key
+*.p12
+*.pfx
+*.aebak
+*.bak
+*.bak-*
+*.backup
+*.backup-*
+*.orig
+*.swp
+*~
